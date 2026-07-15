@@ -593,7 +593,7 @@
 <div class="modal" style="max-width:580px;">
   <button class="modal-close" onclick="closeModal('modal-scan')">✕</button>
   <h3>Upload Order Scan</h3>
-  <div class="scan-drop" id="scan-drop" onclick="document.getElementById('scan-file').click()">
+  <div class="scan-drop" id="scan-drop" role="button" tabindex="0" aria-label="Upload an order scan" onclick="document.getElementById('scan-file').click()" onkeydown="activateFilePicker(event,'scan-file')">
     <div class="drop-icon">📋</div>
     <p><strong>Click to upload</strong> or drag & drop — JPG, PNG, PDF</p>
   </div>
@@ -632,7 +632,7 @@
   <button class="modal-close" onclick="closeModal('modal-usage-upload')">✕</button>
   <h3 style="margin-bottom:10px;">Upload Usage Report</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
-  <div class="upload-zone" id="usage-zone" onclick="document.getElementById('usage-file').click()">
+  <div class="upload-zone" id="usage-zone" role="button" tabindex="0" aria-label="Upload a usage report" onclick="document.getElementById('usage-file').click()" onkeydown="activateFilePicker(event,'usage-file')">
     <div class="up-icon">📊</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF file</p>
   </div>
@@ -662,7 +662,7 @@
   <button class="modal-close" onclick="closeModal('modal-inventory-template-upload')">✕</button>
   <h3 style="margin-bottom:10px;">Inventory Entry Form Template</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Upload the inventory entry form used for counting. Review and adjust the detected product order before applying it to new counts.</p>
-  <div class="upload-zone" id="inventory-template-zone" onclick="document.getElementById('inventory-template-file').click()">
+  <div class="upload-zone" id="inventory-template-zone" role="button" tabindex="0" aria-label="Upload an inventory entry form template" onclick="document.getElementById('inventory-template-file').click()" onkeydown="activateFilePicker(event,'inventory-template-file')">
     <div class="up-icon">📋</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF template</p>
   </div>

@@ -541,3 +541,39 @@ All checks passed.
 ### Follow-up
 
 - Review upload drop zones for keyboard operation; several currently depend on click handlers attached to non-focusable containers.
+
+## Pass 17 — Keyboard-accessible upload zones
+
+### What changed
+
+- Made the order-scan, usage-report, and inventory-template upload zones keyboard focusable.
+- Added clear accessible names for each upload purpose.
+- Added shared Enter and Space activation that opens the existing file picker.
+- Added visible focus treatments while preserving mouse click and drag-and-drop behavior.
+
+### Why
+
+All three upload zones were clickable non-focusable containers. Keyboard users can now discover and activate the same upload workflows without changing file handling or import logic.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/ui.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax check for `ui.js`
+- Targeted Enter, Space, and ignored-key activation behavior test
+- Static role, focusability, accessible-name, and file-target checks for all three zones
+- Visible focus-style checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Audit modal close buttons for descriptive names in the remaining upload and detail dialogs.

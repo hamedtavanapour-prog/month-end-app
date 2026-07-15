@@ -463,6 +463,7 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
 .tab:focus-visible{color:var(--accent);outline:2px solid var(--accent);outline-offset:-3px;}
 .scan-drop{border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:14px;}
 .scan-drop:hover{border-color:var(--accent);background:rgba(232,162,48,0.06);}
+.scan-drop:focus-visible{border-color:var(--accent);background:rgba(232,162,48,0.06);outline:2px solid var(--accent);outline-offset:2px;}
 .scan-drop .drop-icon{font-size:2rem;margin-bottom:8px;}
 .scan-drop p{color:var(--text-muted);font-size:0.84rem;}
 .scan-preview-img{margin-bottom:14px;border-radius:8px;overflow:hidden;border:1px solid var(--border);max-height:200px;display:flex;align-items:center;justify-content:center;background:var(--surface2);}
@@ -515,6 +516,7 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
 .invoice-detail-table th,.invoice-detail-table td{font-size:0.78rem;}
 .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:14px;}
 .upload-zone:hover{border-color:var(--accent);background:rgba(232,162,48,0.06);}
+.upload-zone:focus-visible{border-color:var(--accent);background:rgba(232,162,48,0.06);outline:2px solid var(--accent);outline-offset:2px;}
 .upload-zone .up-icon{font-size:2.5rem;margin-bottom:10px;}
 .upload-zone p{color:var(--text-muted);font-size:0.85rem;}
 .usage-import-modal{max-width:860px;}

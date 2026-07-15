@@ -57,6 +57,11 @@ function toggleSidebar(){
 initSidebar();
 
 function closeAllMenus(){document.querySelectorAll('.drop-menu,.col-menu,.profile-menu').forEach(m=>m.classList.remove('open'));}
+function activateFilePicker(event,inputId){
+  if(event.key!=='Enter'&&event.key!==' ')return;
+  event.preventDefault();
+  document.getElementById(inputId)?.click();
+}
 function toggleMenu(id){const m=document.getElementById(id);const was=m.classList.contains('open');closeAllMenus();if(!was)m.classList.add('open');}
 function toggleProfileMenu(){toggleMenu('profile-menu');}
 function openCurrentProfileSettings(){
