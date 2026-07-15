@@ -6,7 +6,49 @@ function populateValueDates(){const sel=document.getElementById('rep-inv-date');
 function renderValueReport(){const id=document.getElementById('rep-inv-date').value;const inv=id?state.inventories.find(i=>i.id===id):null;if(!inv){document.getElementById('val-tbody').innerHTML='';document.getElementById('val-stats').innerHTML='';return;}let total=0;const bycat={};const rows=Object.entries(inv.items).map(([pid,qty])=>{const p=getProduct(pid);if(!p||qty===0)return'';const val=p.cost*qty;total+=val;bycat[p.category]=(bycat[p.category]||0)+val;return`<tr><td>${productNameLink(p)}</td><td>${catBadge(p.category)}</td><td>${qty}</td><td>${p.cost>0?fmt(p.cost):'—'}</td><td><strong>${fmt(val)}</strong></td></tr>`;}).join('');document.getElementById('val-tbody').innerHTML=rows||`<tr><td colspan="5" style="color:var(--text-muted)">No items.</td></tr>`;document.getElementById('val-stats').innerHTML=Object.entries(bycat).map(([c,v])=>`<div class="stat-card"><div class="label">${c}</div><div class="value">${fmt(v)}</div><div class="sub">${((v/total)*100).toFixed(1)}%</div></div>`).join('')+`<div class="stat-card"><div class="label">Total</div><div class="value">${fmt(total)}</div></div>`;}
 function renderOrdersReport(){const tbody=document.getElementById('rep-ord-tbody');if(!state.orders.length){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No orders.</td></tr>`;return;}const rows=[];state.orders.forEach(raw=>{const o=normalizeOrder(raw);o.lines.forEach(l=>{const product=l.sku||l.productNumber||'(no SKU)';rows.push(`<tr><td>${fmtDate(o.date)}</td><td>${o.invoiceNumber||'—'}</td><td>${product}</td><td>${l.qty||'—'}</td><td>${fmt(l.unitPrice)}</td><td>${fmt(lineTotal(l))}</td></tr>`);});});tbody.innerHTML=rows.join('')||`<tr><td colspan="6" style="color:var(--text-muted)">No lines.</td></tr>`;}
 
+function dashboardSetupState(workspace){
+  const activeDepartments=(workspace.departments||[]).filter(department=>!department.archived);
+  const activeProducts=(workspace.products||[]).filter(product=>!product.archived);
+  const activeRooms=(workspace.rooms||[]).filter(room=>!room.archived);
+  return[
+    {key:'departments',label:'Confirm departments',detail:'Organize shared items for Bar, Kitchen, and other teams.',complete:activeDepartments.length>0,page:'settings',section:'departments'},
+    {key:'products',label:'Review products',detail:'Add products or confirm the starter catalog is right for you.',complete:activeProducts.length>0,page:'products'},
+    {key:'rooms',label:'Build your floor plan',detail:'Choose which products belong in each counting room.',complete:activeRooms.length>0,page:'settings',section:'floor-plan'},
+    {key:'count',label:'File your first count',detail:'Create a baseline for live inventory and reporting.',complete:(workspace.inventories||[]).length>0,page:'inventory',action:'count'}
+  ];
+}
+function openDashboardSetupStep(key){
+  const step=dashboardSetupState(state).find(item=>item.key===key);
+  if(!step)return;
+  if(!profileCanAccessPage(currentProfile(),step.page)){toast('You do not have access to that area.',true);return;}
+  showPage(step.page);
+  if(step.section)setSettingsSection(step.section);
+  if(step.action==='count')openInventoryRoomSelect();
+}
+function renderDashboardOnboarding(){
+  const container=document.getElementById('dashboard-onboarding');
+  if(!container)return;
+  const steps=dashboardSetupState(state);
+  const completed=steps.filter(step=>step.complete).length;
+  const firstCountFiled=steps.find(step=>step.key==='count')?.complete;
+  container.hidden=!!firstCountFiled;
+  if(firstCountFiled)return;
+  const progress=document.getElementById('dashboard-onboarding-progress');
+  progress.textContent=`${completed} of ${steps.length} complete`;
+  const summary=document.getElementById('dashboard-onboarding-summary');
+  summary.textContent=completed? 'Your workspace is taking shape. Finish the remaining steps when you are ready.':'Start here to prepare a clear, reliable first count.';
+  document.getElementById('dashboard-onboarding-steps').innerHTML=steps.map((step,index)=>{
+    const allowed=profileCanAccessPage(currentProfile(),step.page);
+    const status=step.complete?'Complete':index===steps.findIndex(item=>!item.complete)?'Next':'Not started';
+    return`<button type="button" class="dashboard-onboarding-step ${step.complete?'complete':''}" onclick="openDashboardSetupStep('${step.key}')" ${allowed?'':`disabled title="You do not have access to this area."`}>
+      <span class="dashboard-step-marker" aria-hidden="true">${step.complete?'✓':index+1}</span>
+      <span class="dashboard-step-copy"><strong>${step.label}</strong><small>${step.detail}</small></span>
+      <span class="dashboard-step-status">${status}${allowed?' →':''}</span>
+    </button>`;
+  }).join('');
+}
 function renderDashboard(){
+  renderDashboardOnboarding();
   const lastInv=state.inventories[0];let totalVal=0;if(lastInv)Object.entries(lastInv.items).forEach(([id,qty])=>{const p=getProduct(id);if(p)totalVal+=p.cost*qty;});
   const low=lastInv?state.products.filter(p=>p.par>0&&(lastInv.items[p.id]??Infinity)<=p.par).length:0;
   const usage=computeUsage();let atRisk=0;if(lastInv){state.products.forEach(p=>{const u=usage[p.id];const stock=lastInv.items[p.id]??null;if(u&&u.days>0&&stock!==null){const avgD=u.total/u.days;const dL=avgD>0?stock/avgD:Infinity;if(dL<=7)atRisk++;}});}
