@@ -611,8 +611,8 @@
 
 <!-- VIEW SCAN MODAL -->
 <div class="modal-overlay" id="modal-view-scan">
-<div class="modal" style="max-width:700px;">
-  <button class="modal-close" onclick="closeModal('modal-view-scan')">✕</button>
+<div class="modal" style="max-width:700px;" role="dialog" aria-modal="true" aria-labelledby="view-scan-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-view-scan')" aria-label="Close order scan viewer">✕</button>
   <h3 id="view-scan-title">Order Scan</h3>
 <div id="view-scan-body" style="text-align:center;"></div>
 </div>

@@ -780,3 +780,35 @@ All checks passed.
 ### Follow-up
 
 - Review the saved Order Scan viewer separately; it has a dynamic title but is not yet exposed as a dialog.
+
+## Pass 24 — Accessible Order Scan viewer
+
+### What changed
+
+- Identified the saved Order Scan viewer as a modal dialog.
+- Connected the viewer to its existing dynamic scan title.
+- Added a descriptive accessible name to the icon-only close button.
+
+### Why
+
+The viewer already updates its visible heading with the invoice number, but the surrounding modal did not expose that heading as its title. Assistive technology can now identify which scan is open without changing scan storage, display, or download behavior.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted scan-viewer dialog/title and close-control checks
+- Dynamic invoice-number title connection check
+- Title uniqueness check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Continue the saved-record audit with the Usage Log detail modal and its dynamic report title.
