@@ -295,7 +295,7 @@ function renderOrders(){
   const tbody=document.getElementById('ord-tbody');
   const rows=orderTableRows();
   if(!rows.length){
-    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}" class="empty-cell">No orders yet.</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}"><div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🛒</span><strong>Create your first order</strong><p>Record a supplier invoice, its products, quantities, and total to start tracking purchases.</p><button class="btn btn-primary" type="button" onclick="openOrderModal()">＋ Create first order</button></div></td></tr>`;
     return;
   }
 

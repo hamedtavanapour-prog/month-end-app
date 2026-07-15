@@ -309,3 +309,34 @@ All checks passed.
 ### Follow-up
 
 - Review the Orders empty state separately; it currently lacks a direct first-order action.
+
+## Pass 10 — Actionable Orders empty state
+
+### What changed
+
+- Replaced the bare “No orders yet” row with a first-order explanation.
+- Added a direct **Create first order** action that opens the existing manual order workflow.
+- Reused the responsive empty-state presentation already established across the workspace.
+
+### Why
+
+The empty Orders page did not explain what would be recorded or provide a next step inside the table. New users now get enough context to begin, while scan and voice entry remain available in the unchanged page header.
+
+### Files affected
+
+- `apps/web/public/legacy/js/orders.js`
+
+### Checks run
+
+- JavaScript syntax check for `orders.js`
+- Targeted empty-state render, column span, copy, and action test
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review page-level headings and descriptions for department-neutral language now that the workspace supports Bar, Kitchen, and other teams.
