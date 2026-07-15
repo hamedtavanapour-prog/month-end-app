@@ -480,7 +480,7 @@ function openProductView(id){
   body.innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${p.name}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="product-view-title">${escapeHtml(p.name)}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta">${departmentBadges} ${catBadge(p.category)} ${subBadge(p.subcategory)} ${low?'<span class="missing-pill"><span class="missing-dot"></span>At / below par</span>':''}</div>
       </div>
     </div>
@@ -530,6 +530,8 @@ function renderProducts(){
   const cat=document.getElementById('prod-cat-f').value;
   const sub=document.getElementById('prod-sub-f').value;
   const status=document.getElementById('prod-status-f')?.value||'active';
+  const departmentProducts=state.products.filter(product=>productInDepartment(product,productDepartmentView));
+  const activeDepartmentProducts=departmentProducts.filter(product=>!product.archived);
   const lastInv=state.inventories[0];
   const{col,dir}=sortState.products;
   const visCols=PROD_COLS.filter(c=>c.visible);
@@ -538,10 +540,9 @@ function renderProducts(){
     if(c.key==='sel')return`<th style="width:36px;padding:9px 8px;"><input type="checkbox" onchange="prodHeaderCheck(this)" style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;"></th>`;
     const label=productColumnLabel(c);
     if(!c.sort)return`<th>${label}</th>`;
-    const s=sortState.products;const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${cls}" onclick="sortTable('products','${c.sort}')">${label}</th>`;
+    return sortableTableHeader(label,'products',c.sort);
   }).join('')+'</tr>';
-  let list=state.products.filter(p=>{
+  let list=departmentProducts.filter(p=>{
     const supplierText=(p.suppliers||[]).map(sid=>state.suppliers.find(s=>s.id===sid)?.name||'').join(' ').toLowerCase();
     const ms=!search||p.name.toLowerCase().includes(search)||(p.inventoryName||'').toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||supplierText.includes(search);
     const st=status==='all'||(status==='archived'?!!p.archived:!p.archived);
@@ -549,7 +550,18 @@ function renderProducts(){
   }).map(p=>({...p,lastCount:p.lastCount??(lastInv?lastInv.items[p.id]??null:null)}));
   list=sortArr(list,col,dir);
   const tbody=document.getElementById('prod-tbody');
-  if(!list.length){tbody.innerHTML=`<tr><td colspan="${visCols.length}" style="text-align:center;color:var(--text-muted);padding:28px;">No products found.</td></tr>`;syncHeaderCb();return;}
+  if(!list.length){
+    const filtersApplied=!!(search||cat||sub||status!=='active');
+    let emptyState;
+    if(filtersApplied){
+      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🔎</span><strong>No products match these filters</strong><p>Clear the search and filters to return to active ${escapeHtml(title)} products.</p><button class="btn btn-secondary" type="button" onclick="resetProductFilters()">Clear filters</button></div>`;
+    }else if(departmentProducts.length&&!activeDepartmentProducts.length){
+      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>All ${escapeHtml(title)} products are archived</strong><p>Archived products are kept out of active inventory and counts.</p><button class="btn btn-secondary" type="button" onclick="showArchivedProductFilter()">View archived products</button></div>`;
+    }else{
+      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">📦</span><strong>Add your first ${escapeHtml(title)} product</strong><p>Products hold the names, packaging, cost, and supplier details used across inventory.</p><button class="btn btn-primary" type="button" onclick="openProductModal()">＋ Add ${escapeHtml(title)} product</button></div>`;
+    }
+    tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;syncHeaderCb();return;
+  }
   tbody.innerHTML=list.map(p=>{
     const low=p.par>0&&p.lastCount!==null&&p.lastCount<=p.par;
     const sel=selectedProds.has(p.id);
@@ -573,6 +585,19 @@ function renderProducts(){
     }}).join('')}</tr>`;
   }).join('');
   syncHeaderCb();
+}
+
+function resetProductFilters(shouldRender=true){
+  document.getElementById('prod-search').value='';
+  document.getElementById('prod-cat-f').value='';
+  document.getElementById('prod-sub-f').innerHTML='<option value="">All</option>';
+  document.getElementById('prod-status-f').value='active';
+  if(shouldRender)renderProducts();
+}
+function showArchivedProductFilter(){
+  resetProductFilters(false);
+  document.getElementById('prod-status-f').value='archived';
+  renderProducts();
 }
 
 function backlogSeenLabel(value){
@@ -856,7 +881,7 @@ function openDrinkView(id){
   document.getElementById('product-view-body').innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(drink.name)}${drink.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="product-view-title">${escapeHtml(drink.name)}${drink.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta">${drinkTypePill(drink.type)} <span class="sub-badge">${escapeHtml(drink.family||'Classics')}</span></div>
       </div>
     </div>

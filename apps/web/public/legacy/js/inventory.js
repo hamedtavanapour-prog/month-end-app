@@ -675,7 +675,7 @@ function openLiveInventoryDetail(productId){
   body.innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(row.name)}</h3>
+        <h3 id="live-inv-detail-title">${escapeHtml(row.name)}</h3>
         <div class="product-view-meta">${liveStatusBadge(row)} ${catBadge(row.category)} ${subBadge(row.subcategory)} <span class="sub-badge">${escapeHtml(row.roomName)}</span></div>
       </div>
     </div>
@@ -975,11 +975,17 @@ function renderInventoryTable(){
     archiveToggle.textContent=`Archived (${archivedCount})`;
     archiveToggle.classList.toggle('active',showArchivedInventories);
   }
-  document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;const s=sortState.inventories;const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';return`<th class="sortable ${cls}" onclick="sortTable('inventories','${c.sort}')">${c.label}</th>`;}).join('')+'</tr>';
+  document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;return sortableTableHeader(c.label,'inventories',c.sort);}).join('')+'</tr>';
   let rows=state.inventories.filter(inv=>showArchivedInventories?!!inv.archived:!inv.archived).map(inv=>{normalizeInventoryRooms(inv);const total=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);const expected=expectedInventoryProductIds(inv);const counted=Object.keys(inv.items).filter(id=>expected.has(id)).length,missing=Math.max(expected.size-counted,0);const roomsCount=inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length;return{...inv,counted,missing,roomsCount,value:total};});
   rows=sortArr(rows,sortState.inventories.col,sortState.inventories.dir);
   const tbody=document.getElementById('inv-tbody');
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="${visCols.length}" style="text-align:center;color:var(--text-muted);padding:28px;">${showArchivedInventories?'No archived counts.':'No counts yet.'}</td></tr>`;return;}
+  if(!rows.length){
+    const emptyState=showArchivedInventories
+      ?`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
+      :`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">📋</span><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
+    tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;
+    return;
+  }
   tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span style="color:var(--success)">✓</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="viewInventory('${inv.id}')">View</button>${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
 }
 function inventoryMenuHtml(inv,menuId){
@@ -1007,8 +1013,9 @@ function viewInventory(id){
 function editViewedInventory(){const id=viewInvId;if(!id)return;closeModal('modal-view-inv');openInventoryModal(id);}
 function renderViewInvTabs(inv){
   const tabs=document.getElementById('view-inv-tabs');
-  tabs.innerHTML=`<div class="tab ${viewInvTab==='all'?'active':''}" onclick="switchViewInvTab('all')" id="vitab-all">Merged Total</div><div class="tab ${viewInvTab==='missing'?'active':''}" onclick="switchViewInvTab('missing')" id="vitab-missing">Not Counted</div>`+
-    inv.rooms.map(room=>`<div class="tab ${viewInvTab===room.id?'active':''}" onclick="switchViewInvTab('${room.id}')">${escapeHtml(room.name)}</div>`).join('');
+  const tabButton=(id,label)=>`<button type="button" class="tab ${viewInvTab===id?'active':''}" onclick="switchViewInvTab('${id}')" aria-pressed="${viewInvTab===id?'true':'false'}">${label}</button>`;
+  tabs.innerHTML=tabButton('all','Merged Total')+tabButton('missing','Not Counted')+
+    inv.rooms.map(room=>tabButton(room.id,escapeHtml(room.name))).join('');
 }
 function switchViewInvTab(tab){viewInvTab=tab;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
 function roomQtyBreakdown(inv,productId){

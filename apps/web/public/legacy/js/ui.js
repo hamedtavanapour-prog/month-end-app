@@ -57,6 +57,11 @@ function toggleSidebar(){
 initSidebar();
 
 function closeAllMenus(){document.querySelectorAll('.drop-menu,.col-menu,.profile-menu').forEach(m=>m.classList.remove('open'));}
+function activateFilePicker(event,inputId){
+  if(event.key!=='Enter'&&event.key!==' ')return;
+  event.preventDefault();
+  document.getElementById(inputId)?.click();
+}
 function toggleMenu(id){const m=document.getElementById(id);const was=m.classList.contains('open');closeAllMenus();if(!was)m.classList.add('open');}
 function toggleProfileMenu(){toggleMenu('profile-menu');}
 function openCurrentProfileSettings(){
@@ -396,6 +401,25 @@ function refreshLiveInventoryIfVisible(){
   if(document.getElementById('page-live-inventory')?.classList.contains('active'))renderLiveInventoryPage();
 }
 
+function updateMobileNavOverflow(){
+  const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
+  if(window.innerWidth>820){sidebar.classList.remove('has-overflow-left','has-overflow-right');return;}
+  const maxScroll=Math.max(sidebar.scrollWidth-sidebar.clientWidth,0);
+  sidebar.classList.toggle('has-overflow-left',sidebar.scrollLeft>4);
+  sidebar.classList.toggle('has-overflow-right',sidebar.scrollLeft<maxScroll-4);
+}
+function revealActiveMobileNav(item){
+  if(!item||window.innerWidth>820)return;
+  item.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  requestAnimationFrame(updateMobileNavOverflow);
+}
+function initMobileNavigation(){
+  const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
+  sidebar.addEventListener('scroll',updateMobileNavOverflow,{passive:true});
+  window.addEventListener('resize',updateMobileNavOverflow);
+  updateMobileNavOverflow();
+}
+
 function showPage(name,options={}){
   const profile=currentProfile();
   const profileOnlySettings=options.profileOnly&&name==='settings';
@@ -404,9 +428,12 @@ function showPage(name,options={}){
     name=profile.permissions.pages[0]||'dashboard';
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>{n.classList.remove('active');n.removeAttribute('aria-current');});
   document.getElementById('page-'+name).classList.add('active');
-  document.getElementById('nav-'+name).classList.add('active');
+  const activeNav=document.getElementById('nav-'+name);
+  activeNav.classList.add('active');
+  activeNav.setAttribute('aria-current','page');
+  revealActiveMobileNav(activeNav);
   renderAccessControlledNav();
   pendingEdits={};selectedProds.clear();
   if(name==='products'){buildColPicker('prod-col-checks',PROD_COLS,'renderProducts');renderProducts();}
@@ -416,7 +443,7 @@ function showPage(name,options={}){
   else if(name==='usage')renderUsagePage();
   else if(name==='insights')renderInsights();
   else if(name==='suppliers'){buildColPicker('sup-col-checks',SUP_COLS,'renderSuppliers');renderSuppliers();}
-  else if(name==='reports'){renderReport();populateValueDates();renderValueReport();renderOrdersReport();}
+  else if(name==='reports'){renderReportHeader();renderReport();populateValueDates();renderValueReport();renderOrdersReport();}
   else if(name==='settings')renderSettings();
   else if(name==='dashboard')renderDashboard();
 }
@@ -435,5 +462,6 @@ function openModal(id){
   modal.classList.add('open');
 }
 document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)closeModal(ov.id);}));
+window.addEventListener('load',initMobileNavigation);
 
 // PRODUCTS — fixed checkbox logic

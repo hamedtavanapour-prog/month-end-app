@@ -258,7 +258,7 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
   document.getElementById('supplier-view-body').innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(supplier.name)}${supplier.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="supplier-view-title">${escapeHtml(supplier.name)}${supplier.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta"><span class="sup-tag">${products.length} products</span>${supplier.leadDays?`<span class="sub-badge">${supplier.leadDays} lead days</span>`:''}${matchedProduct?`<span class="sub-badge">Showing ${escapeHtml(matchedProduct.name)}</span>`:''}</div>
       </div>
     </div>
@@ -293,16 +293,26 @@ function renderSuppliers(){
   const visCols=SUP_COLS.filter(c=>c.visible);
   thead.innerHTML='<tr>'+visCols.map(c=>{
     if(!c.sort)return`<th>${c.label}</th>`;
-    const s=sortState.suppliers;
-    const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${cls}" onclick="sortTable('suppliers','${c.sort}')">${c.label}</th>`;
+    return sortableTableHeader(c.label,'suppliers',c.sort);
   }).join('')+'</tr>';
   const filtered=state.suppliers.filter(s=>{
     const statusMatch=status==='all'||(status==='archived'?!!s.archived:!s.archived);
     return statusMatch&&(!search||supplierSearchText(s).includes(search)||!!bestSupplierProductMatch(s,search));
   }).map(s=>({...s,productCount:(s.products||[]).filter(id=>getProduct(id)).length}));
   const rows=sortArr(filtered,col,dir);
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="${visCols.length}" style="text-align:center;color:var(--text-muted);padding:28px;">No suppliers found.</td></tr>`;return;}
+  if(!rows.length){
+    const filtersApplied=!!(search||status!=='active');
+    const activeSuppliers=state.suppliers.filter(supplier=>!supplier.archived);
+    let emptyState;
+    if(filtersApplied){
+      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🔎</span><strong>No suppliers match these filters</strong><p>Clear the search and status filter to return to active suppliers.</p><button class="btn btn-secondary" type="button" onclick="resetSupplierFilters()">Clear filters</button></div>';
+    }else if(state.suppliers.length&&!activeSuppliers.length){
+      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>All suppliers are archived</strong><p>Archived suppliers stay saved but are hidden from the active list.</p><button class="btn btn-secondary" type="button" onclick="showArchivedSupplierFilter()">View archived suppliers</button></div>';
+    }else{
+      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🏭</span><strong>Add your first supplier</strong><p>Keep contacts, ordering minimums, lead times, and linked products together.</p><button class="btn btn-primary" type="button" onclick="openSupplierModal()">＋ Add Supplier</button></div>';
+    }
+    tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;return;
+  }
   tbody.innerHTML=rows.map((s,index)=>{
     const menuId=`supplier-actions-${index}`;
     return`<tr class="supplier-row ${s.archived?'archived-row':''}" onclick="openSupplierViewFromSearch('${s.id}')">
@@ -319,4 +329,15 @@ function renderSuppliers(){
       }}).join('')}
     </tr>`;
   }).join('');
+}
+
+function resetSupplierFilters(shouldRender=true){
+  document.getElementById('sup-search').value='';
+  document.getElementById('sup-status-f').value='active';
+  if(shouldRender)renderSuppliers();
+}
+function showArchivedSupplierFilter(){
+  resetSupplierFilters(false);
+  document.getElementById('sup-status-f').value='archived';
+  renderSuppliers();
 }

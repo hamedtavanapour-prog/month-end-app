@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Keg Bar Inventory</title>
-<meta name="description" content="Bar stock counting, ordering, usage tracking and reporting — with automatic cloud sync via Supabase."/>
+<meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
 <link rel="stylesheet" href="css/styles.css"/>
 
@@ -17,25 +17,25 @@
 </head>
 <body>
 <div class="app">
-<nav class="sidebar">
+<nav class="sidebar" aria-label="Primary navigation">
   <div class="sidebar-top">
     <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" title="Collapse sidebar">☰</button>
-    <div class="sidebar-logo"><h1>🍺 Keg Bar</h1><span>Inventory Manager</span></div>
+    <div class="sidebar-logo"><h1><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>Keg Bar</h1><span>Inventory Manager</span></div>
   </div>
-  <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
-  <div class="nav-item" onclick="showPage('products')" id="nav-products"><span class="icon">📦</span><span>Products</span></div>
-  <div class="nav-item" onclick="showPage('live-inventory')" id="nav-live-inventory"><span class="icon">📍</span><span>Live Inventory</span></div>
-  <div class="nav-item" onclick="showPage('inventory')" id="nav-inventory"><span class="icon">📋</span><span>Counts</span></div>
-  <div class="nav-item" onclick="showPage('orders')" id="nav-orders"><span class="icon">🛒</span><span>Orders</span></div>
-  <div class="nav-item" onclick="showPage('usage')" id="nav-usage"><span class="icon">📈</span><span>Usage</span></div>
-  <div class="nav-item" onclick="showPage('insights')" id="nav-insights"><span class="icon">💡</span><span>Insights</span></div>
-  <div class="nav-item" onclick="showPage('suppliers')" id="nav-suppliers"><span class="icon">🏭</span><span>Suppliers</span></div>
-  <div class="nav-item" onclick="showPage('reports')" id="nav-reports"><span class="icon">📑</span><span>Reports</span></div>
-  <div class="nav-item" onclick="showPage('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
+  <button class="nav-item active" type="button" onclick="showPage('dashboard')" id="nav-dashboard" aria-label="Dashboard" aria-current="page"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Dashboard</span></button>
+  <button class="nav-item" type="button" onclick="showPage('products')" id="nav-products" aria-label="Products"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7 8 4 8-4M4 7v10l8 4 8-4V7M12 11v10"/></svg></span><span>Products</span></button>
+  <button class="nav-item" type="button" onclick="showPage('live-inventory')" id="nav-live-inventory" aria-label="Live Inventory"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span>Live Inventory</span></button>
+  <button class="nav-item" type="button" onclick="showPage('inventory')" id="nav-inventory" aria-label="Counts"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg></span><span>Counts</span></button>
+  <button class="nav-item" type="button" onclick="showPage('orders')" id="nav-orders" aria-label="Orders"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span><span>Orders</span></button>
+  <button class="nav-item" type="button" onclick="showPage('usage')" id="nav-usage" aria-label="Usage"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 19h18M5 16l4-5 4 3 6-8"/><path d="M15 6h4v4"/></svg></span><span>Usage</span></button>
+  <button class="nav-item" type="button" onclick="showPage('insights')" id="nav-insights" aria-label="Insights"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8.5 15.5A7 7 0 1 1 15.5 15.5C14.5 16.2 14 17 14 18h-4c0-1-.5-1.8-1.5-2.5Z"/></svg></span><span>Insights</span></button>
+  <button class="nav-item" type="button" onclick="showPage('suppliers')" id="nav-suppliers" aria-label="Suppliers"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21V8l6 3V8l6 3V4h6v17H3Z"/><path d="M7 15h2M7 18h2M13 15h2M13 18h2M18 9h1M18 13h1M18 17h1"/></svg></span><span>Suppliers</span></button>
+  <button class="nav-item" type="button" onclick="showPage('reports')" id="nav-reports" aria-label="Reports"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3Z"/><path d="M15 3v5h5M9 12h7M9 16h7"/></svg></span><span>Reports</span></button>
+  <button class="nav-item" type="button" onclick="showPage('settings')" id="nav-settings" aria-label="Settings"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span>Settings</span></button>
   <div class="sidebar-footer">
     <div class="profile-menu-wrap">
       <button class="profile-button" id="profile-button" type="button" onclick="openCurrentProfileSettings()">
-        <span class="profile-avatar" id="profile-avatar">👤</span>
+        <span class="profile-avatar" id="profile-avatar">M</span>
         <span class="profile-summary"><strong id="profile-name">Manager</strong><small id="profile-role">Active user</small></span>
       </button>
       <div class="profile-menu" id="profile-menu">
@@ -51,7 +51,7 @@
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
   <div class="page-header">
-    <div class="page-header-text"><h2>Dashboard</h2><p>Bar inventory at a glance.</p></div>
+    <div class="page-header-text"><h2>Dashboard</h2><p>Inventory across your departments at a glance.</p></div>
     <div class="drop-wrap">
       <button class="btn btn-secondary btn-sm" onclick="toggleMenu('dash-exp')">⬇ Export ▾</button>
       <div class="drop-menu" id="dash-exp">
@@ -60,6 +60,17 @@
       </div>
     </div>
   </div>
+  <section class="dashboard-onboarding" id="dashboard-onboarding" aria-labelledby="dashboard-onboarding-title" hidden>
+    <div class="dashboard-onboarding-head">
+      <div>
+        <span class="dashboard-onboarding-eyebrow">Getting started</span>
+        <h3 id="dashboard-onboarding-title">Set up your inventory workspace</h3>
+        <p id="dashboard-onboarding-summary">Follow these steps to make your first count easier.</p>
+      </div>
+      <span class="dashboard-onboarding-progress" id="dashboard-onboarding-progress" aria-live="polite"></span>
+    </div>
+    <div class="dashboard-onboarding-steps" id="dashboard-onboarding-steps"></div>
+  </section>
   <div class="stat-grid" id="dash-stats"></div>
   <div class="card">
     <h3 style="margin-bottom:12px;font-size:0.95rem;">Recent Count Filings</h3>
@@ -84,7 +95,7 @@
   <div class="product-department-switch">
     <div>
       <strong>Product workspace</strong>
-      <span id="product-department-help">Bar products, packaging, and suppliers</span>
+      <span id="product-department-help">Products, packaging, and suppliers by department</span>
     </div>
     <div class="segmented-control product-department-tabs" id="product-department-tabs" aria-label="Choose product department"></div>
   </div>
@@ -239,10 +250,10 @@
     <div class="page-header-text"><h2>Reports</h2><p>Usage trends and inventory value.</p></div>
     <div class="drop-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('rep-exp')">⬇ Export ▾</button><div class="drop-menu" id="rep-exp"><button onclick="printPage('Reports','page-reports')">📄 Print / PDF</button><button onclick="xlReports()">📊 Excel / CSV</button></div></div>
   </div>
-  <div class="tabs">
-    <div class="tab active" onclick="switchRepTab('usage')" id="rtab-usage">Usage</div>
-    <div class="tab" onclick="switchRepTab('value')" id="rtab-value">Inventory Value</div>
-    <div class="tab" onclick="switchRepTab('rorders')" id="rtab-rorders">Order History</div>
+  <div class="tabs" role="group" aria-label="Report view">
+    <button class="tab active" type="button" onclick="switchRepTab('usage')" id="rtab-usage" aria-pressed="true">Usage</button>
+    <button class="tab" type="button" onclick="switchRepTab('value')" id="rtab-value" aria-pressed="false">Inventory Value</button>
+    <button class="tab" type="button" onclick="switchRepTab('rorders')" id="rtab-rorders" aria-pressed="false">Order History</button>
   </div>
   <div id="rep-usage">
     <div class="form-row" style="margin-bottom:14px;">
@@ -250,14 +261,7 @@
       <div class="form-group"><label>Category</label><select id="rep-cat" onchange="updateSubcatFilter('rep-sub','rep-cat');renderReport()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
       <div class="form-group"><label>Subcategory</label><select id="rep-sub" onchange="renderReport()"><option value="">All</option></select></div>
     </div>
-    <div class="card"><div class="table-wrap"><table><thead><tr>
-      <th class="sortable" onclick="sortTable('report','name')">Product</th>
-      <th class="sortable" onclick="sortTable('report','category')">Category</th>
-      <th>Sub</th>
-      <th class="sortable" onclick="sortTable('report','avg')">Avg / Period</th>
-      <th class="sortable" onclick="sortTable('report','total')">Total Used</th>
-      <th>Trend</th>
-    </tr></thead><tbody id="rep-tbody"></tbody></table></div></div>
+    <div class="card"><div class="table-wrap"><table><thead id="rep-thead"></thead><tbody id="rep-tbody"></tbody></table></div></div>
   </div>
   <div id="rep-value" style="display:none;">
     <div class="form-row"><div class="form-group"><label>Inventory Date</label><select id="rep-inv-date" onchange="renderValueReport()"><option value="">— Select —</option></select></div></div>
@@ -394,12 +398,12 @@
 
 <!-- INV ROOM SELECT MODAL -->
 <div class="modal-overlay" id="modal-inv-room-select">
-<div class="modal room-select-modal">
-  <button class="modal-close" onclick="closeModal('modal-inv-room-select')">✕</button>
-  <h3>New Count</h3>
+<div class="modal room-select-modal" role="dialog" aria-modal="true" aria-labelledby="room-count-title">
+  <button class="modal-close" type="button" aria-label="Close new count" onclick="closeModal('modal-inv-room-select')">✕</button>
+  <h3 id="room-count-title">New Count</h3>
   <div class="form-grid" style="margin-bottom:16px;">
-    <div class="form-group"><label>Date</label><input type="date" id="room-count-date"></div>
-    <div class="form-group"><label>Label</label><input type="text" id="room-count-label" placeholder="e.g. Month End June"></div>
+    <div class="form-group"><label for="room-count-date">Date</label><input type="date" id="room-count-date"></div>
+    <div class="form-group"><label for="room-count-label">Label</label><input type="text" id="room-count-label" placeholder="e.g. Month End June"></div>
   </div>
   <div class="room-select-grid" id="room-count-list"></div>
   <div class="modal-actions">
@@ -411,13 +415,13 @@
 
 <!-- INV MODAL -->
 <div class="modal-overlay" id="modal-inventory">
-<div class="inv-modal">
+<div class="inv-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-count-title">
   <div class="inv-modal-header">
-    <button class="modal-close" onclick="closeModal('modal-inventory')" style="position:absolute;top:14px;right:14px;">✕</button>
-    <h3>File Inventory Count</h3>
+    <button class="modal-close" type="button" aria-label="Close inventory count" onclick="closeModal('modal-inventory')" style="position:absolute;top:14px;right:14px;">✕</button>
+    <h3 id="inventory-count-title">File Inventory Count</h3>
     <div class="form-grid" style="margin-bottom:12px;">
-      <div class="form-group"><label>Date</label><input type="date" id="inv-date"></div>
-      <div class="form-group"><label>Label</label><input type="text" id="inv-label" placeholder="e.g. Month End May"></div>
+      <div class="form-group"><label for="inv-date">Date</label><input type="date" id="inv-date"></div>
+      <div class="form-group"><label for="inv-label">Label</label><input type="text" id="inv-label" placeholder="e.g. Month End May"></div>
     </div>
     <div class="inv-room-manager">
       <div class="inv-room-tabs" id="inv-room-tabs"></div>
@@ -425,11 +429,11 @@
   </div>
   <div class="inv-modal-filters">
     <div class="form-row" style="margin-bottom:6px;">
-      <div class="form-group" style="flex:2;min-width:110px;"><label>Search</label><input type="text" id="inv-search" placeholder="Filter…" oninput="renderInvRows()"></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label>Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label>Sub</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label>Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
-      <div class="form-group" style="flex:1;min-width:120px;"><label>Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
+      <div class="form-group" style="flex:2;min-width:110px;"><label for="inv-search">Search</label><input type="text" id="inv-search" placeholder="Filter…" oninput="renderInvRows()"></div>
+      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
+      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
+      <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
     </div>
   </div>
   <div class="inv-modal-progress">
@@ -452,35 +456,35 @@
 
 <!-- PRODUCT MODAL -->
 <div class="modal-overlay" id="modal-product">
-<div class="modal">
-  <button class="modal-close" onclick="closeModal('modal-product')">✕</button>
+<div class="modal" role="dialog" aria-modal="true" aria-labelledby="prod-modal-title">
+  <button class="modal-close" type="button" aria-label="Close product editor" onclick="closeModal('modal-product')">✕</button>
   <h3 id="prod-modal-title">Add Product</h3>
   <p class="product-editor-context" id="pm-department-context"></p>
   <div class="form-grid">
-    <div class="form-group" style="grid-column:1/-1"><label>Product Name <span class="field-help">(name on this system)</span></label><input type="text" id="pm-name"></div>
-    <div class="form-group" style="grid-column:1/-1"><label>Inventory Name <span class="field-help">(as listed in your inventory)</span></label><input type="text" id="pm-inventory-name" placeholder="Leave blank if it is the same as the product name"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-name">Product Name <span class="field-help">(name on this system)</span></label><input type="text" id="pm-name"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-inventory-name">Inventory Name <span class="field-help">(as listed in your inventory)</span></label><input type="text" id="pm-inventory-name" placeholder="Leave blank if it is the same as the product name"></div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Alternate <span class="field-help">(comma-separated, for voice commands)</span></label>
+      <label for="pm-aliases">Alternate <span class="field-help">(comma-separated, for voice commands)</span></label>
       <input type="text" id="pm-aliases" placeholder="e.g. Disaronno, amaretto" oninput="previewAliases()">
       <div id="pm-aliases-preview" class="alias-chips"></div>
     </div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Departments <span class="field-help">(select every department that uses this item)</span></label>
-      <div class="product-department-options" id="pm-department-list"></div>
+      <label id="pm-departments-label">Departments <span class="field-help">(select every department that uses this item)</span></label>
+      <div class="product-department-options" id="pm-department-list" role="group" aria-labelledby="pm-departments-label"></div>
     </div>
-    <div class="form-group"><label>Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
-    <div class="form-group"><label>Subcategory</label><select id="pm-sub"></select></div>
-    <div class="form-group"><label id="pm-unit-label">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
-    <div class="form-group"><label id="pm-cost-label">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
-    <div class="form-group"><label>Par Level</label><input type="number" id="pm-par" min="0" oninput="syncSelectedProductUnitField('par',this.value)"></div>
-    <div class="form-group"><label>Last Count</label><input type="number" id="pm-last-count" min="0" step="0.01"></div>
-    <div class="form-group"><label>SKU / Code</label><input type="text" id="pm-sku" readonly></div>
+    <div class="form-group"><label for="pm-cat">Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+    <div class="form-group"><label for="pm-sub">Subcategory</label><select id="pm-sub"></select></div>
+    <div class="form-group"><label id="pm-unit-label" for="pm-unit">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
+    <div class="form-group"><label id="pm-cost-label" for="pm-cost">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
+    <div class="form-group"><label for="pm-par">Par Level</label><input type="number" id="pm-par" min="0" oninput="syncSelectedProductUnitField('par',this.value)"></div>
+    <div class="form-group"><label for="pm-last-count">Last Count</label><input type="number" id="pm-last-count" min="0" step="0.01"></div>
+    <div class="form-group"><label for="pm-sku">SKU / Code</label><input type="text" id="pm-sku" readonly></div>
     <div class="form-group" style="grid-column:1/-1">
       <button class="unit-editor-toggle" id="pm-unit-editor-button" type="button" onclick="openProductUnitEditor()">Edit Packaging</button>
     </div>
-    <div class="form-group" style="grid-column:1/-1"><label>Notes</label><input type="text" id="pm-notes"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-notes">Notes</label><input type="text" id="pm-notes"></div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Suppliers <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(where to buy this — select all that apply)</span></label>
+      <label for="pm-sup-search">Suppliers <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(where to buy this — select all that apply)</span></label>
       <input type="search" id="pm-sup-search" class="supplier-search" placeholder="Search suppliers…" oninput="filterProductSuppliers()">
       <div id="pm-sup-list" style="max-height:150px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;"></div>
     </div>
@@ -491,8 +495,8 @@
 
 <!-- PRODUCT VIEW MODAL -->
 <div class="modal-overlay" id="modal-product-view">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-product-view')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="product-view-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-product-view')" aria-label="Close product detail">✕</button>
   <div id="product-view-body"></div>
 </div>
 </div>
@@ -512,20 +516,20 @@
 
 <!-- VIEW INV MODAL -->
 <div class="modal-overlay" id="modal-view-inv">
-<div class="modal" style="max-width:740px;">
-  <button class="modal-close" onclick="closeModal('modal-view-inv')">✕</button>
+<div class="modal" style="max-width:740px;" role="dialog" aria-modal="true" aria-labelledby="view-inv-title">
+  <button class="modal-close" type="button" aria-label="Close saved count preview" onclick="closeModal('modal-view-inv')">✕</button>
   <h3 id="view-inv-title">Inventory Count</h3>
-  <div class="tabs" style="margin-bottom:14px;" id="view-inv-tabs"></div>
-  <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Qty</th><th>Unit</th><th>Par</th><th>Unit Cost</th><th>Value</th></tr></thead><tbody id="view-inv-tbody"></tbody></table></div>
-  <div style="text-align:right;margin-top:12px;font-weight:700;" id="view-inv-total"></div>
+  <div class="tabs" style="margin-bottom:14px;" id="view-inv-tabs" role="group" aria-label="Count preview view"></div>
+  <div class="table-wrap"><table aria-label="Inventory count items"><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Qty</th><th>Unit</th><th>Par</th><th>Unit Cost</th><th>Value</th></tr></thead><tbody id="view-inv-tbody"></tbody></table></div>
+  <div style="text-align:right;margin-top:12px;font-weight:700;" id="view-inv-total" aria-live="polite"></div>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-view-inv')">Close</button><button class="btn btn-primary" onclick="editViewedInventory()">Edit Count</button></div>
 </div>
 </div>
 
 <!-- LIVE INVENTORY DETAIL MODAL -->
 <div class="modal-overlay" id="modal-live-inv-detail">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-live-inv-detail')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="live-inv-detail-title">
+  <button class="modal-close" type="button" aria-label="Close live inventory detail" onclick="closeModal('modal-live-inv-detail')">✕</button>
   <div id="live-inv-detail-body"></div>
 </div>
 </div>
@@ -546,38 +550,38 @@
 
 <!-- ORDER MODAL -->
 <div class="modal-overlay" id="modal-order">
-<div class="modal invoice-modal">
-  <button class="modal-close" onclick="closeModal('modal-order')">✕</button>
+<div class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="ord-modal-title">
+  <button class="modal-close" type="button" aria-label="Close order editor" onclick="closeModal('modal-order')">✕</button>
   <div class="invoice-modal-head">
     <div>
       <h3 id="ord-modal-title">New Invoice</h3>
-      <p id="order-validation-summary" class="validation-summary"></p>
+      <p id="order-validation-summary" class="validation-summary" role="alert" aria-live="polite"></p>
     </div>
     <label class="refund-toggle"><input type="checkbox" id="om-refund"> Refund / Credit</label>
   </div>
   <div class="form-grid invoice-grid">
-    <div class="form-group"><label>Supplier *</label><input type="text" id="om-supplier" list="supplier-options"></div>
-    <div class="form-group"><label>Date *</label><input type="date" id="om-date"></div>
-    <div class="form-group"><label>Invoice Number *</label><input type="text" id="om-invoice"></div>
-    <div class="form-group"><label>Total Order Price *</label><input type="number" min="0" step="0.01" id="om-total-price" oninput="updateOrderTotal()"></div>
-    <div class="form-group"><label>HST *</label><input type="number" min="0" step="0.01" id="om-hst"></div>
-    <div class="form-group"><label>Status</label><select id="om-status"><option>Draft</option><option>Finished</option><option>Pending</option><option>Received</option><option>Partial</option><option>Draft from Scan</option></select></div>
-    <div class="form-group"><label>Delivery Fee</label><input type="number" min="0" step="0.01" id="om-delivery-fee"></div>
-    <div class="form-group"><label>Agency Fee</label><input type="number" min="0" step="0.01" id="om-agency-fee"></div>
-    <div class="form-group"><label>Fuel Charge</label><input type="number" min="0" step="0.01" id="om-fuel-charge"></div>
-    <div class="form-group"><label>Store #</label><input type="text" id="om-store-number"></div>
-    <div class="form-group" style="grid-column:span 2;"><label>Store Address</label><input type="text" id="om-store-address"></div>
-    <div class="form-group" style="grid-column:1/-1"><label>Notes</label><input type="text" id="om-notes"></div>
+    <div class="form-group"><label for="om-supplier">Supplier *</label><input type="text" id="om-supplier" list="supplier-options"></div>
+    <div class="form-group"><label for="om-date">Date *</label><input type="date" id="om-date"></div>
+    <div class="form-group"><label for="om-invoice">Invoice Number *</label><input type="text" id="om-invoice"></div>
+    <div class="form-group"><label for="om-total-price">Total Order Price *</label><input type="number" min="0" step="0.01" id="om-total-price" oninput="updateOrderTotal()"></div>
+    <div class="form-group"><label for="om-hst">HST *</label><input type="number" min="0" step="0.01" id="om-hst"></div>
+    <div class="form-group"><label for="om-status">Status</label><select id="om-status"><option>Draft</option><option>Finished</option><option>Pending</option><option>Received</option><option>Partial</option><option>Draft from Scan</option></select></div>
+    <div class="form-group"><label for="om-delivery-fee">Delivery Fee</label><input type="number" min="0" step="0.01" id="om-delivery-fee"></div>
+    <div class="form-group"><label for="om-agency-fee">Agency Fee</label><input type="number" min="0" step="0.01" id="om-agency-fee"></div>
+    <div class="form-group"><label for="om-fuel-charge">Fuel Charge</label><input type="number" min="0" step="0.01" id="om-fuel-charge"></div>
+    <div class="form-group"><label for="om-store-number">Store #</label><input type="text" id="om-store-number"></div>
+    <div class="form-group" style="grid-column:span 2;"><label for="om-store-address">Store Address</label><input type="text" id="om-store-address"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="om-notes">Notes</label><input type="text" id="om-notes"></div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="font-size:0.84rem;font-weight:700;">Invoice Items *</span>
+    <span id="order-lines-label" style="font-size:0.84rem;font-weight:700;">Invoice Items *</span>
     <button class="btn btn-secondary btn-sm" onclick="addOrderLine()">＋ Add Item</button>
   </div>
   <div class="invoice-line-head">
     <span>Product</span><span>Product #</span><span>SKU</span><span>Qty</span><span>Unit</span><span>Unit Size</span><span>Unit Price</span><span>Deposit</span><span>Total</span><span></span>
   </div>
-  <div id="order-lines"></div>
-  <div style="margin-top:12px;text-align:right;font-weight:700;font-size:0.88rem;" id="order-total-disp"></div>
+  <div id="order-lines" role="group" aria-labelledby="order-lines-label"></div>
+  <div style="margin-top:12px;text-align:right;font-weight:700;font-size:0.88rem;" id="order-total-disp" aria-live="polite"></div>
   <datalist id="supplier-options"></datalist>
   <datalist id="invoice-product-options"></datalist>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-order')">Cancel</button><button class="btn btn-secondary" onclick="saveOrder('draft')">Save Draft</button><button class="btn btn-primary" onclick="saveOrder('finish')">Finish Invoice</button></div>
@@ -586,29 +590,29 @@
 
 <!-- SCAN MODAL -->
 <div class="modal-overlay" id="modal-scan">
-<div class="modal" style="max-width:580px;">
-  <button class="modal-close" onclick="closeModal('modal-scan')">✕</button>
-  <h3>Upload Order Scan</h3>
-  <div class="scan-drop" id="scan-drop" onclick="document.getElementById('scan-file').click()">
+<div class="modal" style="max-width:580px;" role="dialog" aria-modal="true" aria-labelledby="scan-upload-title">
+  <button class="modal-close" type="button" aria-label="Close order scan upload" onclick="closeModal('modal-scan')">✕</button>
+  <h3 id="scan-upload-title">Upload Order Scan</h3>
+  <div class="scan-drop" id="scan-drop" role="button" tabindex="0" aria-label="Upload an order scan" onclick="document.getElementById('scan-file').click()" onkeydown="activateFilePicker(event,'scan-file')">
     <div class="drop-icon">📋</div>
     <p><strong>Click to upload</strong> or drag & drop — JPG, PNG, PDF</p>
   </div>
   <input type="file" id="scan-file" accept="image/*,.pdf" style="display:none;" onchange="onScanFileChosen(event)">
   <div id="scan-preview"></div>
   <div class="form-grid" style="margin-bottom:14px;">
-    <div class="form-group"><label>Order Date</label><input type="date" id="scan-date"></div>
-    <div class="form-group"><label>Reference</label><input type="text" id="scan-ref"></div>
+    <div class="form-group"><label for="scan-date">Order Date</label><input type="date" id="scan-date"></div>
+    <div class="form-group"><label for="scan-ref">Reference</label><input type="text" id="scan-ref"></div>
   </div>
 <div id="scan-fname" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;"></div>
-  <div id="scan-status" class="scan-status"></div>
+  <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-scan')">Cancel</button><button class="btn btn-primary" id="scan-create-btn" onclick="createOrderFromScan()" disabled>Create Draft Invoice</button></div>
 </div>
 </div>
 
 <!-- VIEW SCAN MODAL -->
 <div class="modal-overlay" id="modal-view-scan">
-<div class="modal" style="max-width:700px;">
-  <button class="modal-close" onclick="closeModal('modal-view-scan')">✕</button>
+<div class="modal" style="max-width:700px;" role="dialog" aria-modal="true" aria-labelledby="view-scan-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-view-scan')" aria-label="Close order scan viewer">✕</button>
   <h3 id="view-scan-title">Order Scan</h3>
 <div id="view-scan-body" style="text-align:center;"></div>
 </div>
@@ -616,24 +620,24 @@
 
 <!-- INVOICE DETAIL MODAL -->
 <div class="modal-overlay" id="modal-order-detail">
-<div class="modal invoice-modal">
-  <button class="modal-close" onclick="closeModal('modal-order-detail')">✕</button>
+<div class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-order-detail')" aria-label="Close invoice detail">✕</button>
   <div id="order-detail-body"></div>
 </div>
 </div>
 
 <!-- USAGE UPLOAD MODAL -->
 <div class="modal-overlay" id="modal-usage-upload">
-<div class="modal usage-import-modal">
-  <button class="modal-close" onclick="closeModal('modal-usage-upload')">✕</button>
-  <h3 style="margin-bottom:10px;">Upload Usage Report</h3>
+<div class="modal usage-import-modal" role="dialog" aria-modal="true" aria-labelledby="usage-upload-title">
+  <button class="modal-close" type="button" aria-label="Close usage report upload" onclick="closeModal('modal-usage-upload')">✕</button>
+  <h3 id="usage-upload-title" style="margin-bottom:10px;">Upload Usage Report</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
-  <div class="upload-zone" id="usage-zone" onclick="document.getElementById('usage-file').click()">
+  <div class="upload-zone" id="usage-zone" role="button" tabindex="0" aria-label="Upload a usage report" onclick="document.getElementById('usage-file').click()" onkeydown="activateFilePicker(event,'usage-file')">
     <div class="up-icon">📊</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF file</p>
   </div>
   <input type="file" id="usage-file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="handleUsageUpload(event)">
-  <div id="usage-status" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
+  <div id="usage-status" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
   <section class="usage-import-review" id="usage-import-review" hidden>
     <div class="inventory-template-import-summary" id="usage-import-summary"></div>
     <div id="usage-import-matched-groups"></div>
@@ -654,16 +658,16 @@
 
 <!-- INVENTORY ENTRY TEMPLATE UPLOAD MODAL -->
 <div class="modal-overlay" id="modal-inventory-template-upload">
-<div class="modal inventory-template-modal">
-  <button class="modal-close" onclick="closeModal('modal-inventory-template-upload')">✕</button>
-  <h3 style="margin-bottom:10px;">Inventory Entry Form Template</h3>
+<div class="modal inventory-template-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-template-upload-title">
+  <button class="modal-close" type="button" aria-label="Close inventory template upload" onclick="closeModal('modal-inventory-template-upload')">✕</button>
+  <h3 id="inventory-template-upload-title" style="margin-bottom:10px;">Inventory Entry Form Template</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Upload the inventory entry form used for counting. Review and adjust the detected product order before applying it to new counts.</p>
-  <div class="upload-zone" id="inventory-template-zone" onclick="document.getElementById('inventory-template-file').click()">
+  <div class="upload-zone" id="inventory-template-zone" role="button" tabindex="0" aria-label="Upload an inventory entry form template" onclick="document.getElementById('inventory-template-file').click()" onkeydown="activateFilePicker(event,'inventory-template-file')">
     <div class="up-icon">📋</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF template</p>
   </div>
   <input type="file" id="inventory-template-file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="handleInventoryTemplateUpload(event)">
-  <div id="inventory-template-status" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
+  <div id="inventory-template-status" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
   <div class="inventory-template-import-summary" id="inventory-template-import-summary" hidden></div>
   <section class="inventory-template-unmatched" id="inventory-template-unmatched" hidden>
     <div class="inventory-template-unmatched-head"><strong>Items requiring review</strong><small>Select unmatched products to add. Missing units are added only when you press Add unit.</small></div>
@@ -710,23 +714,23 @@
 
 <!-- SUPPLIER MODAL -->
 <div class="modal-overlay" id="modal-supplier">
-<div class="modal" style="max-width:680px;">
-  <button class="modal-close" onclick="closeModal('modal-supplier')">✕</button>
+<div class="modal" style="max-width:680px;" role="dialog" aria-modal="true" aria-labelledby="sup-modal-title">
+  <button class="modal-close" type="button" aria-label="Close supplier editor" onclick="closeModal('modal-supplier')">✕</button>
   <h3 id="sup-modal-title">Add Supplier</h3>
   <div class="form-grid">
-    <div class="form-group" style="grid-column:1/-1"><label>Supplier Name</label><input type="text" id="sm-name"></div>
-    <div class="form-group"><label>Contact Person</label><input type="text" id="sm-contact"></div>
-    <div class="form-group"><label>Email</label><input type="email" id="sm-email"></div>
-    <div class="form-group"><label>Phone</label><input type="text" id="sm-phone"></div>
-    <div class="form-group"><label>Website</label><input type="text" id="sm-website"></div>
-    <div class="form-group"><label>Lead Days</label><input type="number" id="sm-lead" min="0"></div>
-    <div class="form-group"><label>Min Spend ($)</label><input type="number" id="sm-minspend" min="0" step="0.01"></div>
-    <div class="form-group"><label>Min Order Qty</label><input type="number" id="sm-minqty" min="0"></div>
-    <div class="form-group" style="grid-column:1/-1"><label>Notes / Order Instructions</label><textarea id="sm-notes" rows="2"></textarea></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="sm-name">Supplier Name</label><input type="text" id="sm-name"></div>
+    <div class="form-group"><label for="sm-contact">Contact Person</label><input type="text" id="sm-contact"></div>
+    <div class="form-group"><label for="sm-email">Email</label><input type="email" id="sm-email"></div>
+    <div class="form-group"><label for="sm-phone">Phone</label><input type="text" id="sm-phone"></div>
+    <div class="form-group"><label for="sm-website">Website</label><input type="text" id="sm-website"></div>
+    <div class="form-group"><label for="sm-lead">Lead Days</label><input type="number" id="sm-lead" min="0"></div>
+    <div class="form-group"><label for="sm-minspend">Min Spend ($)</label><input type="number" id="sm-minspend" min="0" step="0.01"></div>
+    <div class="form-group"><label for="sm-minqty">Min Order Qty</label><input type="number" id="sm-minqty" min="0"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="sm-notes">Notes / Order Instructions</label><textarea id="sm-notes" rows="2"></textarea></div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Linked Products <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(select all that apply)</span></label>
+      <label id="sm-products-label" for="sm-prod-search">Linked Products <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(select all that apply)</span></label>
       <input type="text" id="sm-prod-search" placeholder="Search products…" oninput="filterSupplierProds()" style="margin-bottom:8px;">
-      <div id="sm-prod-list" style="max-height:180px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;"></div>
+      <div id="sm-prod-list" role="group" aria-labelledby="sm-products-label" style="max-height:180px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;"></div>
     </div>
   </div>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-supplier')">Cancel</button><button class="btn btn-primary" onclick="saveSupplier()">Save Supplier</button></div>
@@ -735,8 +739,8 @@
 
 <!-- SUPPLIER VIEW MODAL -->
 <div class="modal-overlay" id="modal-supplier-view">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-supplier-view')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="supplier-view-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-supplier-view')" aria-label="Close supplier detail">✕</button>
   <div id="supplier-view-body"></div>
 </div>
 </div>

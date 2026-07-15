@@ -243,11 +243,9 @@ function normalizeOrder(order={}){
 }
 
 function renderOrderHeader(cols){
-  const sort=sortState.orders;
   return '<tr>'+cols.map(col=>{
     if(!col.sort||col.key==='scan'||col.key==='actions')return`<th>${col.label}</th>`;
-    const sortClass=sort.col===col.sort?(sort.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${sortClass}" onclick="sortTable('orders','${col.sort}')">${col.label}</th>`;
+    return sortableTableHeader(col.label,'orders',col.sort);
   }).join('')+'</tr>';
 }
 
@@ -297,7 +295,7 @@ function renderOrders(){
   const tbody=document.getElementById('ord-tbody');
   const rows=orderTableRows();
   if(!rows.length){
-    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}" class="empty-cell">No orders yet.</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}"><div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🛒</span><strong>Create your first order</strong><p>Record a supplier invoice, its products, quantities, and total to start tracking purchases.</p><button class="btn btn-primary" type="button" onclick="openOrderModal()">＋ Create first order</button></div></td></tr>`;
     return;
   }
 
@@ -391,20 +389,22 @@ function addOrderLine(existingLine=null){
   const row=document.createElement('div');
   row.id='ol-'+lineId;
   row.className='order-line-row';
+  row.setAttribute('role','group');
+  row.setAttribute('aria-label','Invoice item');
   row.innerHTML=`
     <div class="invoice-product-search">
-      <input type="text" data-field="productName" placeholder="Search product" value="${escapeHtml(line.productName)}" oninput="showInvoiceProductSuggestions(this)" onblur="hideInvoiceProductSuggestions(this)">
+      <input type="text" data-field="productName" aria-label="Product" placeholder="Search product" value="${escapeHtml(line.productName)}" oninput="showInvoiceProductSuggestions(this)" onblur="hideInvoiceProductSuggestions(this)">
       <div class="invoice-product-menu"></div>
     </div>
-    <input type="text" data-field="productNumber" placeholder="Product #" value="${escapeHtml(line.productNumber)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="text" data-field="sku" placeholder="SKU" value="${escapeHtml(line.sku)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="number" min="0" step="0.01" data-field="qty" placeholder="Qty" value="${escapeHtml(line.qty)}" oninput="updateOrderTotal()">
-    <input type="text" data-field="unit" placeholder="Unit" value="${escapeHtml(line.unit)}">
-    <input type="text" data-field="unitSize" placeholder="Unit Size" value="${escapeHtml(line.unitSize)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="number" min="0" step="0.01" data-field="unitPrice" placeholder="Unit $" value="${escapeHtml(line.unitPrice)}" oninput="updateOrderTotal()">
-    <input type="number" min="0" step="0.01" data-field="deposit" placeholder="Deposit" value="${escapeHtml(line.deposit)}">
+    <input type="text" data-field="productNumber" aria-label="Product number" placeholder="Product #" value="${escapeHtml(line.productNumber)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="text" data-field="sku" aria-label="SKU" placeholder="SKU" value="${escapeHtml(line.sku)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="number" min="0" step="0.01" data-field="qty" aria-label="Quantity" placeholder="Qty" value="${escapeHtml(line.qty)}" oninput="updateOrderTotal()">
+    <input type="text" data-field="unit" aria-label="Unit" placeholder="Unit" value="${escapeHtml(line.unit)}">
+    <input type="text" data-field="unitSize" aria-label="Unit size" placeholder="Unit Size" value="${escapeHtml(line.unitSize)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="number" min="0" step="0.01" data-field="unitPrice" aria-label="Unit price" placeholder="Unit $" value="${escapeHtml(line.unitPrice)}" oninput="updateOrderTotal()">
+    <input type="number" min="0" step="0.01" data-field="deposit" aria-label="Deposit" placeholder="Deposit" value="${escapeHtml(line.deposit)}">
     <div class="order-line-total">$0.00</div>
-    <button class="btn btn-ghost-danger btn-sm" onclick="removeLine('ol-${lineId}')">✕</button>
+    <button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove invoice item" onclick="removeLine('ol-${lineId}')">✕</button>
   `;
   container.appendChild(row);
   updateOrderTotal();
@@ -1189,7 +1189,7 @@ function viewOrderDetail(id){
   body.innerHTML=`
     <div class="invoice-detail-head">
       <div class="invoice-detail-title">
-        <h3>${order.isRefund?'Refund / Credit':'Invoice'} ${order.invoiceNumber?escapeHtml(order.invoiceNumber):''}</h3>
+        <h3 id="order-detail-title">${order.isRefund?'Refund / Credit':'Invoice'} ${order.invoiceNumber?escapeHtml(order.invoiceNumber):''}</h3>
         <p style="color:var(--text-muted);font-size:0.86rem;">${escapeHtml(order.supplier||'No supplier')}</p>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="openOrderModal('${order.id}');closeModal('modal-order-detail')">Edit</button>
@@ -1208,7 +1208,7 @@ function viewOrderDetail(id){
       ${detailField('Status',order.status)}
       ${detailField('Notes',order.notes)}
     </div>
-    <div class="table-wrap"><table class="invoice-detail-table">
+    <div class="table-wrap"><table class="invoice-detail-table" aria-label="Invoice items">
       <thead><tr><th>Product</th><th>Product #</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Size</th><th>Unit Price</th><th>Deposit</th><th>Total</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="9" class="empty-cell">No items entered.</td></tr>'}</tbody>
     </table></div>
