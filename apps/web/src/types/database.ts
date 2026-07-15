@@ -180,6 +180,7 @@ export type Database = {
           accepted_at: string | null
           accepted_by: string | null
           created_at: string
+          display_name: string | null
           email: string
           expires_at: string
           id: string
@@ -194,6 +195,7 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           created_at?: string
+          display_name?: string | null
           email: string
           expires_at: string
           id?: string
@@ -208,6 +210,7 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           created_at?: string
+          display_name?: string | null
           email?: string
           expires_at?: string
           id?: string
@@ -426,6 +429,7 @@ export type Database = {
           avatar_path: string | null
           created_at: string
           display_name: string | null
+          email: string | null
           id: string
           updated_at: string
         }
@@ -433,6 +437,7 @@ export type Database = {
           avatar_path?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id: string
           updated_at?: string
         }
@@ -440,17 +445,95 @@ export type Database = {
           avatar_path?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      workspace_states: {
+        Row: {
+          created_at: string
+          data: Json
+          organization_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          organization_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_states_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_team_invitation: {
+        Args: { p_token_hash: string }
+        Returns: string
+      }
+      create_team_invitation: {
+        Args: {
+          p_department_ids: string[]
+          p_display_name: string
+          p_email: string
+          p_expires_at: string
+          p_organization_id: string
+          p_permission_keys: string[]
+          p_role: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      get_invitation_details: {
+        Args: { p_token_hash: string }
+        Returns: {
+          display_name: string
+          email: string
+          expires_at: string
+          organization_name: string
+          role: string
+          status: string
+        }[]
+      }
+      record_workspace_save: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
+      revoke_team_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      update_team_member: {
+        Args: {
+          p_department_ids: string[]
+          p_membership_id: string
+          p_permission_keys: string[]
+          p_role: string
+          p_status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -583,4 +666,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

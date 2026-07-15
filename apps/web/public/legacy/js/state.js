@@ -1,0 +1,34 @@
+// state.js — in-memory app state and transient UI flags.
+
+let state={products:[],drinks:[],inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[]};
+let editingProductId=null,editingOrderId=null,editingSupId=null;
+let currentInvEdit=null,viewInvId=null,viewInvTab='all';
+let showArchivedInventories=false;
+let currentInvRoomId=null;
+let currentInvRooms=[];
+let dirtyInventoryRoomIds=new Set();
+let deletedInventoryRoomIds=new Set();
+let expandedInventorySections=new Set();
+let scanFileData=null,scanFileName=null;
+let selectedUsageLogId=null;
+let usageLogEditMode=false;
+let usageLogHeaderPinned=true;
+let usageSummaryExpanded=false;
+let liveInventoryViewMode='list';
+let liveInventoryRoomIds=null;
+let currentProfileId=null;
+let editingSettingsRoomId=null;
+let addingSettingsRoom=false;
+let activeSettingsSection='general';
+let settingsProductMenuWorkspace='bar';
+let floorPlanEditMode=false;
+let pendingInventoryEntryTemplate=null;
+let pendingUsageImport=null;
+let draggedInventoryTemplateIndex=null;
+let productCatalogView='products';
+let productDepartmentView='bar';
+let pendingEdits={};
+let liveInvCounts={};
+let selectedProds=new Set();
+const sortState={products:{col:'name',dir:'asc'},inventories:{col:'date',dir:'desc'},orders:{col:'date',dir:'desc'},suppliers:{col:'name',dir:'asc'},report:{col:'avg',dir:'desc'}};
+sortState.liveInventory={col:'name',dir:'asc'};

@@ -15,7 +15,7 @@ const errors: Record<string, string> = {
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -25,23 +25,24 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const params = await searchParams;
   const errorMessage = params.error ? errors[params.error] : null;
+  const next = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/app";
 
   return (
     <main className="login-page">
-      <section className="login-story" aria-label="Month End introduction">
+      <section className="login-story" aria-label="Keg Bar introduction">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">M</span>
-          <span>Month End</span>
+          <span className="brand-mark" aria-hidden="true">🍺</span>
+          <span>Keg Bar</span>
         </div>
         <div className="story-copy">
-          <p className="eyebrow">Inventory operations</p>
-          <h1>Every count, order, and report—properly accounted for.</h1>
+          <p className="eyebrow">Inventory Manager</p>
+          <h1>Your bar, kitchen, and supplies—properly counted.</h1>
           <p>
             One secure workspace for bar, kitchen, office, and every department
             your operation needs.
           </p>
         </div>
-        <p className="story-footnote">Private by default · Department-aware · Fully traceable</p>
+        <p className="story-footnote">Private accounts · Department access · Fully traceable</p>
       </section>
 
       <section className="login-panel">
@@ -53,8 +54,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
 
           {errorMessage ? <div className="form-alert" role="alert">{errorMessage}</div> : null}
+          {params.reset ? <div className="success-alert">Your password has been updated. Sign in to continue.</div> : null}
 
           <form action={login} className="auth-form">
+            <input name="next" type="hidden" value={next} />
             <label>
               <span>Email address</span>
               <input name="email" type="email" autoComplete="email" required />
@@ -63,13 +66,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <span>Password</span>
               <input name="password" type="password" autoComplete="current-password" required />
             </label>
+            <div className="password-help"><Link href="/forgot-password">Forgot password?</Link></div>
             <button type="submit">Sign in</button>
           </form>
 
           <div className="login-help">
             <p>Need an account?</p>
-            <span>Your administrator or department manager can invite you.</span>
-            <Link href="/activate">First-time Owner setup</Link>
+            <span>Your administrator or department manager can send you a private invitation.</span>
           </div>
         </div>
       </section>

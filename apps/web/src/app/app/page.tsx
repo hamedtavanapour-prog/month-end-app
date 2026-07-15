@@ -43,41 +43,13 @@ export default async function AppHome() {
     );
   }
 
-  const departments = membership.membership_departments
-    .flatMap((assignment) => assignment.departments ?? [])
-    .map((department) => department.name);
-
   return (
-    <main className="app-shell">
-      <aside className="app-sidebar">
-        <div className="brand-lockup"><span className="brand-mark">M</span><span>Month End</span></div>
-        <nav aria-label="Main navigation">
-          <a className="active" href="/app">Overview</a>
-          <span>Products</span><span>Live inventory</span><span>Counts</span>
-          <span>Orders</span><span>Usage</span><span>Reports</span><span>Settings</span>
-        </nav>
-        <form action={signOut}><button className="sidebar-signout">Sign out</button></form>
-      </aside>
-      <section className="app-content">
-        <header className="app-header">
-          <div><p className="eyebrow">{organization.name}</p><h1>Workspace overview</h1></div>
-          <div className="user-chip"><span>{email}</span><strong>{membership.role}</strong></div>
-        </header>
-        <div className="foundation-banner">
-          <div><span className="status-dot" />Secure foundation active</div>
-          <p>Authentication, organization boundaries, permissions, and audit history are connected.</p>
-        </div>
-        <section className="summary-grid">
-          <article><span>Organization</span><strong>{organization.name}</strong><small>Isolated workspace</small></article>
-          <article><span>Your role</span><strong className="capitalize">{membership.role}</strong><small>Database-enforced access</small></article>
-          <article><span>Departments</span><strong>{departments.length || "All"}</strong><small>{departments.join(", ") || "Organization-wide access"}</small></article>
-        </section>
-        <section className="next-step-card">
-          <p className="eyebrow">Foundation milestone</p>
-          <h2>The new application is ready for its first owner.</h2>
-          <p>Next we will activate the owner account, then build the team-management screen for inviting managers and staff.</p>
-        </section>
-      </section>
+    <main className="legacy-host">
+      <iframe
+        className="legacy-frame"
+        src="/legacy/index.html?v=users-1"
+        title={`${organization.name} inventory workspace for ${email}`}
+      />
     </main>
   );
 }
