@@ -258,7 +258,7 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
   document.getElementById('supplier-view-body').innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(supplier.name)}${supplier.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="supplier-view-title">${escapeHtml(supplier.name)}${supplier.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta"><span class="sup-tag">${products.length} products</span>${supplier.leadDays?`<span class="sub-badge">${supplier.leadDays} lead days</span>`:''}${matchedProduct?`<span class="sub-badge">Showing ${escapeHtml(matchedProduct.name)}</span>`:''}</div>
       </div>
     </div>

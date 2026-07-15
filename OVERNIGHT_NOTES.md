@@ -711,3 +711,37 @@ All checks passed.
 ### Follow-up
 
 - Review the Supplier saved-record detail dialog next; it also renders its title inside a dynamic body.
+
+## Pass 22 — Accessible Supplier detail
+
+### What changed
+
+- Identified the Supplier saved-record detail as a modal dialog.
+- Connected the dynamically rendered supplier heading to the dialog with a stable title ID.
+- Added a descriptive accessible name to the icon-only close button.
+
+### Why
+
+The supplier name was already the clear visible heading, but the surrounding modal did not expose it as its title. Assistive technology can now identify which supplier record is open without changing supplier data, linking, or actions.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/suppliers.js`
+
+### Checks run
+
+- JavaScript syntax check for `suppliers.js`
+- Targeted dialog/title and close-control checks
+- Dynamic title rendering and uniqueness checks
+- Supplier-title escaping check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Continue the saved-record audit with the Order detail surfaces, which use dynamic headings and icon-only controls.

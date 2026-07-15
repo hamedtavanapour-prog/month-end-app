@@ -739,8 +739,8 @@
 
 <!-- SUPPLIER VIEW MODAL -->
 <div class="modal-overlay" id="modal-supplier-view">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-supplier-view')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="supplier-view-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-supplier-view')" aria-label="Close supplier detail">✕</button>
   <div id="supplier-view-body"></div>
 </div>
 </div>
