@@ -47,6 +47,8 @@ button { cursor: pointer; }
 .auth-form button:hover { background: var(--amber-dark); }
 .login-help { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.5; }
 .login-help p { margin: 0; color: var(--ink); font-weight: 700; }
+.login-help a { display: inline-block; margin-top: 12px; color: var(--amber-dark); font-weight: 700; text-decoration: none; }
+.login-help a:hover { text-decoration: underline; }
 
 .setup-page { display: grid; min-height: 100vh; place-items: center; padding: 28px; background: radial-gradient(circle at 50% 0, #fff 0, transparent 44%), var(--canvas); }
 .setup-card { width: min(560px, 100%); padding: 42px; border: 1px solid var(--line); border-radius: 20px; background: #fff; box-shadow: 0 24px 70px rgba(23,32,51,.09); text-align: center; }
@@ -54,6 +56,14 @@ button { cursor: pointer; }
 .setup-card h1 { margin: 0 0 16px; font-size: 34px; letter-spacing: -.04em; }
 .setup-card > p:not(.eyebrow) { color: var(--muted); line-height: 1.7; }
 .secondary-button { margin-top: 18px; padding: 10px 18px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: #fff; font-weight: 700; }
+.activation-card { text-align: left; }
+.activation-card .brand-mark { display: grid; margin-inline: auto; }
+.activation-card > .eyebrow, .activation-card > h1, .activation-card > p { text-align: center; }
+.activation-form { text-align: left; }
+.activation-form small { color: var(--muted); font-size: 12px; font-weight: 450; line-height: 1.5; }
+.primary-link, .secondary-link { display: block; width: fit-content; margin: 24px auto 0; border-radius: 10px; padding: 13px 18px; font-weight: 750; text-decoration: none; }
+.primary-link { color: #fff; background: linear-gradient(180deg, #c47b13, #a86100); }
+.secondary-link { border: 1px solid var(--line); color: var(--ink); background: #fff; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 242px minmax(0, 1fr); }
 .app-sidebar { position: sticky; top: 0; display: flex; height: 100vh; flex-direction: column; padding: 26px 18px 20px; border-right: 1px solid #263044; color: #e9edf4; background: #172033; }

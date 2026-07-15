@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 const errors: Record<string, string> = {
   invalid_form: "Enter your email address and password.",
   invalid_credentials: "That email address or password is not correct.",
+  confirmation_failed: "That verification link could not be completed. Please try signing in or request a new link.",
 };
 
 type LoginPageProps = {
@@ -67,6 +69,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <div className="login-help">
             <p>Need an account?</p>
             <span>Your administrator or department manager can invite you.</span>
+            <Link href="/activate">First-time Owner setup</Link>
           </div>
         </div>
       </section>
