@@ -590,9 +590,9 @@
 
 <!-- SCAN MODAL -->
 <div class="modal-overlay" id="modal-scan">
-<div class="modal" style="max-width:580px;">
-  <button class="modal-close" onclick="closeModal('modal-scan')">✕</button>
-  <h3>Upload Order Scan</h3>
+<div class="modal" style="max-width:580px;" role="dialog" aria-modal="true" aria-labelledby="scan-upload-title">
+  <button class="modal-close" type="button" aria-label="Close order scan upload" onclick="closeModal('modal-scan')">✕</button>
+  <h3 id="scan-upload-title">Upload Order Scan</h3>
   <div class="scan-drop" id="scan-drop" role="button" tabindex="0" aria-label="Upload an order scan" onclick="document.getElementById('scan-file').click()" onkeydown="activateFilePicker(event,'scan-file')">
     <div class="drop-icon">📋</div>
     <p><strong>Click to upload</strong> or drag & drop — JPG, PNG, PDF</p>
@@ -600,11 +600,11 @@
   <input type="file" id="scan-file" accept="image/*,.pdf" style="display:none;" onchange="onScanFileChosen(event)">
   <div id="scan-preview"></div>
   <div class="form-grid" style="margin-bottom:14px;">
-    <div class="form-group"><label>Order Date</label><input type="date" id="scan-date"></div>
-    <div class="form-group"><label>Reference</label><input type="text" id="scan-ref"></div>
+    <div class="form-group"><label for="scan-date">Order Date</label><input type="date" id="scan-date"></div>
+    <div class="form-group"><label for="scan-ref">Reference</label><input type="text" id="scan-ref"></div>
   </div>
 <div id="scan-fname" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;"></div>
-  <div id="scan-status" class="scan-status"></div>
+  <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-scan')">Cancel</button><button class="btn btn-primary" id="scan-create-btn" onclick="createOrderFromScan()" disabled>Create Draft Invoice</button></div>
 </div>
 </div>
@@ -628,16 +628,16 @@
 
 <!-- USAGE UPLOAD MODAL -->
 <div class="modal-overlay" id="modal-usage-upload">
-<div class="modal usage-import-modal">
-  <button class="modal-close" onclick="closeModal('modal-usage-upload')">✕</button>
-  <h3 style="margin-bottom:10px;">Upload Usage Report</h3>
+<div class="modal usage-import-modal" role="dialog" aria-modal="true" aria-labelledby="usage-upload-title">
+  <button class="modal-close" type="button" aria-label="Close usage report upload" onclick="closeModal('modal-usage-upload')">✕</button>
+  <h3 id="usage-upload-title" style="margin-bottom:10px;">Upload Usage Report</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
   <div class="upload-zone" id="usage-zone" role="button" tabindex="0" aria-label="Upload a usage report" onclick="document.getElementById('usage-file').click()" onkeydown="activateFilePicker(event,'usage-file')">
     <div class="up-icon">📊</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF file</p>
   </div>
   <input type="file" id="usage-file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="handleUsageUpload(event)">
-  <div id="usage-status" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
+  <div id="usage-status" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
   <section class="usage-import-review" id="usage-import-review" hidden>
     <div class="inventory-template-import-summary" id="usage-import-summary"></div>
     <div id="usage-import-matched-groups"></div>
@@ -658,16 +658,16 @@
 
 <!-- INVENTORY ENTRY TEMPLATE UPLOAD MODAL -->
 <div class="modal-overlay" id="modal-inventory-template-upload">
-<div class="modal inventory-template-modal">
-  <button class="modal-close" onclick="closeModal('modal-inventory-template-upload')">✕</button>
-  <h3 style="margin-bottom:10px;">Inventory Entry Form Template</h3>
+<div class="modal inventory-template-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-template-upload-title">
+  <button class="modal-close" type="button" aria-label="Close inventory template upload" onclick="closeModal('modal-inventory-template-upload')">✕</button>
+  <h3 id="inventory-template-upload-title" style="margin-bottom:10px;">Inventory Entry Form Template</h3>
   <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Upload the inventory entry form used for counting. Review and adjust the detected product order before applying it to new counts.</p>
   <div class="upload-zone" id="inventory-template-zone" role="button" tabindex="0" aria-label="Upload an inventory entry form template" onclick="document.getElementById('inventory-template-file').click()" onkeydown="activateFilePicker(event,'inventory-template-file')">
     <div class="up-icon">📋</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF template</p>
   </div>
   <input type="file" id="inventory-template-file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="handleInventoryTemplateUpload(event)">
-  <div id="inventory-template-status" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
+  <div id="inventory-template-status" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
   <div class="inventory-template-import-summary" id="inventory-template-import-summary" hidden></div>
   <section class="inventory-template-unmatched" id="inventory-template-unmatched" hidden>
     <div class="inventory-template-unmatched-head"><strong>Items requiring review</strong><small>Select unmatched products to add. Missing units are added only when you press Add unit.</small></div>

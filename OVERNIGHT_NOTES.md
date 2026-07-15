@@ -577,3 +577,36 @@ All checks passed.
 ### Follow-up
 
 - Audit modal close buttons for descriptive names in the remaining upload and detail dialogs.
+
+## Pass 18 — Accessible upload dialogs and status updates
+
+### What changed
+
+- Identified the order-scan, usage-report, and inventory-template surfaces as modal dialogs.
+- Connected each upload dialog to its visible title and gave each close button a descriptive name.
+- Connected the order-scan date and reference labels to their inputs.
+- Made processing and result status updates announce politely in all three workflows.
+
+### Why
+
+The upload zones became keyboard accessible in Pass 17, but the surrounding dialogs still lacked structural names and their processing updates were silent. This completes the upload interaction without changing parsing, review, or import behavior.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted dialog/title and close-control checks for all three upload workflows
+- Order-scan label/control relationship checks
+- Live status-announcement checks for all three workflows
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Audit saved-record detail dialogs separately; several use dynamic titles or dynamic body content.
