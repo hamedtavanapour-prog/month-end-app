@@ -528,8 +528,8 @@
 
 <!-- LIVE INVENTORY DETAIL MODAL -->
 <div class="modal-overlay" id="modal-live-inv-detail">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-live-inv-detail')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="live-inv-detail-title">
+  <button class="modal-close" type="button" aria-label="Close live inventory detail" onclick="closeModal('modal-live-inv-detail')">✕</button>
   <div id="live-inv-detail-body"></div>
 </div>
 </div>

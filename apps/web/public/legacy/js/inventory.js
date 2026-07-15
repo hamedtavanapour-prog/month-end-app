@@ -675,7 +675,7 @@ function openLiveInventoryDetail(productId){
   body.innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(row.name)}</h3>
+        <h3 id="live-inv-detail-title">${escapeHtml(row.name)}</h3>
         <div class="product-view-meta">${liveStatusBadge(row)} ${catBadge(row.category)} ${subBadge(row.subcategory)} <span class="sub-badge">${escapeHtml(row.roomName)}</span></div>
       </div>
     </div>

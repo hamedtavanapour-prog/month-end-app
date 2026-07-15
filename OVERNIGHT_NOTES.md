@@ -643,3 +643,36 @@ All checks passed.
 ### Follow-up
 
 - Review the Live Inventory product detail next; it uses dynamic body content without a stable dialog label.
+
+## Pass 20 — Accessible Live Inventory detail
+
+### What changed
+
+- Identified the Live Inventory product detail as a modal dialog.
+- Gave the dynamically rendered product heading a stable ID and connected the dialog to it.
+- Added a descriptive accessible name to the detail close button.
+
+### Why
+
+The product name was already the clear visible heading, but the surrounding modal did not expose it as its title. Assistive technology can now identify the record being viewed without changing live-inventory calculations or display content.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/inventory.js`
+
+### Checks run
+
+- JavaScript syntax check for `inventory.js`
+- Targeted dialog/title and close-control checks
+- Dynamic title rendering and uniqueness checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the Product and Supplier saved-record detail dialogs, both of which also render titles inside dynamic bodies.
