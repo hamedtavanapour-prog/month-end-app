@@ -676,3 +676,38 @@ All checks passed.
 ### Follow-up
 
 - Review the Product and Supplier saved-record detail dialogs, both of which also render titles inside dynamic bodies.
+
+## Pass 21 — Accessible Product detail
+
+### What changed
+
+- Identified the shared Product and Drink detail surface as a modal dialog.
+- Connected both dynamically rendered record headings to the dialog with one stable title ID.
+- Added a descriptive accessible name to the icon-only close button.
+- Escaped the dynamic inventory-product name when rendering the dialog title.
+
+### Why
+
+Both detail entry points displayed a clear record name, but the shared modal did not expose that heading as its accessible title. The inventory-product path also inserted its title without the escaping already used by the drink path. The modal is now consistently identifiable and safer without changing product data or actions.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/products.js`
+
+### Checks run
+
+- JavaScript syntax check for `products.js`
+- Targeted shared-dialog semantics and close-control checks
+- Dynamic title checks for both Product and Drink rendering paths
+- Product-title escaping check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the Supplier saved-record detail dialog next; it also renders its title inside a dynamic body.

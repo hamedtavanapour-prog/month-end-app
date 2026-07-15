@@ -480,7 +480,7 @@ function openProductView(id){
   body.innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${p.name}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="product-view-title">${escapeHtml(p.name)}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta">${departmentBadges} ${catBadge(p.category)} ${subBadge(p.subcategory)} ${low?'<span class="missing-pill"><span class="missing-dot"></span>At / below par</span>':''}</div>
       </div>
     </div>
@@ -881,7 +881,7 @@ function openDrinkView(id){
   document.getElementById('product-view-body').innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3>${escapeHtml(drink.name)}${drink.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="product-view-title">${escapeHtml(drink.name)}${drink.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta">${drinkTypePill(drink.type)} <span class="sub-badge">${escapeHtml(drink.family||'Classics')}</span></div>
       </div>
     </div>

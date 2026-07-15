@@ -495,8 +495,8 @@
 
 <!-- PRODUCT VIEW MODAL -->
 <div class="modal-overlay" id="modal-product-view">
-<div class="modal product-view-modal">
-  <button class="modal-close" onclick="closeModal('modal-product-view')">✕</button>
+<div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="product-view-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-product-view')" aria-label="Close product detail">✕</button>
   <div id="product-view-body"></div>
 </div>
 </div>
