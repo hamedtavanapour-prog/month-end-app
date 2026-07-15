@@ -472,3 +472,36 @@ All checks passed.
 ### Follow-up
 
 - Review other high-use editors one workflow at a time rather than applying broad markup changes.
+
+## Pass 15 — Accessible Supplier editor
+
+### What changed
+
+- Identified the Add/Edit Supplier surface as a modal dialog and connected it to its dynamic title.
+- Added a descriptive accessible name to the Supplier editor close button.
+- Explicitly connected all ten visible field labels to their inputs and textarea.
+- Exposed the linked-products checkbox area as a labelled control group.
+
+### Why
+
+The Supplier editor had clear visual labels but did not expose their relationships to assistive technology. This pass makes the existing form understandable without changing supplier data, product links, or saving.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted Supplier dialog title and close-control checks
+- Explicit label/control checks for all ten Supplier fields
+- Linked-products selector group relationship check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Audit the New/Edit Order dialog separately because its invoice grid contains many dynamic controls.
