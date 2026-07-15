@@ -848,3 +848,35 @@ All checks passed.
 ### Follow-up
 
 - Review the redesigned workflows interactively and adjust visual preferences based on product-owner feedback before merging.
+
+## Pass 26 — Minimal theme-aware navigation
+
+### What changed
+
+- Replaced every sidebar emoji with a consistent custom outline SVG icon.
+- Replaced the emoji brand mark and default profile placeholder with restrained text/vector treatments.
+- Reduced the collapsed rail from 88px to 76px and tightened its controls, spacing, and active state.
+- Removed the large filled icon tiles from the collapsed state in favor of a slim accent marker.
+- Added dedicated sidebar foreground, muted, border, hover, and mobile color tokens for both dark and light themes.
+
+### Why
+
+The redesigned expanded navigation worked well, but emoji artwork became visually inconsistent and oversized when the rail collapsed. The rail also stayed dark when the rest of the application used the light theme. The navigation now has one minimalist visual language and follows the selected appearance mode.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- Collapsed light-theme visual render at 1100 × 757
+- Navigation item and SVG icon-count checks
+- Sidebar emoji-removal check
+- Theme-token and collapsed-state checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
