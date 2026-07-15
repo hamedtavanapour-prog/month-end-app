@@ -138,3 +138,37 @@ All checks passed.
 ### Follow-up
 
 - Audit modal tab controls separately; several still use clickable non-button elements.
+
+## Pass 5 — Accessible count-preview controls
+
+### What changed
+
+- Replaced the clickable `div` controls in the saved-count preview with semantic toggle buttons.
+- Labelled the switcher as a count-preview control group.
+- Added announced selected state for Merged Total, Not Counted, and each room view.
+- Added a visible keyboard-focus treatment while preserving the existing tab-like appearance.
+
+### Why
+
+The saved-count preview could switch views only through pointer interaction. Keyboard and assistive-technology users can now reach every view and understand which one is selected without changing the preview workflow.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/inventory.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax check for `inventory.js`
+- Targeted control-group, semantic-button, selected-state, and focus-style checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- The Reports page has a separate pointer-only tab switcher that can be addressed independently.

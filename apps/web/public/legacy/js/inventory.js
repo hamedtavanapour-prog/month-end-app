@@ -1013,8 +1013,9 @@ function viewInventory(id){
 function editViewedInventory(){const id=viewInvId;if(!id)return;closeModal('modal-view-inv');openInventoryModal(id);}
 function renderViewInvTabs(inv){
   const tabs=document.getElementById('view-inv-tabs');
-  tabs.innerHTML=`<div class="tab ${viewInvTab==='all'?'active':''}" onclick="switchViewInvTab('all')" id="vitab-all">Merged Total</div><div class="tab ${viewInvTab==='missing'?'active':''}" onclick="switchViewInvTab('missing')" id="vitab-missing">Not Counted</div>`+
-    inv.rooms.map(room=>`<div class="tab ${viewInvTab===room.id?'active':''}" onclick="switchViewInvTab('${room.id}')">${escapeHtml(room.name)}</div>`).join('');
+  const tabButton=(id,label)=>`<button type="button" class="tab ${viewInvTab===id?'active':''}" onclick="switchViewInvTab('${id}')" aria-pressed="${viewInvTab===id?'true':'false'}">${label}</button>`;
+  tabs.innerHTML=tabButton('all','Merged Total')+tabButton('missing','Not Counted')+
+    inv.rooms.map(room=>tabButton(room.id,escapeHtml(room.name))).join('');
 }
 function switchViewInvTab(tab){viewInvTab=tab;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
 function roomQtyBreakdown(inv,productId){
