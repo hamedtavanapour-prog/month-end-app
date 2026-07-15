@@ -27,8 +27,18 @@ function usageCell(row,index){
 function usageNumber(value){
   if(value===null||value===undefined||value==='')return '';
   if(typeof value==='number')return isNaN(value)?'':value;
-  const cleaned=String(value).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
-  return cleaned?parseFloat(cleaned[0]):'';
+  const raw=String(value).trim().replace(/−/g,'-');
+  const accountingNegative=/^\s*\([^()]*\d[^()]*\)\s*$/.test(raw);
+  const trailingNegative=/-\s*$/.test(raw);
+  const cleaned=raw.replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
+  if(!cleaned)return '';
+  const number=parseFloat(cleaned[0]);
+  return accountingNegative||trailingNegative?-Math.abs(number):number;
+}
+
+function usageNumbersInText(value){
+  const tokens=String(value||'').match(/\(\s*\$?\s*\d[\d,]*(?:\.\d+)?\s*%?\s*\)|[−-]?\s*\$?\s*\d[\d,]*(?:\.\d+)?\s*%?\s*-?/g)||[];
+  return tokens.map(usageNumber).filter(number=>number!=='');
 }
 
 function usageDate(value){
@@ -273,7 +283,7 @@ function parseUsageReportRows(rows,fileName){
     const begin=usageNumber(usageCell(row,col.begin));
     const end=usageNumber(usageCell(row,col.end));
     const purch=usageNumber(usageCell(row,col.purch));
-    const calculated=begin!==''||end!==''||purch!==''?Math.max(0,(parseFloat(begin)||0)+(parseFloat(purch)||0)-(parseFloat(end)||0)):'';
+    const calculated=begin!==''||end!==''||purch!==''?(parseFloat(begin)||0)+(parseFloat(purch)||0)-(parseFloat(end)||0):'';
     const qty=actual!==''?actual:calculated;
     if(qty==='')return;
 
@@ -873,7 +883,7 @@ function usageImportReviewCategory(entry){
 function prepareUsageImport(fileName,sourceFile,rows){
   const entries=rows.map((row,index)=>{
     const inferred=inferFoodtrakUsageCategory(row);
-    return{index,row,category:inferred.category,subcategory:inferred.subcategory,selected:false,suggestion:row.matched?null:bestUsageImportSuggestion(row)};
+    return{index,row,category:inferred.category,subcategory:inferred.subcategory,selected:false,suggestionAccepted:false,suggestion:row.matched?null:bestUsageImportSuggestion(row)};
   });
   pendingUsageImport={fileName,sourceFile,rows,entries};
   return pendingUsageImport;
@@ -889,36 +899,59 @@ function usageImportCounts(){
   return{rows:rows.length,matched:rows.length-unmatched.length,unmatched:unmatched.length};
 }
 
-function renderUsageImportReview(){
+function renderUsageImportReview({preservePosition=false}={}){
   const panel=document.getElementById('usage-import-review');
   const summary=document.getElementById('usage-import-summary');
   const wrap=document.getElementById('usage-import-unmatched-groups');
-  if(!panel||!summary||!wrap)return;
+  const matchedWrap=document.getElementById('usage-import-matched-groups');
+  if(!panel||!summary||!wrap||!matchedWrap)return;
+  const modal=panel.closest('.modal');
+  const scrollTop=modal?.scrollTop||0;
+  const openCategories=new Set([...wrap.querySelectorAll('details[open][data-usage-category-group]')].map(details=>details.dataset.usageCategoryGroup));
+  const matchedOpen=!!matchedWrap.querySelector('details[open]');
   const pending=pendingUsageImport;
   panel.hidden=!pending;
-  if(!pending){summary.innerHTML='';wrap.innerHTML='';return;}
+  if(!pending){summary.innerHTML='';wrap.innerHTML='';matchedWrap.innerHTML='';return;}
   const counts=usageImportCounts();
   summary.innerHTML=`
     <div><strong>${counts.rows}</strong><span>rows extracted</span></div>
     <div><strong>${counts.matched}</strong><span>matched rows</span></div>
     <div><strong>${counts.unmatched}</strong><span>unmatched rows</span></div>
   `;
+  const matchedEntries=pending.entries.filter(entry=>entry.row.matched&&entry.row.productId);
+  matchedWrap.innerHTML=`<details class="inventory-template-review-group usage-import-matched-group" ${matchedOpen?'open':''}>
+    <summary><span>Matched products</span><strong>${matchedEntries.length} matched</strong></summary>
+    <div class="inventory-template-review-list">${matchedEntries.map(entry=>`
+      <div class="inventory-template-review-row usage-import-matched-row">
+        <span class="filled-pill">${entry.suggestionAccepted?'Added':'Matched'}</span>
+        <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
+        <span class="usage-import-suggestion"><small>Matched to</small><strong>${escapeHtml(entry.row.matchedName||entry.row.productName||'Existing product')}</strong></span>
+      </div>`).join('')||'<div class="inventory-template-empty">No matched products yet.</div>'}</div>
+  </details>`;
   const byCategory=new Map();
-  unmatchedUsageImportEntries().forEach(entry=>{
+  pending.entries.filter(entry=>!entry.row.matched||!entry.row.productId||entry.suggestionAccepted).forEach(entry=>{
     const category=usageImportReviewCategory(entry);
     if(!byCategory.has(category))byCategory.set(category,[]);
     byCategory.get(category).push(entry);
   });
-  wrap.innerHTML=[...byCategory.entries()].map(([category,entries])=>`<details class="inventory-template-review-group">
-    <summary><span class="inventory-template-section-select"><input type="checkbox" data-usage-category="${escapeHtml(category)}" aria-label="Select all ${escapeHtml(category)} unmatched products" onclick="event.stopPropagation()" onchange="toggleUsageImportCategory(this.dataset.usageCategory,this.checked)"><span>${escapeHtml(category)}</span></span><strong>${entries.length} unmatched</strong></summary>
-    <div class="inventory-template-review-list">${entries.map(entry=>`
+  wrap.innerHTML=[...byCategory.entries()].map(([category,entries])=>{
+    const unresolved=entries.filter(entry=>!entry.row.matched||!entry.row.productId);
+    return`<details class="inventory-template-review-group" data-usage-category-group="${escapeHtml(category)}" ${openCategories.has(category)?'open':''}>
+    <summary><span class="inventory-template-section-select">${unresolved.length?`<input type="checkbox" data-usage-category="${escapeHtml(category)}" aria-label="Select all ${escapeHtml(category)} unmatched products" onclick="event.stopPropagation()" onchange="toggleUsageImportCategory(this.dataset.usageCategory,this.checked)">`:''}<span>${escapeHtml(category)}</span></span><strong>${unresolved.length} unmatched</strong></summary>
+    <div class="inventory-template-review-list">${entries.map(entry=>entry.suggestionAccepted?`
+      <div class="inventory-template-review-row usage-import-added-row">
+        <span class="filled-pill">Added</span>
+        <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.category)} · ${escapeHtml(entry.subcategory)}${entry.row.reportSubcategory?` · Source: ${escapeHtml(entry.row.reportSubcategory)}`:''} · ${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
+        <span class="usage-import-suggestion"><small>Matched to ${escapeHtml(entry.row.matchedName||entry.row.productName)}</small><button class="btn btn-success btn-sm" type="button" disabled>Added</button></span>
+      </div>`:`
       <label class="inventory-template-review-row">
         <input type="checkbox" data-usage-entry="${entry.index}" ${entry.selected?'checked':''} onchange="toggleUsageImportEntry(${entry.index},this.checked)">
         <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.category)} · ${escapeHtml(entry.subcategory)}${entry.row.reportSubcategory?` · Source: ${escapeHtml(entry.row.reportSubcategory)}`:''} · ${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
         <span class="usage-import-suggestion">${entry.suggestion?`<small>Possible match: ${escapeHtml(entry.suggestion.productName)}</small><button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();useUsageImportSuggestion(${entry.index})">Use suggested match</button>`:'<small>No confident existing-product match</small>'}</span>
       </label>`).join('')}</div>
-  </details>`).join('')||'<div class="inventory-template-empty">All extracted rows are matched.</div>';
+  </details>`;}).join('')||'<div class="inventory-template-empty">All extracted rows are matched.</div>';
   syncAllUsageImportControls();
+  if(preservePosition&&modal)requestAnimationFrame(()=>{modal.scrollTop=scrollTop;});
 }
 
 function usageImportEntry(index){
@@ -980,7 +1013,8 @@ function useUsageImportSuggestion(index){
   const product=entry?.suggestion?.productId?getProduct(entry.suggestion.productId):null;
   if(!entry||!product){toast('That suggested product is no longer available.',true);return;}
   linkUsageImportRow(entry,product);
-  renderUsageImportReview();
+  entry.suggestionAccepted=true;
+  renderUsageImportReview({preservePosition:true});
   toast(`Matched ${entry.row.reportProductName||entry.row.productName} to ${product.name}.`);
 }
 
@@ -1076,7 +1110,7 @@ function parseUsagePdfTextRows(rows,fileName){
     }
     numericText=numericText.replace(/\b\d+(?:\.\d+)?\s*(?:ml|l|oz|g|kg)\b/ig,' ');
 
-    const nums=[...numericText.matchAll(/-?\d+(?:\.\d+)?/g)].map(item=>parseFloat(item[0]));
+    const nums=usageNumbersInText(numericText);
     if(nums.length<1)return;
 
     const actual=nums[0];
@@ -1516,7 +1550,7 @@ function usageProductOptions(selectedId=''){
 
 function usageRowQty(row){
   if(row.actualUsage!==''&&row.actualUsage!==null&&row.actualUsage!==undefined)return parseFloat(row.actualUsage)||0;
-  return Math.max(0,(parseFloat(row.begin)||0)+(parseFloat(row.purch)||0)-(parseFloat(row.end)||0));
+  return(parseFloat(row.begin)||0)+(parseFloat(row.purch)||0)-(parseFloat(row.end)||0);
 }
 
 function usageDisplayNumber(value){
