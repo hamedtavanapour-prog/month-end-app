@@ -241,3 +241,37 @@ All checks passed.
 ### Follow-up
 
 - Review empty filter-result states in catalog pages for clear recovery actions.
+
+## Pass 8 — Contextual Products empty states
+
+### What changed
+
+- Replaced the generic “No products found” message with three contextual states.
+- Filtered results now explain that filters are hiding products and offer **Clear filters**.
+- Departments containing only archived products now offer **View archived products**.
+- Truly empty departments now explain what product records contain and offer the department-specific add action.
+- Reused the responsive empty-state styling established on Counts.
+
+### Why
+
+The same generic message previously appeared whether products were hidden, archived, or absent. The new states identify the cause and provide one direct recovery action, reducing accidental duplicate entry and filter confusion.
+
+### Files affected
+
+- `apps/web/public/legacy/js/products.js`
+
+### Checks run
+
+- JavaScript syntax check for `products.js`
+- Targeted filter-reset and archived-view recovery behavior test
+- Static checks for all three contextual empty states
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Apply contextual recovery only to other pages where multiple empty causes are currently indistinguishable.
