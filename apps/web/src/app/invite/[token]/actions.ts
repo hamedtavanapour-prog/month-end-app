@@ -50,3 +50,28 @@ export async function acceptInvitation(formData: FormData) {
   redirect("/app");
 }
 
+export async function finishEmailedInvitation(formData: FormData) {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const passwordConfirmation = String(formData.get("passwordConfirmation") ?? "");
+  const supabase = await createClient();
+  const { data: details } = await supabase.rpc("get_invitation_details", { p_token_hash: hashToken(token) });
+  const invitation = details?.[0];
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const signedInEmail = typeof claimsData?.claims?.email === "string" ? claimsData.claims.email.toLowerCase() : "";
+
+  if (!invitation || invitation.status !== "pending" || invitation.email.toLowerCase() !== signedInEmail) {
+    redirect(`/invite/${token}?error=accept_failed&ready=1`);
+  }
+  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    redirect(`/invite/${token}?error=weak_password&ready=1`);
+  }
+  if (password !== passwordConfirmation) redirect(`/invite/${token}?error=password_mismatch&ready=1`);
+
+  const { error: passwordError } = await supabase.auth.updateUser({ password });
+  if (passwordError) redirect(`/invite/${token}?error=account_failed&ready=1`);
+
+  const { error: acceptError } = await supabase.rpc("accept_team_invitation", { p_token_hash: hashToken(token) });
+  if (acceptError) redirect(`/invite/${token}?error=accept_failed&ready=1`);
+  redirect("/app");
+}

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireAccessContext } from "@/lib/auth/context";
+import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
 import { createInvitation, revokeInvitation, updateTeamMember } from "./actions";
 
@@ -17,6 +18,7 @@ type TeamPageProps = {
     updated?: string;
     revoked?: string;
     error?: string;
+    delivery?: string;
   }>;
 };
 
@@ -68,7 +70,9 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
-  const inviteUrl = params.token ? `${protocol}://${host}/invite/${params.token}` : null;
+  const configuredPublicUrl = getPublicAppUrl();
+  const pageOrigin = configuredPublicUrl.includes("localhost") ? `${protocol}://${host}` : configuredPublicUrl;
+  const inviteUrl = params.token ? `${pageOrigin}/invite/${params.token}` : null;
 
   return (
     <main className="team-shell">
@@ -96,8 +100,11 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
         {params.updated ? <div className="success-alert">User access updated.</div> : null}
         {params.revoked ? <div className="success-alert">Invitation revoked.</div> : null}
         {inviteUrl ? (
-          <div className="invite-result">
-            <div><strong>Invitation ready for {params.created}</strong><span>Copy and send this private link. It expires in 7 days.</span></div>
+          <div className={`invite-result ${params.delivery === "failed" ? "delivery-warning" : ""}`}>
+            <div>
+              <strong>{params.delivery === "email" ? `Invitation emailed to ${params.created}` : `Invitation ready for ${params.created}`}</strong>
+              <span>{params.delivery === "email" ? "The newest secure link was sent automatically. You can also copy it below." : "Email delivery was unavailable. Copy and send this newest link; it expires in 7 days."}</span>
+            </div>
             <input readOnly value={inviteUrl} aria-label="Invitation link" />
           </div>
         ) : null}
@@ -128,7 +135,7 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                 </div></div>
               ))}
             </div></fieldset>
-            <div className="team-form-actions"><button type="submit">Create invitation</button></div>
+            <div className="team-form-actions"><button type="submit">Email invitation</button></div>
           </form>
         </section>
 

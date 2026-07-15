@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
-import { acceptInvitation, createInvitedAccount } from "./actions";
+import { acceptInvitation, createInvitedAccount, finishEmailedInvitation } from "./actions";
+import { InviteSessionBridge } from "./invite-session-bridge";
 import { createHash } from "node:crypto";
 
 export const metadata: Metadata = { title: "Join Keg Bar" };
@@ -36,6 +37,7 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
 
   return (
     <main className="login-page invite-page">
+      <InviteSessionBridge />
       <section className="login-story" aria-label="Keg Bar invitation">
         <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">🍺</span><span>Keg Bar</span></div>
         <div className="story-copy"><p className="eyebrow">Team invitation</p><h1>You’re joining one shared operation.</h1><p>Your work will be saved under your own account, with access limited to the departments and actions assigned to you.</p></div>
@@ -45,9 +47,14 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
         {unavailable ? <><p className="eyebrow">Invitation unavailable</p><h2>This link cannot be used.</h2><p className="muted">It may have expired, been revoked, or already been accepted.</p><Link className="secondary-link" href="/login">Go to sign in</Link></> : query.status === "check_email" ? <>
           <p className="eyebrow">Check your email</p><h2>Confirm your account.</h2><p className="muted">We sent a secure verification link to <strong>{invitation.email}</strong>. Open it to return here and finish joining {invitation.organization_name}.</p>
         </> : signedIn && query.ready ? <>
-          <p className="eyebrow">Account confirmed</p><h2>Join {invitation.organization_name}</h2><p className="muted">Your {invitation.role} access is ready to be applied.</p>
+          <p className="eyebrow">Email confirmed</p><h2>Finish joining {invitation.organization_name}</h2><p className="muted">Choose the password you will use for future sign-ins. Your {invitation.role} access will be applied immediately.</p>
           {query.error ? <div className="form-alert" role="alert">{errors[query.error]}</div> : null}
-          <form action={acceptInvitation} className="auth-form"><input name="token" type="hidden" value={token} /><button type="submit">Enter workspace</button></form>
+          <form action={finishEmailedInvitation} className="auth-form">
+            <input name="token" type="hidden" value={token} />
+            <label><span>Choose a password</span><input name="password" type="password" autoComplete="new-password" minLength={12} required /><small>At least 12 characters with uppercase, lowercase, and a number.</small></label>
+            <label><span>Confirm password</span><input name="passwordConfirmation" type="password" autoComplete="new-password" minLength={12} required /></label>
+            <button type="submit">Set password and join</button>
+          </form>
         </> : signedIn ? <>
           <p className="eyebrow">Signed in</p><h2>Accept your invitation</h2><p className="muted">Continue only if you are signed in as <strong>{invitation.email}</strong>.</p>
           {query.error ? <div className="form-alert" role="alert">{errors[query.error]}</div> : null}
@@ -68,4 +75,3 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
     </main>
   );
 }
-
