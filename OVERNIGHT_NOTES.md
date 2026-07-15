@@ -610,3 +610,36 @@ All checks passed.
 ### Follow-up
 
 - Audit saved-record detail dialogs separately; several use dynamic titles or dynamic body content.
+
+## Pass 19 — Accessible saved-count preview
+
+### What changed
+
+- Identified the saved-count preview as a modal dialog and connected it to the dynamic count title.
+- Added a descriptive accessible name to the preview close button.
+- Added a clear name to the count-items table.
+- Made total changes announce politely when switching among merged, missing, and room views.
+
+### Why
+
+The preview's dynamic title and controls were visually clear, but assistive technology could not identify the modal or its icon-only close action. View changes also updated the total silently. The record-view workflow is now exposed without changing count data or editing.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted saved-count dialog/title and close-control checks
+- Item-table accessible-name and total-announcement checks
+- Dynamic title uniqueness check within the modal
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the Live Inventory product detail next; it uses dynamic body content without a stable dialog label.

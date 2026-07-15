@@ -516,12 +516,12 @@
 
 <!-- VIEW INV MODAL -->
 <div class="modal-overlay" id="modal-view-inv">
-<div class="modal" style="max-width:740px;">
-  <button class="modal-close" onclick="closeModal('modal-view-inv')">✕</button>
+<div class="modal" style="max-width:740px;" role="dialog" aria-modal="true" aria-labelledby="view-inv-title">
+  <button class="modal-close" type="button" aria-label="Close saved count preview" onclick="closeModal('modal-view-inv')">✕</button>
   <h3 id="view-inv-title">Inventory Count</h3>
   <div class="tabs" style="margin-bottom:14px;" id="view-inv-tabs" role="group" aria-label="Count preview view"></div>
-  <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Qty</th><th>Unit</th><th>Par</th><th>Unit Cost</th><th>Value</th></tr></thead><tbody id="view-inv-tbody"></tbody></table></div>
-  <div style="text-align:right;margin-top:12px;font-weight:700;" id="view-inv-total"></div>
+  <div class="table-wrap"><table aria-label="Inventory count items"><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Qty</th><th>Unit</th><th>Par</th><th>Unit Cost</th><th>Value</th></tr></thead><tbody id="view-inv-tbody"></tbody></table></div>
+  <div style="text-align:right;margin-top:12px;font-weight:700;" id="view-inv-total" aria-live="polite"></div>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-view-inv')">Close</button><button class="btn btn-primary" onclick="editViewedInventory()">Edit Count</button></div>
 </div>
 </div>
