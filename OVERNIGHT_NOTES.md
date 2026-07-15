@@ -812,3 +812,39 @@ All checks passed.
 ### Follow-up
 
 - Continue the saved-record audit with the Usage Log detail modal and its dynamic report title.
+
+## Pass 25 — Full hospitality workspace visual redesign
+
+### What changed
+
+- Rebuilt the shared visual system around a warmer hospitality-operations palette with richer light and dark themes.
+- Redesigned the desktop navigation into a clearer premium rail with stronger active-page orientation, icon treatments, profile presentation, and collapse behavior.
+- Turned page headers into consistent workspace command surfaces with clearer hierarchy and action placement.
+- Upgraded cards, dashboard metrics, onboarding, tables, filters, form controls, buttons, menus, segmented controls, badges, and selection states.
+- Refined Products and Settings with more intentional side panels and active-state styling.
+- Reworked modal presentation with stronger hierarchy, softer overlays, improved close controls, and clearer action footers.
+- Rebuilt the compact layout with a translucent bottom navigation bar, full-width page actions, denser metric cards, and phone-safe onboarding steps.
+
+### Why
+
+The preceding passes substantially improved usability and accessibility, but intentionally made only small visual changes. This pass delivers the requested visible transformation across the entire product while preserving the existing DOM, event handlers, workflows, and data behavior.
+
+### Files affected
+
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- Desktop visual render at 1440 × 1000
+- Compact visual render at 500 × 844
+- Responsive onboarding overflow inspection and correction
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the redesigned workflows interactively and adjust visual preferences based on product-owner feedback before merging.
