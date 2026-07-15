@@ -406,3 +406,35 @@ All checks passed.
 ### Follow-up
 
 - Audit form labels and dialog titles for clear relationships with their controls.
+
+## Pass 13 — Accessible count dialogs and filters
+
+### What changed
+
+- Identified both the New Count room selector and File Inventory Count as modal dialogs.
+- Connected each dialog to its visible title and gave each close button a descriptive accessible name.
+- Explicitly connected labels to count date, label, search, category, subcategory, show, and sort controls.
+- Expanded the abbreviated “Sub” label to “Subcategory.”
+
+### Why
+
+The controls had visible labels, but assistive technology could not reliably determine which label belonged to which input or what each modal represented. The count workflow now exposes the same structure that sighted users already see.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted checks for both dialog-title relationships and close-button names
+- Explicit label/control relationship checks for all nine count fields and filters
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Remove the duplicate close control found in the Add/Edit Product dialog as a separate verified visual bug.
