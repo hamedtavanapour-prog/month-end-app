@@ -372,3 +372,37 @@ All checks passed.
 ### Follow-up
 
 - Review mobile navigation discoverability now that all ten destinations appear in a horizontally scrolling bottom bar.
+
+## Pass 12 — Discoverable mobile navigation overflow
+
+### What changed
+
+- Added subtle left and right edge cues when additional bottom-navigation destinations exist off-screen.
+- Updates the cues as the user scrolls and removes them at the corresponding ends.
+- Automatically brings the active destination into view when navigating on a phone.
+- Keeps the desktop sidebar behavior and styling unchanged.
+
+### Why
+
+The phone layout contains ten destinations in a horizontally scrolling bottom bar, but there was no indication that more options existed beyond the viewport. The active page could also remain off-screen after programmatic navigation. The new cues make the navigation model discoverable without restructuring it.
+
+### Files affected
+
+- `apps/web/public/legacy/js/ui.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax check for `ui.js`
+- Targeted left/right overflow-cue and active-item reveal behavior test
+- Desktop reset behavior check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Audit form labels and dialog titles for clear relationships with their controls.

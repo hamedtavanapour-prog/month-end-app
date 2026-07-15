@@ -396,6 +396,25 @@ function refreshLiveInventoryIfVisible(){
   if(document.getElementById('page-live-inventory')?.classList.contains('active'))renderLiveInventoryPage();
 }
 
+function updateMobileNavOverflow(){
+  const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
+  if(window.innerWidth>820){sidebar.classList.remove('has-overflow-left','has-overflow-right');return;}
+  const maxScroll=Math.max(sidebar.scrollWidth-sidebar.clientWidth,0);
+  sidebar.classList.toggle('has-overflow-left',sidebar.scrollLeft>4);
+  sidebar.classList.toggle('has-overflow-right',sidebar.scrollLeft<maxScroll-4);
+}
+function revealActiveMobileNav(item){
+  if(!item||window.innerWidth>820)return;
+  item.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  requestAnimationFrame(updateMobileNavOverflow);
+}
+function initMobileNavigation(){
+  const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
+  sidebar.addEventListener('scroll',updateMobileNavOverflow,{passive:true});
+  window.addEventListener('resize',updateMobileNavOverflow);
+  updateMobileNavOverflow();
+}
+
 function showPage(name,options={}){
   const profile=currentProfile();
   const profileOnlySettings=options.profileOnly&&name==='settings';
@@ -406,8 +425,10 @@ function showPage(name,options={}){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>{n.classList.remove('active');n.removeAttribute('aria-current');});
   document.getElementById('page-'+name).classList.add('active');
-  document.getElementById('nav-'+name).classList.add('active');
-  document.getElementById('nav-'+name).setAttribute('aria-current','page');
+  const activeNav=document.getElementById('nav-'+name);
+  activeNav.classList.add('active');
+  activeNav.setAttribute('aria-current','page');
+  revealActiveMobileNav(activeNav);
   renderAccessControlledNav();
   pendingEdits={};selectedProds.clear();
   if(name==='products'){buildColPicker('prod-col-checks',PROD_COLS,'renderProducts');renderProducts();}
@@ -436,5 +457,6 @@ function openModal(id){
   modal.classList.add('open');
 }
 document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)closeModal(ov.id);}));
+window.addEventListener('load',initMobileNavigation);
 
 // PRODUCTS — fixed checkbox logic
