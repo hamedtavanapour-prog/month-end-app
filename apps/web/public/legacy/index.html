@@ -456,35 +456,35 @@
 
 <!-- PRODUCT MODAL -->
 <div class="modal-overlay" id="modal-product">
-<div class="modal">
-  <button class="modal-close" onclick="closeModal('modal-product')">✕</button>
+<div class="modal" role="dialog" aria-modal="true" aria-labelledby="prod-modal-title">
+  <button class="modal-close" type="button" aria-label="Close product editor" onclick="closeModal('modal-product')">✕</button>
   <h3 id="prod-modal-title">Add Product</h3>
   <p class="product-editor-context" id="pm-department-context"></p>
   <div class="form-grid">
-    <div class="form-group" style="grid-column:1/-1"><label>Product Name <span class="field-help">(name on this system)</span></label><input type="text" id="pm-name"></div>
-    <div class="form-group" style="grid-column:1/-1"><label>Inventory Name <span class="field-help">(as listed in your inventory)</span></label><input type="text" id="pm-inventory-name" placeholder="Leave blank if it is the same as the product name"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-name">Product Name <span class="field-help">(name on this system)</span></label><input type="text" id="pm-name"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-inventory-name">Inventory Name <span class="field-help">(as listed in your inventory)</span></label><input type="text" id="pm-inventory-name" placeholder="Leave blank if it is the same as the product name"></div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Alternate <span class="field-help">(comma-separated, for voice commands)</span></label>
+      <label for="pm-aliases">Alternate <span class="field-help">(comma-separated, for voice commands)</span></label>
       <input type="text" id="pm-aliases" placeholder="e.g. Disaronno, amaretto" oninput="previewAliases()">
       <div id="pm-aliases-preview" class="alias-chips"></div>
     </div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Departments <span class="field-help">(select every department that uses this item)</span></label>
-      <div class="product-department-options" id="pm-department-list"></div>
+      <label id="pm-departments-label">Departments <span class="field-help">(select every department that uses this item)</span></label>
+      <div class="product-department-options" id="pm-department-list" role="group" aria-labelledby="pm-departments-label"></div>
     </div>
-    <div class="form-group"><label>Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
-    <div class="form-group"><label>Subcategory</label><select id="pm-sub"></select></div>
-    <div class="form-group"><label id="pm-unit-label">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
-    <div class="form-group"><label id="pm-cost-label">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
-    <div class="form-group"><label>Par Level</label><input type="number" id="pm-par" min="0" oninput="syncSelectedProductUnitField('par',this.value)"></div>
-    <div class="form-group"><label>Last Count</label><input type="number" id="pm-last-count" min="0" step="0.01"></div>
-    <div class="form-group"><label>SKU / Code</label><input type="text" id="pm-sku" readonly></div>
+    <div class="form-group"><label for="pm-cat">Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+    <div class="form-group"><label for="pm-sub">Subcategory</label><select id="pm-sub"></select></div>
+    <div class="form-group"><label id="pm-unit-label" for="pm-unit">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
+    <div class="form-group"><label id="pm-cost-label" for="pm-cost">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
+    <div class="form-group"><label for="pm-par">Par Level</label><input type="number" id="pm-par" min="0" oninput="syncSelectedProductUnitField('par',this.value)"></div>
+    <div class="form-group"><label for="pm-last-count">Last Count</label><input type="number" id="pm-last-count" min="0" step="0.01"></div>
+    <div class="form-group"><label for="pm-sku">SKU / Code</label><input type="text" id="pm-sku" readonly></div>
     <div class="form-group" style="grid-column:1/-1">
       <button class="unit-editor-toggle" id="pm-unit-editor-button" type="button" onclick="openProductUnitEditor()">Edit Packaging</button>
     </div>
-    <div class="form-group" style="grid-column:1/-1"><label>Notes</label><input type="text" id="pm-notes"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="pm-notes">Notes</label><input type="text" id="pm-notes"></div>
     <div class="form-group" style="grid-column:1/-1">
-      <label>Suppliers <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(where to buy this — select all that apply)</span></label>
+      <label for="pm-sup-search">Suppliers <span style="font-weight:400;color:var(--text-muted);font-size:0.71rem;">(where to buy this — select all that apply)</span></label>
       <input type="search" id="pm-sup-search" class="supplier-search" placeholder="Search suppliers…" oninput="filterProductSuppliers()">
       <div id="pm-sup-list" style="max-height:150px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;"></div>
     </div>

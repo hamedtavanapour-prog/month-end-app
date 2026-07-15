@@ -437,4 +437,38 @@ All checks passed.
 
 ### Follow-up
 
-- Remove the duplicate close control found in the Add/Edit Product dialog as a separate verified visual bug.
+- Audit the Add/Edit Product dialog's field and group relationships separately.
+
+## Pass 14 — Accessible Product editor
+
+### What changed
+
+- Identified the Add/Edit Product surface as a modal dialog and connected it to its dynamic title.
+- Added a descriptive accessible name to the Product editor close button.
+- Explicitly connected all twelve visible field labels to their inputs and selects.
+- Exposed the department checkbox area as a labelled control group.
+
+### Why
+
+The Product editor presented clear visual labels, but assistive technology could not reliably associate them with the corresponding controls. This pass exposes the existing form structure without changing product data, validation, or saving.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted Product dialog title and close-control checks
+- Explicit label/control checks for all twelve Product fields
+- Department selector group relationship check
+- Static verification of one header close and one footer cancel action
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review other high-use editors one workflow at a time rather than applying broad markup changes.
