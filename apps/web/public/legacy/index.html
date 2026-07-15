@@ -620,8 +620,8 @@
 
 <!-- INVOICE DETAIL MODAL -->
 <div class="modal-overlay" id="modal-order-detail">
-<div class="modal invoice-modal">
-  <button class="modal-close" onclick="closeModal('modal-order-detail')">✕</button>
+<div class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
+  <button type="button" class="modal-close" onclick="closeModal('modal-order-detail')" aria-label="Close invoice detail">✕</button>
   <div id="order-detail-body"></div>
 </div>
 </div>

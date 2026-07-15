@@ -1189,7 +1189,7 @@ function viewOrderDetail(id){
   body.innerHTML=`
     <div class="invoice-detail-head">
       <div class="invoice-detail-title">
-        <h3>${order.isRefund?'Refund / Credit':'Invoice'} ${order.invoiceNumber?escapeHtml(order.invoiceNumber):''}</h3>
+        <h3 id="order-detail-title">${order.isRefund?'Refund / Credit':'Invoice'} ${order.invoiceNumber?escapeHtml(order.invoiceNumber):''}</h3>
         <p style="color:var(--text-muted);font-size:0.86rem;">${escapeHtml(order.supplier||'No supplier')}</p>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="openOrderModal('${order.id}');closeModal('modal-order-detail')">Edit</button>
@@ -1208,7 +1208,7 @@ function viewOrderDetail(id){
       ${detailField('Status',order.status)}
       ${detailField('Notes',order.notes)}
     </div>
-    <div class="table-wrap"><table class="invoice-detail-table">
+    <div class="table-wrap"><table class="invoice-detail-table" aria-label="Invoice items">
       <thead><tr><th>Product</th><th>Product #</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Size</th><th>Unit Price</th><th>Deposit</th><th>Total</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="9" class="empty-cell">No items entered.</td></tr>'}</tbody>
     </table></div>

@@ -745,3 +745,38 @@ All checks passed.
 ### Follow-up
 
 - Continue the saved-record audit with the Order detail surfaces, which use dynamic headings and icon-only controls.
+
+## Pass 23 — Accessible Invoice detail
+
+### What changed
+
+- Identified the saved Invoice and Refund/Credit detail surface as a modal dialog.
+- Connected its dynamically rendered record heading to the dialog with a stable title ID.
+- Added a descriptive accessible name to the icon-only close button.
+- Added a concise accessible name to the invoice-items table.
+
+### Why
+
+The invoice type and number were already visually prominent, but the modal did not expose that heading as its title and its item table had no concise purpose label. The saved-order review workflow is now easier to identify and navigate without changing order calculations, data, or actions.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/orders.js`
+
+### Checks run
+
+- JavaScript syntax check for `orders.js`
+- Targeted invoice-detail dialog/title and close-control checks
+- Dynamic title uniqueness check
+- Invoice-items table accessible-name check
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the saved Order Scan viewer separately; it has a dynamic title but is not yet exposed as a dialog.
