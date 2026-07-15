@@ -68,3 +68,35 @@ All checks passed.
 ### Follow-up
 
 - Continue auditing interactive table rows and custom dropdowns for equivalent keyboard support in separate, bounded passes.
+
+## Pass 3 — Actionable Counts empty state
+
+### What changed
+
+- Replaced the bare “No counts yet” table message with a clear first-count explanation and a direct **Start first count** action.
+- Added a separate informational empty state for the Archived view so it does not suggest creating a new count there.
+- Added compact, responsive styling that keeps the prompt readable on phones and desktops.
+
+### Why
+
+The empty Counts page was a dead end for new users. The new state explains what a count establishes and provides the next action in context, reducing the need to interpret the page header or search elsewhere.
+
+### Files affected
+
+- `apps/web/public/legacy/js/inventory.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax check for `inventory.js`
+- Targeted active/archived empty-state copy and action checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Add similarly purposeful empty states to other workflows only where the current page leaves users without a clear next action.
