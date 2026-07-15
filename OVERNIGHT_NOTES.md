@@ -34,3 +34,37 @@ All checks passed.
 ### Follow-up
 
 - Consider adding a dismissible contextual tour only after observing first-time users with this lighter guidance.
+
+## Pass 2 — Keyboard-accessible primary navigation
+
+### What changed
+
+- Replaced the ten clickable primary-navigation `div` elements with semantic buttons.
+- Added an accessible label to the primary navigation and accessible names that remain available when the sidebar is collapsed.
+- Marked decorative navigation icons as hidden from assistive technology.
+- Added visible keyboard-focus styling and kept `aria-current` synchronized with the active page.
+
+### Why
+
+The primary navigation previously worked with a pointer but could not be reached or activated reliably from a keyboard. This change makes every destination keyboard-operable and communicates the current page to screen readers without changing routing, permissions, or layout.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/ui.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax check for `ui.js`
+- Targeted markup and active-page accessibility-state checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Continue auditing interactive table rows and custom dropdowns for equivalent keyboard support in separate, bounded passes.

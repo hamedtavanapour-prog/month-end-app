@@ -17,21 +17,21 @@
 </head>
 <body>
 <div class="app">
-<nav class="sidebar">
+<nav class="sidebar" aria-label="Primary navigation">
   <div class="sidebar-top">
     <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" title="Collapse sidebar">☰</button>
     <div class="sidebar-logo"><h1>🍺 Keg Bar</h1><span>Inventory Manager</span></div>
   </div>
-  <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
-  <div class="nav-item" onclick="showPage('products')" id="nav-products"><span class="icon">📦</span><span>Products</span></div>
-  <div class="nav-item" onclick="showPage('live-inventory')" id="nav-live-inventory"><span class="icon">📍</span><span>Live Inventory</span></div>
-  <div class="nav-item" onclick="showPage('inventory')" id="nav-inventory"><span class="icon">📋</span><span>Counts</span></div>
-  <div class="nav-item" onclick="showPage('orders')" id="nav-orders"><span class="icon">🛒</span><span>Orders</span></div>
-  <div class="nav-item" onclick="showPage('usage')" id="nav-usage"><span class="icon">📈</span><span>Usage</span></div>
-  <div class="nav-item" onclick="showPage('insights')" id="nav-insights"><span class="icon">💡</span><span>Insights</span></div>
-  <div class="nav-item" onclick="showPage('suppliers')" id="nav-suppliers"><span class="icon">🏭</span><span>Suppliers</span></div>
-  <div class="nav-item" onclick="showPage('reports')" id="nav-reports"><span class="icon">📑</span><span>Reports</span></div>
-  <div class="nav-item" onclick="showPage('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
+  <button class="nav-item active" type="button" onclick="showPage('dashboard')" id="nav-dashboard" aria-label="Dashboard" aria-current="page"><span class="icon" aria-hidden="true">📊</span><span>Dashboard</span></button>
+  <button class="nav-item" type="button" onclick="showPage('products')" id="nav-products" aria-label="Products"><span class="icon" aria-hidden="true">📦</span><span>Products</span></button>
+  <button class="nav-item" type="button" onclick="showPage('live-inventory')" id="nav-live-inventory" aria-label="Live Inventory"><span class="icon" aria-hidden="true">📍</span><span>Live Inventory</span></button>
+  <button class="nav-item" type="button" onclick="showPage('inventory')" id="nav-inventory" aria-label="Counts"><span class="icon" aria-hidden="true">📋</span><span>Counts</span></button>
+  <button class="nav-item" type="button" onclick="showPage('orders')" id="nav-orders" aria-label="Orders"><span class="icon" aria-hidden="true">🛒</span><span>Orders</span></button>
+  <button class="nav-item" type="button" onclick="showPage('usage')" id="nav-usage" aria-label="Usage"><span class="icon" aria-hidden="true">📈</span><span>Usage</span></button>
+  <button class="nav-item" type="button" onclick="showPage('insights')" id="nav-insights" aria-label="Insights"><span class="icon" aria-hidden="true">💡</span><span>Insights</span></button>
+  <button class="nav-item" type="button" onclick="showPage('suppliers')" id="nav-suppliers" aria-label="Suppliers"><span class="icon" aria-hidden="true">🏭</span><span>Suppliers</span></button>
+  <button class="nav-item" type="button" onclick="showPage('reports')" id="nav-reports" aria-label="Reports"><span class="icon" aria-hidden="true">📑</span><span>Reports</span></button>
+  <button class="nav-item" type="button" onclick="showPage('settings')" id="nav-settings" aria-label="Settings"><span class="icon" aria-hidden="true">⚙️</span><span>Settings</span></button>
   <div class="sidebar-footer">
     <div class="profile-menu-wrap">
       <button class="profile-button" id="profile-button" type="button" onclick="openCurrentProfileSettings()">

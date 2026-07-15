@@ -404,9 +404,10 @@ function showPage(name,options={}){
     name=profile.permissions.pages[0]||'dashboard';
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>{n.classList.remove('active');n.removeAttribute('aria-current');});
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
+  document.getElementById('nav-'+name).setAttribute('aria-current','page');
   renderAccessControlledNav();
   pendingEdits={};selectedProds.clear();
   if(name==='products'){buildColPicker('prod-col-checks',PROD_COLS,'renderProducts');renderProducts();}
