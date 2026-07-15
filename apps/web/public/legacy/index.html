@@ -250,10 +250,10 @@
     <div class="page-header-text"><h2>Reports</h2><p>Usage trends and inventory value.</p></div>
     <div class="drop-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('rep-exp')">⬇ Export ▾</button><div class="drop-menu" id="rep-exp"><button onclick="printPage('Reports','page-reports')">📄 Print / PDF</button><button onclick="xlReports()">📊 Excel / CSV</button></div></div>
   </div>
-  <div class="tabs">
-    <div class="tab active" onclick="switchRepTab('usage')" id="rtab-usage">Usage</div>
-    <div class="tab" onclick="switchRepTab('value')" id="rtab-value">Inventory Value</div>
-    <div class="tab" onclick="switchRepTab('rorders')" id="rtab-rorders">Order History</div>
+  <div class="tabs" role="group" aria-label="Report view">
+    <button class="tab active" type="button" onclick="switchRepTab('usage')" id="rtab-usage" aria-pressed="true">Usage</button>
+    <button class="tab" type="button" onclick="switchRepTab('value')" id="rtab-value" aria-pressed="false">Inventory Value</button>
+    <button class="tab" type="button" onclick="switchRepTab('rorders')" id="rtab-rorders" aria-pressed="false">Order History</button>
   </div>
   <div id="rep-usage">
     <div class="form-row" style="margin-bottom:14px;">

@@ -172,3 +172,37 @@ All checks passed.
 ### Follow-up
 
 - The Reports page has a separate pointer-only tab switcher that can be addressed independently.
+
+## Pass 6 — Accessible Reports view switcher
+
+### What changed
+
+- Replaced the three clickable `div` controls on Reports with semantic toggle buttons.
+- Labelled the controls as the Report view group.
+- Kept `aria-pressed` synchronized when switching among Usage, Inventory Value, and Order History.
+- Reused the focus styling introduced for count-preview controls.
+
+### Why
+
+The Reports page switcher could only be operated with a pointer and did not announce the current view. It is now keyboard-operable and exposes selected state without changing report rendering or calculations.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/reports.js`
+
+### Checks run
+
+- JavaScript syntax check for `reports.js`
+- Targeted report-button state and panel-switching behavior test
+- Static check for a labelled group containing all three toggle buttons
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Reports usage-table sorting remains a separate candidate for the shared accessible sortable-header helper.
