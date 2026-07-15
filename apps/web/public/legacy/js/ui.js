@@ -417,7 +417,7 @@ function showPage(name,options={}){
   else if(name==='usage')renderUsagePage();
   else if(name==='insights')renderInsights();
   else if(name==='suppliers'){buildColPicker('sup-col-checks',SUP_COLS,'renderSuppliers');renderSuppliers();}
-  else if(name==='reports'){renderReport();populateValueDates();renderValueReport();renderOrdersReport();}
+  else if(name==='reports'){renderReportHeader();renderReport();populateValueDates();renderValueReport();renderOrdersReport();}
   else if(name==='settings')renderSettings();
   else if(name==='dashboard')renderDashboard();
 }

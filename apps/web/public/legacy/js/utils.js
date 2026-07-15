@@ -41,5 +41,5 @@ function sortableTableHeader(label,tableKey,sortKey){
   const ariaSort=direction==='asc'?'ascending':direction==='desc'?'descending':'none';
   return`<th class="sortable ${sortClass}" aria-sort="${ariaSort}"><button class="table-sort-button" type="button" onclick="sortTable('${tableKey}','${sortKey}')">${label}</button></th>`;
 }
-function sortTable(key,col){const s=sortState[key];s.dir=(s.col===col&&s.dir==='asc')?'desc':'asc';s.col=col;({products:renderProducts,inventories:renderInventoryTable,liveInventory:renderLiveInventoryPage,orders:renderOrders,suppliers:renderSuppliers,report:renderReport})[key]();}
+function sortTable(key,col){const s=sortState[key];s.dir=(s.col===col&&s.dir==='asc')?'desc':'asc';s.col=col;({products:renderProducts,inventories:renderInventoryTable,liveInventory:renderLiveInventoryPage,orders:renderOrders,suppliers:renderSuppliers,report:renderReport})[key]();if(key==='report')renderReportHeader();}
 function sortArr(arr,col,dir){return[...arr].sort((a,b)=>{let va=a[col]??'',vb=b[col]??'';if(typeof va==='string')va=va.toLowerCase();if(typeof vb==='string')vb=vb.toLowerCase();return va<vb?(dir==='asc'?-1:1):va>vb?(dir==='asc'?1:-1):0;});}

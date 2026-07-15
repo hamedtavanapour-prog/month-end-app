@@ -206,3 +206,38 @@ All checks passed.
 ### Follow-up
 
 - Reports usage-table sorting remains a separate candidate for the shared accessible sortable-header helper.
+
+## Pass 7 — Accessible Usage report sorting
+
+### What changed
+
+- Replaced the Usage report's four pointer-only sortable headers with the shared semantic sort-button renderer.
+- Added announced ascending, descending, and unsorted state through the existing `aria-sort` pattern.
+- Refreshes the rendered header after each report sort so visual and assistive states remain synchronized.
+
+### Why
+
+The Usage report was the last primary data table whose sorting required a mouse. It now behaves consistently with Products, Counts, Orders, and Suppliers without changing report filtering or calculations.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/reports.js`
+- `apps/web/public/legacy/js/ui.js`
+- `apps/web/public/legacy/js/utils.js`
+
+### Checks run
+
+- JavaScript syntax checks for all affected scripts
+- Targeted report-header rendering and direction-refresh behavior test
+- Static check that pointer-only report sort headers were removed
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review empty filter-result states in catalog pages for clear recovery actions.

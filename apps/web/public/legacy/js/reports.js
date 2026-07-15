@@ -1,5 +1,16 @@
 // reports.js — value/orders reports and the dashboard.
 
+function renderReportHeader(){
+  const thead=document.getElementById('rep-thead');if(!thead)return;
+  thead.innerHTML='<tr>'+[
+    sortableTableHeader('Product','report','name'),
+    sortableTableHeader('Category','report','category'),
+    '<th>Sub</th>',
+    sortableTableHeader('Avg / Period','report','avg'),
+    sortableTableHeader('Total Used','report','total'),
+    '<th>Trend</th>'
+  ].join('')+'</tr>';
+}
 function switchRepTab(tab){['usage','value','rorders'].forEach(t=>{const selected=t===tab;const button=document.getElementById('rtab-'+t);button.classList.toggle('active',selected);button.setAttribute('aria-pressed',selected?'true':'false');document.getElementById('rep-'+t).style.display=selected?'block':'none';});if(tab==='value'){populateValueDates();renderValueReport();}if(tab==='rorders')renderOrdersReport();if(tab==='usage')renderReport();}
 function renderReport(){const period=document.getElementById('rep-period').value;const cat=document.getElementById('rep-cat').value;const sub=document.getElementById('rep-sub').value;const usage=computeUsage();const pd=period==='weekly'?7:30;const{col,dir}=sortState.report;let rows=state.products.filter(p=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)).map(p=>{const u=usage[p.id];const avg=u&&u.days>0?(u.total/u.days)*pd:0;return{p,avg,total:u?u.total:0,name:p.name,category:p.category,subcategory:p.subcategory};});rows=sortArr(rows,col,dir);const maxAvg=rows.reduce((m,r)=>Math.max(m,r.avg),1);const tbody=document.getElementById('rep-tbody');if(!rows.length){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">File two+ inventory counts to see usage.</td></tr>`;return;}tbody.innerHTML=rows.map(({p,avg,total})=>`<tr><td><strong>${productNameLink(p)}</strong></td><td>${catBadge(p.category)}</td><td>${subBadge(p.subcategory)}</td><td>${avg>0?avg.toFixed(2):'—'}</td><td>${total>0?total.toFixed(2):'—'}</td><td style="min-width:80px;"><div class="usage-bar-bg"><div class="usage-bar" style="width:${avg>0?(avg/maxAvg*100).toFixed(1):0}%"></div></div></td></tr>`).join('');}
 function populateValueDates(){const sel=document.getElementById('rep-inv-date');sel.innerHTML='<option value="">— Select —</option>'+state.inventories.map(inv=>`<option value="${inv.id}">${fmtDate(inv.date)}${inv.label?' — '+inv.label:''}</option>`).join('');}

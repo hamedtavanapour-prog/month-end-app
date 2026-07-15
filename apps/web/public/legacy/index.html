@@ -261,14 +261,7 @@
       <div class="form-group"><label>Category</label><select id="rep-cat" onchange="updateSubcatFilter('rep-sub','rep-cat');renderReport()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
       <div class="form-group"><label>Subcategory</label><select id="rep-sub" onchange="renderReport()"><option value="">All</option></select></div>
     </div>
-    <div class="card"><div class="table-wrap"><table><thead><tr>
-      <th class="sortable" onclick="sortTable('report','name')">Product</th>
-      <th class="sortable" onclick="sortTable('report','category')">Category</th>
-      <th>Sub</th>
-      <th class="sortable" onclick="sortTable('report','avg')">Avg / Period</th>
-      <th class="sortable" onclick="sortTable('report','total')">Total Used</th>
-      <th>Trend</th>
-    </tr></thead><tbody id="rep-tbody"></tbody></table></div></div>
+    <div class="card"><div class="table-wrap"><table><thead id="rep-thead"></thead><tbody id="rep-tbody"></tbody></table></div></div>
   </div>
   <div id="rep-value" style="display:none;">
     <div class="form-row"><div class="form-group"><label>Inventory Date</label><select id="rep-inv-date" onchange="renderValueReport()"><option value="">— Select —</option></select></div></div>
