@@ -275,3 +275,37 @@ All checks passed.
 ### Follow-up
 
 - Apply contextual recovery only to other pages where multiple empty causes are currently indistinguishable.
+
+## Pass 9 — Contextual Suppliers empty states
+
+### What changed
+
+- Replaced the generic “No suppliers found” message with three contextual states.
+- Search or status mismatches now offer **Clear filters**.
+- Archived-only supplier lists now offer **View archived suppliers**.
+- A genuinely empty supplier list explains the information a supplier record holds and offers **Add Supplier**.
+- Reused the existing responsive empty-state presentation.
+
+### Why
+
+Users could not tell whether suppliers were absent or merely hidden, which could lead to duplicate entries. The new state explains the cause and provides one safe recovery action.
+
+### Files affected
+
+- `apps/web/public/legacy/js/suppliers.js`
+
+### Checks run
+
+- JavaScript syntax check for `suppliers.js`
+- Targeted filter-reset and archived-view recovery behavior test
+- Static checks for all three contextual supplier states
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review the Orders empty state separately; it currently lacks a direct first-order action.
