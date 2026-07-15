@@ -15,7 +15,7 @@ const errors: Record<string, string> = {
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
+  searchParams: Promise<{ email?: string; error?: string; next?: string; reset?: string; status?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -55,12 +55,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           {errorMessage ? <div className="form-alert" role="alert">{errorMessage}</div> : null}
           {params.reset ? <div className="success-alert">Your password has been updated. Sign in to continue.</div> : null}
+          {params.status === "account_ready" ? <div className="success-alert">Your account is ready. Sign in with your new password.</div> : null}
 
           <form action={login} className="auth-form">
             <input name="next" type="hidden" value={next} />
             <label>
               <span>Email address</span>
-              <input name="email" type="email" autoComplete="email" required />
+              <input name="email" type="email" autoComplete="email" defaultValue={params.email ?? ""} required />
             </label>
             <label>
               <span>Password</span>

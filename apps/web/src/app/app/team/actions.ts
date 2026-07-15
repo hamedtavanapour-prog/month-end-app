@@ -1,13 +1,11 @@
 "use server";
 
 import { createHash, randomBytes } from "node:crypto";
-import { createClient as createAuthClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAccessContext } from "@/lib/auth/context";
-import { getPublicAppUrl } from "@/lib/auth/public-url";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { sendInvitationSetupEmail } from "@/lib/auth/invitation-email";
 import { createClient } from "@/lib/supabase/server";
 
 function values(formData: FormData, key: string) {
@@ -49,23 +47,10 @@ export async function createInvitation(formData: FormData) {
 
   if (error) redirect(`/app/team?error=${invitationError(error.message)}`);
 
-  const invitePath = `/invite/${token}`;
-  const { url, publishableKey } = getSupabaseEnv();
-  const invitationMailer = createAuthClient(url, publishableKey, {
-    auth: {
-      flowType: "implicit",
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: false,
-    },
-  });
-  const { error: emailError } = await invitationMailer.auth.signInWithOtp({
+  const { error: emailError } = await sendInvitationSetupEmail({
+    displayName,
     email,
-    options: {
-      shouldCreateUser: true,
-      data: { display_name: displayName },
-      emailRedirectTo: `${getPublicAppUrl()}/auth/callback?next=${encodeURIComponent(`${invitePath}?ready=1`)}`,
-    },
+    token,
   });
 
   revalidatePath("/app/team");
