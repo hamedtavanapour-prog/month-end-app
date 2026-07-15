@@ -975,7 +975,7 @@ function renderInventoryTable(){
     archiveToggle.textContent=`Archived (${archivedCount})`;
     archiveToggle.classList.toggle('active',showArchivedInventories);
   }
-  document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;const s=sortState.inventories;const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';return`<th class="sortable ${cls}" onclick="sortTable('inventories','${c.sort}')">${c.label}</th>`;}).join('')+'</tr>';
+  document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;return sortableTableHeader(c.label,'inventories',c.sort);}).join('')+'</tr>';
   let rows=state.inventories.filter(inv=>showArchivedInventories?!!inv.archived:!inv.archived).map(inv=>{normalizeInventoryRooms(inv);const total=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);const expected=expectedInventoryProductIds(inv);const counted=Object.keys(inv.items).filter(id=>expected.has(id)).length,missing=Math.max(expected.size-counted,0);const roomsCount=inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length;return{...inv,counted,missing,roomsCount,value:total};});
   rows=sortArr(rows,sortState.inventories.col,sortState.inventories.dir);
   const tbody=document.getElementById('inv-tbody');

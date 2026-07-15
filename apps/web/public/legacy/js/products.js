@@ -538,8 +538,7 @@ function renderProducts(){
     if(c.key==='sel')return`<th style="width:36px;padding:9px 8px;"><input type="checkbox" onchange="prodHeaderCheck(this)" style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;"></th>`;
     const label=productColumnLabel(c);
     if(!c.sort)return`<th>${label}</th>`;
-    const s=sortState.products;const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${cls}" onclick="sortTable('products','${c.sort}')">${label}</th>`;
+    return sortableTableHeader(label,'products',c.sort);
   }).join('')+'</tr>';
   let list=state.products.filter(p=>{
     const supplierText=(p.suppliers||[]).map(sid=>state.suppliers.find(s=>s.id===sid)?.name||'').join(' ').toLowerCase();

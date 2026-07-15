@@ -293,9 +293,7 @@ function renderSuppliers(){
   const visCols=SUP_COLS.filter(c=>c.visible);
   thead.innerHTML='<tr>'+visCols.map(c=>{
     if(!c.sort)return`<th>${c.label}</th>`;
-    const s=sortState.suppliers;
-    const cls=s.col===c.sort?(s.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${cls}" onclick="sortTable('suppliers','${c.sort}')">${c.label}</th>`;
+    return sortableTableHeader(c.label,'suppliers',c.sort);
   }).join('')+'</tr>';
   const filtered=state.suppliers.filter(s=>{
     const statusMatch=status==='all'||(status==='archived'?!!s.archived:!s.archived);

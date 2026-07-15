@@ -243,11 +243,9 @@ function normalizeOrder(order={}){
 }
 
 function renderOrderHeader(cols){
-  const sort=sortState.orders;
   return '<tr>'+cols.map(col=>{
     if(!col.sort||col.key==='scan'||col.key==='actions')return`<th>${col.label}</th>`;
-    const sortClass=sort.col===col.sort?(sort.dir==='asc'?'sort-asc':'sort-desc'):'';
-    return`<th class="sortable ${sortClass}" onclick="sortTable('orders','${col.sort}')">${col.label}</th>`;
+    return sortableTableHeader(col.label,'orders',col.sort);
   }).join('')+'</tr>';
 }
 

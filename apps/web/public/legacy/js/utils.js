@@ -34,5 +34,12 @@ function aliasBadges(a){if(!a)return'';const chips=a.split(',').map(x=>x.trim())
 function previewAliases(){const v=document.getElementById('pm-aliases').value;document.getElementById('pm-aliases-preview').innerHTML=v.split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="alias-chip">${x}</span>`).join('');}
 function updateSubcatOptions(tid,sid){const cat=document.getElementById(sid).value;const s=document.getElementById(tid);if(!s)return;s.innerHTML=(SUBCATS[cat]||[]).map(x=>`<option>${x}</option>`).join('');}
 function updateSubcatFilter(tid,sid){const cat=document.getElementById(sid).value;const s=document.getElementById(tid);if(!s)return;s.innerHTML='<option value="">All</option>'+(cat?(SUBCATS[cat]||[]):[]).map(x=>`<option>${x}</option>`).join('');}
+function sortableTableHeader(label,tableKey,sortKey){
+  const current=sortState[tableKey]||{};
+  const direction=current.col===sortKey?current.dir:'none';
+  const sortClass=direction==='asc'?'sort-asc':direction==='desc'?'sort-desc':'';
+  const ariaSort=direction==='asc'?'ascending':direction==='desc'?'descending':'none';
+  return`<th class="sortable ${sortClass}" aria-sort="${ariaSort}"><button class="table-sort-button" type="button" onclick="sortTable('${tableKey}','${sortKey}')">${label}</button></th>`;
+}
 function sortTable(key,col){const s=sortState[key];s.dir=(s.col===col&&s.dir==='asc')?'desc':'asc';s.col=col;({products:renderProducts,inventories:renderInventoryTable,liveInventory:renderLiveInventoryPage,orders:renderOrders,suppliers:renderSuppliers,report:renderReport})[key]();}
 function sortArr(arr,col,dir){return[...arr].sort((a,b)=>{let va=a[col]??'',vb=b[col]??'';if(typeof va==='string')va=va.toLowerCase();if(typeof vb==='string')vb=vb.toLowerCase();return va<vb?(dir==='asc'?-1:1):va>vb?(dir==='asc'?1:-1):0;});}

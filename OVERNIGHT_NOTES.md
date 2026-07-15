@@ -100,3 +100,41 @@ All checks passed.
 ### Follow-up
 
 - Add similarly purposeful empty states to other workflows only where the current page leaves users without a clear next action.
+
+## Pass 4 — Keyboard-accessible table sorting
+
+### What changed
+
+- Replaced pointer-only sortable headers with semantic sort buttons in Products, Counts, Orders, and Suppliers.
+- Added visible keyboard-focus styling without changing the existing table layout.
+- Added `aria-sort` state so assistive technology can identify ascending, descending, and unsorted columns.
+- Centralized the sortable-header markup in one helper to keep behavior consistent across tables.
+
+### Why
+
+Sorting was attached directly to table-header click events, which excluded keyboard users and did not communicate the active sort direction to screen readers. The same sorting functions now work through accessible controls.
+
+### Files affected
+
+- `apps/web/public/legacy/js/utils.js`
+- `apps/web/public/legacy/js/products.js`
+- `apps/web/public/legacy/js/inventory.js`
+- `apps/web/public/legacy/js/orders.js`
+- `apps/web/public/legacy/js/suppliers.js`
+- `apps/web/public/legacy/css/styles.css`
+
+### Checks run
+
+- JavaScript syntax checks for all affected scripts
+- Targeted generated-header semantics and sort-state checks
+- Static check that pointer-only sortable headers were removed from all four tables
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Audit modal tab controls separately; several still use clickable non-button elements.
