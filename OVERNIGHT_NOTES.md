@@ -340,3 +340,35 @@ All checks passed.
 ### Follow-up
 
 - Review page-level headings and descriptions for department-neutral language now that the workspace supports Bar, Kitchen, and other teams.
+
+## Pass 11 — Department-neutral workspace descriptions
+
+### What changed
+
+- Updated the app-page description to describe multi-department hospitality inventory.
+- Changed the Dashboard subtitle from Bar-only inventory to inventory across departments.
+- Changed the initial Products helper to describe products, packaging, and suppliers by department.
+- Preserved the Keg Bar product name and all department-specific labels and behavior.
+
+### Why
+
+The workspace already supports Bar, Kitchen, Office Supply, and custom departments, but several prominent descriptions still implied that only Bar inventory belonged in the app. The revised copy matches the current information architecture and reduces uncertainty for non-Bar managers.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+
+### Checks run
+
+- Targeted department-neutral copy and brand-preservation checks
+- Static checks that the stale Bar-only descriptions were removed
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review mobile navigation discoverability now that all ten destinations appear in a horizontally scrolling bottom bar.
