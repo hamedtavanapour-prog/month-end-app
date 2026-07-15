@@ -550,38 +550,38 @@
 
 <!-- ORDER MODAL -->
 <div class="modal-overlay" id="modal-order">
-<div class="modal invoice-modal">
-  <button class="modal-close" onclick="closeModal('modal-order')">✕</button>
+<div class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="ord-modal-title">
+  <button class="modal-close" type="button" aria-label="Close order editor" onclick="closeModal('modal-order')">✕</button>
   <div class="invoice-modal-head">
     <div>
       <h3 id="ord-modal-title">New Invoice</h3>
-      <p id="order-validation-summary" class="validation-summary"></p>
+      <p id="order-validation-summary" class="validation-summary" role="alert" aria-live="polite"></p>
     </div>
     <label class="refund-toggle"><input type="checkbox" id="om-refund"> Refund / Credit</label>
   </div>
   <div class="form-grid invoice-grid">
-    <div class="form-group"><label>Supplier *</label><input type="text" id="om-supplier" list="supplier-options"></div>
-    <div class="form-group"><label>Date *</label><input type="date" id="om-date"></div>
-    <div class="form-group"><label>Invoice Number *</label><input type="text" id="om-invoice"></div>
-    <div class="form-group"><label>Total Order Price *</label><input type="number" min="0" step="0.01" id="om-total-price" oninput="updateOrderTotal()"></div>
-    <div class="form-group"><label>HST *</label><input type="number" min="0" step="0.01" id="om-hst"></div>
-    <div class="form-group"><label>Status</label><select id="om-status"><option>Draft</option><option>Finished</option><option>Pending</option><option>Received</option><option>Partial</option><option>Draft from Scan</option></select></div>
-    <div class="form-group"><label>Delivery Fee</label><input type="number" min="0" step="0.01" id="om-delivery-fee"></div>
-    <div class="form-group"><label>Agency Fee</label><input type="number" min="0" step="0.01" id="om-agency-fee"></div>
-    <div class="form-group"><label>Fuel Charge</label><input type="number" min="0" step="0.01" id="om-fuel-charge"></div>
-    <div class="form-group"><label>Store #</label><input type="text" id="om-store-number"></div>
-    <div class="form-group" style="grid-column:span 2;"><label>Store Address</label><input type="text" id="om-store-address"></div>
-    <div class="form-group" style="grid-column:1/-1"><label>Notes</label><input type="text" id="om-notes"></div>
+    <div class="form-group"><label for="om-supplier">Supplier *</label><input type="text" id="om-supplier" list="supplier-options"></div>
+    <div class="form-group"><label for="om-date">Date *</label><input type="date" id="om-date"></div>
+    <div class="form-group"><label for="om-invoice">Invoice Number *</label><input type="text" id="om-invoice"></div>
+    <div class="form-group"><label for="om-total-price">Total Order Price *</label><input type="number" min="0" step="0.01" id="om-total-price" oninput="updateOrderTotal()"></div>
+    <div class="form-group"><label for="om-hst">HST *</label><input type="number" min="0" step="0.01" id="om-hst"></div>
+    <div class="form-group"><label for="om-status">Status</label><select id="om-status"><option>Draft</option><option>Finished</option><option>Pending</option><option>Received</option><option>Partial</option><option>Draft from Scan</option></select></div>
+    <div class="form-group"><label for="om-delivery-fee">Delivery Fee</label><input type="number" min="0" step="0.01" id="om-delivery-fee"></div>
+    <div class="form-group"><label for="om-agency-fee">Agency Fee</label><input type="number" min="0" step="0.01" id="om-agency-fee"></div>
+    <div class="form-group"><label for="om-fuel-charge">Fuel Charge</label><input type="number" min="0" step="0.01" id="om-fuel-charge"></div>
+    <div class="form-group"><label for="om-store-number">Store #</label><input type="text" id="om-store-number"></div>
+    <div class="form-group" style="grid-column:span 2;"><label for="om-store-address">Store Address</label><input type="text" id="om-store-address"></div>
+    <div class="form-group" style="grid-column:1/-1"><label for="om-notes">Notes</label><input type="text" id="om-notes"></div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="font-size:0.84rem;font-weight:700;">Invoice Items *</span>
+    <span id="order-lines-label" style="font-size:0.84rem;font-weight:700;">Invoice Items *</span>
     <button class="btn btn-secondary btn-sm" onclick="addOrderLine()">＋ Add Item</button>
   </div>
   <div class="invoice-line-head">
     <span>Product</span><span>Product #</span><span>SKU</span><span>Qty</span><span>Unit</span><span>Unit Size</span><span>Unit Price</span><span>Deposit</span><span>Total</span><span></span>
   </div>
-  <div id="order-lines"></div>
-  <div style="margin-top:12px;text-align:right;font-weight:700;font-size:0.88rem;" id="order-total-disp"></div>
+  <div id="order-lines" role="group" aria-labelledby="order-lines-label"></div>
+  <div style="margin-top:12px;text-align:right;font-weight:700;font-size:0.88rem;" id="order-total-disp" aria-live="polite"></div>
   <datalist id="supplier-options"></datalist>
   <datalist id="invoice-product-options"></datalist>
   <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('modal-order')">Cancel</button><button class="btn btn-secondary" onclick="saveOrder('draft')">Save Draft</button><button class="btn btn-primary" onclick="saveOrder('finish')">Finish Invoice</button></div>

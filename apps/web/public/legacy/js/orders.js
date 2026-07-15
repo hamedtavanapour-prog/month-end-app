@@ -389,20 +389,22 @@ function addOrderLine(existingLine=null){
   const row=document.createElement('div');
   row.id='ol-'+lineId;
   row.className='order-line-row';
+  row.setAttribute('role','group');
+  row.setAttribute('aria-label','Invoice item');
   row.innerHTML=`
     <div class="invoice-product-search">
-      <input type="text" data-field="productName" placeholder="Search product" value="${escapeHtml(line.productName)}" oninput="showInvoiceProductSuggestions(this)" onblur="hideInvoiceProductSuggestions(this)">
+      <input type="text" data-field="productName" aria-label="Product" placeholder="Search product" value="${escapeHtml(line.productName)}" oninput="showInvoiceProductSuggestions(this)" onblur="hideInvoiceProductSuggestions(this)">
       <div class="invoice-product-menu"></div>
     </div>
-    <input type="text" data-field="productNumber" placeholder="Product #" value="${escapeHtml(line.productNumber)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="text" data-field="sku" placeholder="SKU" value="${escapeHtml(line.sku)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="number" min="0" step="0.01" data-field="qty" placeholder="Qty" value="${escapeHtml(line.qty)}" oninput="updateOrderTotal()">
-    <input type="text" data-field="unit" placeholder="Unit" value="${escapeHtml(line.unit)}">
-    <input type="text" data-field="unitSize" placeholder="Unit Size" value="${escapeHtml(line.unitSize)}" onblur="applyProductMatchToOrderLine(this)">
-    <input type="number" min="0" step="0.01" data-field="unitPrice" placeholder="Unit $" value="${escapeHtml(line.unitPrice)}" oninput="updateOrderTotal()">
-    <input type="number" min="0" step="0.01" data-field="deposit" placeholder="Deposit" value="${escapeHtml(line.deposit)}">
+    <input type="text" data-field="productNumber" aria-label="Product number" placeholder="Product #" value="${escapeHtml(line.productNumber)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="text" data-field="sku" aria-label="SKU" placeholder="SKU" value="${escapeHtml(line.sku)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="number" min="0" step="0.01" data-field="qty" aria-label="Quantity" placeholder="Qty" value="${escapeHtml(line.qty)}" oninput="updateOrderTotal()">
+    <input type="text" data-field="unit" aria-label="Unit" placeholder="Unit" value="${escapeHtml(line.unit)}">
+    <input type="text" data-field="unitSize" aria-label="Unit size" placeholder="Unit Size" value="${escapeHtml(line.unitSize)}" onblur="applyProductMatchToOrderLine(this)">
+    <input type="number" min="0" step="0.01" data-field="unitPrice" aria-label="Unit price" placeholder="Unit $" value="${escapeHtml(line.unitPrice)}" oninput="updateOrderTotal()">
+    <input type="number" min="0" step="0.01" data-field="deposit" aria-label="Deposit" placeholder="Deposit" value="${escapeHtml(line.deposit)}">
     <div class="order-line-total">$0.00</div>
-    <button class="btn btn-ghost-danger btn-sm" onclick="removeLine('ol-${lineId}')">✕</button>
+    <button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove invoice item" onclick="removeLine('ol-${lineId}')">✕</button>
   `;
   container.appendChild(row);
   updateOrderTotal();

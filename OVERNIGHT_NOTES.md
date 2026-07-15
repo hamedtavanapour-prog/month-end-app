@@ -505,3 +505,39 @@ All checks passed.
 ### Follow-up
 
 - Audit the New/Edit Order dialog separately because its invoice grid contains many dynamic controls.
+
+## Pass 16 — Accessible Order editor and line items
+
+### What changed
+
+- Identified the New/Edit Invoice surface as a modal dialog and connected it to its dynamic title.
+- Added a descriptive accessible name to the Order editor close button.
+- Explicitly connected all twelve static invoice labels to their controls.
+- Labelled every dynamic line-item input, the line-item group, and each remove action.
+- Made validation messages and invoice-total updates announce politely when they change.
+
+### Why
+
+The invoice header and dynamic item grid relied heavily on visual position and placeholders. Assistive-technology users can now understand and operate the same fields without changing order calculations, validation, product matching, or saving.
+
+### Files affected
+
+- `apps/web/public/legacy/index.html`
+- `apps/web/public/legacy/js/orders.js`
+
+### Checks run
+
+- JavaScript syntax check for `orders.js`
+- Order dialog title and close-control checks
+- Explicit label/control checks for all twelve invoice fields
+- Dynamic line-item input, group, remove-action, validation, and total-announcement checks
+- `git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+All checks passed.
+
+### Follow-up
+
+- Review upload drop zones for keyboard operation; several currently depend on click handlers attached to non-focusable containers.
