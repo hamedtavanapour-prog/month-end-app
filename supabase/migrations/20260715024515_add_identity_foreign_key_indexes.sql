@@ -1,0 +1,13 @@
+create index audit_logs_department_id_idx on public.audit_logs(department_id);
+create index departments_created_by_idx on public.departments(created_by);
+create index invitation_departments_department_id_idx on public.invitation_departments(department_id);
+create index invitation_permissions_permission_key_idx on public.invitation_permissions(permission_key);
+create index invitations_accepted_by_idx on public.invitations(accepted_by);
+create index invitations_invited_by_idx on public.invitations(invited_by);
+create index invitations_reports_to_idx on public.invitations(reports_to_membership_id);
+create index membership_departments_created_by_idx on public.membership_departments(created_by);
+create index membership_permissions_granted_by_idx on public.membership_permissions(granted_by);
+create index membership_permissions_permission_key_idx on public.membership_permissions(permission_key);
+create index memberships_created_by_idx on public.memberships(created_by);
+create index memberships_reports_to_idx on public.memberships(reports_to_membership_id);
+create index organizations_created_by_idx on public.organizations(created_by);

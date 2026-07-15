@@ -1,0 +1,21 @@
+{
+  "name": "month-end-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@month-end/web",
+    "build": "npm run build --workspace=@month-end/web",
+    "lint": "npm run lint --workspace=@month-end/web",
+    "typecheck": "npm run typecheck --workspace=@month-end/web"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "supabase": "2.109.1"
+  }
+}
