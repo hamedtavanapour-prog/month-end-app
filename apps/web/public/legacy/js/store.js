@@ -79,6 +79,7 @@ function compactStateForStorage(){
   return{
     products:state.products||[],
     drinks:state.drinks||[],
+    menus:state.menus||[],
     inventories:state.inventories||[],
     orders:state.orders||[],
     suppliers:state.suppliers||[],
@@ -137,7 +138,8 @@ function ensureDrinkCatalog(){
 
 function seedDefaultProducts(){
   return SEED_PRODUCTS.map(p=>{
-    const prod={...p,id:uid(),departments:['bar'],inventoryName:p.inventoryName||'',lastCount:null};
+    const{supplierNames,...seed}=p;
+    const prod={...seed,id:uid(),departments:['bar'],inventoryName:p.inventoryName||'',lastCount:p.lastCount===null||p.lastCount===undefined?null:Number(p.lastCount)};
     normalizeProductUnits(prod);
     return prod;
   });
@@ -145,8 +147,19 @@ function seedDefaultProducts(){
 
 function ensureProductCatalog(){
   if(!Array.isArray(state.products))state.products=[];
+  if(state.productCatalogVersion!==DEFAULT_PRODUCT_CATALOG_VERSION){
+    const existingByName=new Map(state.products.map(product=>[String(product.name||'').trim().toLowerCase(),product]).filter(([name])=>name));
+    const existingByInventoryName=new Map(state.products.map(product=>[String(product.inventoryName||'').trim().toLowerCase(),product]).filter(([name])=>name));
+    state.products=seedDefaultProducts().map(product=>{
+      const existing=existingByName.get(product.name.trim().toLowerCase())||existingByInventoryName.get(product.inventoryName.trim().toLowerCase());
+      return existing?{...product,id:existing.id}:product;
+    });
+    state.productCatalogVersion=DEFAULT_PRODUCT_CATALOG_VERSION;
+    return true;
+  }
   if(!state.products.length){
     state.products=seedDefaultProducts();
+    state.productCatalogVersion=DEFAULT_PRODUCT_CATALOG_VERSION;
     return true;
   }
   if(state.products.length>=Math.min(100,SEED_PRODUCTS.length))return false;
@@ -172,12 +185,32 @@ function supplierSeedProductIds(seedSupplier){
   return ids;
 }
 
+function supplierCatalogSeeds(){
+  const seeds=new Map();
+  (Array.isArray(SEED_SUPPLIERS)?SEED_SUPPLIERS:[]).forEach(seed=>{
+    const name=String(seed.name||'').trim();
+    if(!name)return;
+    seeds.set(name.toLowerCase(),{...seed,name,productNames:[...(seed.productNames||[])]});
+  });
+  SEED_PRODUCTS.forEach(product=>{
+    (product.supplierNames||[]).forEach(rawName=>{
+      const name=String(rawName||'').trim();
+      if(!name)return;
+      const key=name.toLowerCase();
+      const seed=seeds.get(key)||{name,productNames:[]};
+      if(!seed.productNames.includes(product.name))seed.productNames.push(product.name);
+      seeds.set(key,seed);
+    });
+  });
+  return[...seeds.values()];
+}
+
 function ensureSupplierCatalog(){
   if(!Array.isArray(state.suppliers))state.suppliers=[];
   if(typeof SEED_SUPPLIERS==='undefined'||!Array.isArray(SEED_SUPPLIERS))return false;
   const existingByName=new Map(state.suppliers.map(supplier=>[String(supplier.name||'').trim().toLowerCase(),supplier]).filter(([name])=>name));
   let changed=false;
-  SEED_SUPPLIERS.forEach(seed=>{
+  supplierCatalogSeeds().forEach(seed=>{
     const name=String(seed.name||'').trim();
     if(!name)return;
     const key=name.toLowerCase();
@@ -218,6 +251,7 @@ function syncAllSupplierProductLinks(){
 function normalizeLoadedState(){
   if(!state.products)state.products=[];
   if(!state.drinks)state.drinks=[];
+  if(!state.menus)state.menus=[];
   if(!state.inventories)state.inventories=[];
   if(!state.orders)state.orders=[];
   if(!state.suppliers)state.suppliers=[];
@@ -276,8 +310,9 @@ function normalizeLoadedState(){
   const suppliersChanged=ensureSupplierCatalog();
   const drinksChanged=ensureDrinkCatalog();
   const productMenusChanged=typeof ensureProductMenuSettings==='function'?ensureProductMenuSettings():false;
+  const menusChanged=typeof ensureMenuLibrary==='function'?ensureMenuLibrary():false;
   syncAllSupplierProductLinks();
-  return departmentsChanged||productSchemaChanged||productMenusChanged||productsChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged;
+  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged;
 }
 
 function load(){

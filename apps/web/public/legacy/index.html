@@ -6,7 +6,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css"/>
+<link rel="stylesheet" href="css/styles.css?v=mobile-count-5"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -43,6 +43,38 @@
         <button type="button" onclick="showPage('settings');setSettingsSection('profiles');closeAllMenus()">Switch User</button>
         <button type="button" onclick="logoutProfile()">Logout</button>
       </div>
+    </div>
+  </div>
+</nav>
+<nav class="mobile-nav" aria-label="Mobile navigation">
+  <button class="mobile-nav-item" id="mobile-nav-home" type="button" data-mobile-page="dashboard">
+    <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9.5 20v-6h5v6"/></svg></span><span>Home</span>
+  </button>
+  <div class="mobile-nav-menu-wrap">
+    <button class="mobile-nav-item" id="mobile-nav-actions" type="button" aria-haspopup="menu" aria-expanded="false">
+      <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></span><span>Actions</span>
+    </button>
+    <div class="mobile-nav-popover" id="mobile-actions-menu" role="menu" aria-label="Actions">
+      <span class="mobile-nav-popover-title">Actions</span>
+      <button type="button" role="menuitem" data-mobile-page="inventory"><span aria-hidden="true">📋</span><span><strong>Counts</strong><small>File and review inventory counts</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="orders"><span aria-hidden="true">🛒</span><span><strong>Orders</strong><small>Draft and manage orders</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="usage"><span aria-hidden="true">📈</span><span><strong>Usage</strong><small>Import and review usage</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="reports"><span aria-hidden="true">📄</span><span><strong>Reports</strong><small>Review and export reports</small></span></button>
+    </div>
+  </div>
+  <button class="mobile-nav-item" id="mobile-nav-live" type="button" data-mobile-page="live-inventory">
+    <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span>Live Inventory</span>
+  </button>
+  <div class="mobile-nav-menu-wrap">
+    <button class="mobile-nav-item" id="mobile-nav-more" type="button" aria-haspopup="menu" aria-expanded="false">
+      <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span><span>More</span>
+    </button>
+    <div class="mobile-nav-popover" id="mobile-more-menu" role="menu" aria-label="More">
+      <span class="mobile-nav-popover-title">More</span>
+      <button type="button" role="menuitem" data-mobile-page="products"><span aria-hidden="true">📦</span><span><strong>Products</strong><small>Catalog and drink items</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="insights"><span aria-hidden="true">💡</span><span><strong>Insights</strong><small>Inventory trends and alerts</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="suppliers"><span aria-hidden="true">🏭</span><span><strong>Suppliers</strong><small>Contacts and product links</small></span></button>
+      <button type="button" role="menuitem" data-mobile-page="settings"><span aria-hidden="true">⚙️</span><span><strong>Settings</strong><small>Workspace and account setup</small></span></button>
     </div>
   </div>
 </nav>
@@ -289,7 +321,7 @@
         <button class="settings-nav-item active" type="button" data-settings-key="general" onclick="setSettingsSection('general')"><span class="settings-icon">⚙️</span><span>General</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="floor-plan" onclick="setSettingsSection('floor-plan')"><span class="settings-icon">🧭</span><span>Floor Plan</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="departments" onclick="setSettingsSection('departments')"><span class="settings-icon">🏢</span><span>Departments</span></button>
-        <button class="settings-nav-item" type="button" data-settings-key="product-menus" onclick="setSettingsSection('product-menus')"><span class="settings-icon">📦</span><span>Product Menus</span></button>
+        <button class="settings-nav-item" type="button" data-settings-key="product-menus" onclick="setSettingsSection('product-menus')"><span class="settings-icon">📋</span><span>Menu</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="profiles" onclick="setSettingsSection('profiles')"><span class="settings-icon">👤</span><span>Profiles</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="appearance" onclick="setSettingsSection('appearance')"><span class="settings-icon">◐</span><span>Appearance</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="sync" onclick="setSettingsSection('sync')"><span class="settings-icon">☁️</span><span>Sync & Storage</span></button>
@@ -304,7 +336,7 @@
           <button class="settings-row" type="button" onclick="setSettingsSection('floor-plan')"><span class="settings-icon">🧭</span><strong>Floor Plan</strong><em>Rooms and spaces</em></button>
           <button class="settings-row" type="button" onclick="setSettingsSection('departments')"><span class="settings-icon">🏢</span><strong>Departments</strong><em>Bar, Kitchen, Office Supply, and more</em></button>
           <button class="settings-row" type="button" onclick="setSettingsSection('profiles')"><span class="settings-icon">👤</span><strong>Profiles</strong><em>Managers and switching</em></button>
-          <button class="settings-row" type="button" onclick="setSettingsSection('product-menus')"><span class="settings-icon">📦</span><strong>Product Menus</strong><em>Bar, Kitchen, and drink groups</em></button>
+          <button class="settings-row" type="button" onclick="setSettingsSection('product-menus')"><span class="settings-icon">📋</span><strong>Menu</strong><em>Seasonal menus, items, and recipes</em></button>
           <button class="settings-row" type="button" onclick="setSettingsSection('appearance')"><span class="settings-icon">◐</span><strong>Appearance</strong><em>Theme and display</em></button>
         </div>
       </div>
@@ -336,20 +368,19 @@
         </div>
       </div>
       <div class="settings-pane" data-settings-pane="product-menus">
-        <div class="settings-section-head"><h3>Product Menus</h3><p>Each department has its own Product workspace menu. Rename, show, hide, and reorder the available views here.</p></div>
+        <div class="settings-section-head"><h3>Menus</h3><p>Create independent menus for different seasons or locations. Each menu keeps its own items and recipes.</p></div>
         <div class="settings-group">
-          <div class="product-menu-settings-head">
-            <div class="segmented-control settings-product-menu-workspaces" id="settings-product-menu-workspace"></div>
-            <button class="btn btn-secondary btn-sm" type="button" onclick="resetProductMenuSettings()">Restore Defaults</button>
+          <div class="menu-create-bar">
+            <input type="text" id="settings-menu-name" placeholder="e.g. Lobster Summer 2026" onkeydown="if(event.key==='Enter')addSettingsMenu()">
+            <button class="btn btn-primary btn-sm" type="button" onclick="addSettingsMenu()">＋ Create Menu</button>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('settings-menu-file').click()">⬆ Import Menu</button>
+            <input type="file" id="settings-menu-file" accept=".xlsx,.xls,.csv,.pdf,.txt,.json,image/*" hidden onchange="handleMenuImport(event)">
           </div>
-          <p class="settings-note">Each entry controls a working catalog view. Drink views are only available in Bar.</p>
-          <div class="product-menu-settings-list" id="settings-product-menu-list"></div>
+          <p class="settings-note">Import Excel, CSV, PDF, text, JSON, or an image. Imported items become an editable draft so you can confirm names, prices, and recipes.</p>
+          <div class="menu-import-status" id="settings-menu-import-status" hidden></div>
+          <div class="menu-settings-list" id="settings-menu-list"></div>
         </div>
-        <div class="settings-group" id="settings-drink-classification-group">
-          <div class="settings-section-head compact"><h3>Drink Classification</h3><p>Choose which drinks appear in your Core and Non-Core views.</p></div>
-          <input type="search" id="settings-drink-search" placeholder="Search drinks…" oninput="renderDrinkClassificationSettings()">
-          <div class="drink-classification-list" id="settings-drink-classification-list"></div>
-        </div>
+        <div class="settings-group menu-editor" id="settings-menu-editor" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="profiles">
         <div class="settings-section-head"><h3>Profiles</h3><p>Invite managers, assign room access, and control what each person can work on.</p></div>
@@ -400,15 +431,21 @@
 <div class="modal-overlay" id="modal-inv-room-select">
 <div class="modal room-select-modal" role="dialog" aria-modal="true" aria-labelledby="room-count-title">
   <button class="modal-close" type="button" aria-label="Close new count" onclick="closeModal('modal-inv-room-select')">✕</button>
-  <h3 id="room-count-title">New Count</h3>
+  <div class="count-setup-step">Step 1 of 2</div>
+  <h3 id="room-count-title"><span class="desktop-only">New Count</span><span class="mobile-only">Start New Count</span></h3>
+  <p class="count-setup-intro">Name this count and confirm the date. You will choose the room on the next screen.</p>
   <div class="form-grid" style="margin-bottom:16px;">
     <div class="form-group"><label for="room-count-date">Date</label><input type="date" id="room-count-date"></div>
     <div class="form-group"><label for="room-count-label">Label</label><input type="text" id="room-count-label" placeholder="e.g. Month End June"></div>
   </div>
   <div class="room-select-grid" id="room-count-list"></div>
-  <div class="modal-actions">
+  <div class="modal-actions room-select-desktop-actions">
     <button class="btn btn-secondary" onclick="closeModal('modal-inv-room-select')">Cancel</button>
     <button class="btn btn-primary" onclick="createCountDraft()">Create Draft</button>
+  </div>
+  <div class="modal-actions room-select-phone-actions">
+    <button class="btn btn-secondary" onclick="closeModal('modal-inv-room-select')">Cancel</button>
+    <button class="btn btn-primary" id="mobile-count-continue" type="button">Continue to Count →</button>
   </div>
 </div>
 </div>
@@ -418,22 +455,32 @@
 <div class="inv-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-count-title">
   <div class="inv-modal-header">
     <button class="modal-close" type="button" aria-label="Close inventory count" onclick="closeModal('modal-inventory')" style="position:absolute;top:14px;right:14px;">✕</button>
-    <h3 id="inventory-count-title">File Inventory Count</h3>
+    <div class="count-setup-step mobile-only">Step 2 of 2</div>
+    <h3 id="inventory-count-title"><span class="desktop-only">File Inventory Count</span><span class="mobile-only">Count Items</span></h3>
+    <div class="mobile-count-context mobile-only"><strong id="mobile-count-label">Inventory Count</strong><span id="mobile-count-date"></span></div>
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group"><label for="inv-date">Date</label><input type="date" id="inv-date"></div>
       <div class="form-group"><label for="inv-label">Label</label><input type="text" id="inv-label" placeholder="e.g. Month End May"></div>
     </div>
     <div class="inv-room-manager">
       <div class="inv-room-tabs" id="inv-room-tabs"></div>
+      <label class="inv-room-select-mobile mobile-only" for="inv-room-select"><span>Room</span><select id="inv-room-select" onchange="switchInventoryRoom(this.value)"></select></label>
     </div>
   </div>
   <div class="inv-modal-filters">
-    <div class="form-row" style="margin-bottom:6px;">
+    <div class="form-row inv-filter-row" style="margin-bottom:6px;">
       <div class="form-group" style="flex:2;min-width:110px;"><label for="inv-search">Search</label><input type="text" id="inv-search" placeholder="Filter…" oninput="renderInvRows()"></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
-      <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
-      <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
+      <button class="btn btn-secondary inv-filter-trigger mobile-only" type="button" onclick="openInventoryFilterSheet()"><span>Sort & Filter</span><small id="inv-filter-summary">Default</small></button>
+      <div class="inv-filter-sheet" id="inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="inv-filter-title">
+        <div class="inv-filter-sheet-head mobile-only"><div><span>Count options</span><h4 id="inv-filter-title">Sort & Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeInventoryFilterSheet()">✕</button></div>
+        <div class="inv-filter-sheet-fields">
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
+          <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
+        </div>
+        <button class="btn btn-primary inv-filter-done mobile-only" id="inv-filter-done" type="button">Done</button>
+      </div>
     </div>
   </div>
   <div class="inv-modal-progress">
@@ -447,8 +494,8 @@
   <div class="inv-modal-footer">
     <button class="voice-btn" id="voice-btn-inventory" onclick="toggleVoice('inventory')"><span style="font-size:1.1rem;">🎙</span> Voice Count</button>
     <div style="display:flex;gap:10px;">
-      <button class="btn btn-secondary" onclick="closeModal('modal-inventory')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveInventory()">Finish Count</button>
+      <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="inventory-count-finish" type="button"><span class="desktop-only">Finish Count</span><span class="mobile-only">Finish & View Report</span></button>
     </div>
   </div>
 </div>
@@ -774,9 +821,9 @@
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
-<script src="js/ui.js"></script>
+<script src="js/ui.js?v=mobile-nav-6"></script>
 <script src="js/products.js"></script>
-<script src="js/inventory.js"></script>
+<script src="js/inventory.js?v=mobile-count-5"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>

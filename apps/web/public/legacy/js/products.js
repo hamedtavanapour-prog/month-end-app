@@ -728,77 +728,404 @@ function refreshProductCatalogIfVisible(){
   if(document.getElementById('page-products')?.classList.contains('active'))renderProducts();
 }
 
-function setSettingsProductMenuWorkspace(department){
-  if(!getDepartment(department)||getDepartment(department).archived)return;
-  settingsProductMenuWorkspace=department;
+function normalizeMenuLibraryItem(item,index=0){
+  const ingredients=Array.isArray(item?.ingredients)?item.ingredients.join('\n'):'';
+  return{
+    id:item?.id||uid(),
+    name:String(item?.name||item?.title||`Menu item ${index+1}`).trim()||`Menu item ${index+1}`,
+    category:String(item?.category||item?.section||'').trim(),
+    description:String(item?.description||item?.details||'').trim(),
+    recipe:String(item?.recipe||ingredients||item?.method||'').trim(),
+    price:String(item?.price??item?.cost??'').replace(/^\$/,'').trim(),
+    source:String(item?.source||'manual')
+  };
+}
+
+function ensureMenuLibrary(){
+  let changed=false;
+  if(!Array.isArray(state.menus)){state.menus=[];changed=true;}
+  const seen=new Set();
+  const normalized=state.menus.map((menu,index)=>{
+    if(!menu||seen.has(menu.id)){changed=true;return null;}
+    const next={
+      id:menu.id||uid(),
+      name:String(menu.name||`Menu ${index+1}`).trim()||`Menu ${index+1}`,
+      description:String(menu.description||'').trim(),
+      active:menu.active!==false,
+      sourceFile:String(menu.sourceFile||''),
+      importedAt:String(menu.importedAt||''),
+      items:(Array.isArray(menu.items)?menu.items:[]).map(normalizeMenuLibraryItem)
+    };
+    seen.add(next.id);
+    if(JSON.stringify(menu)!==JSON.stringify(next))changed=true;
+    return next;
+  }).filter(Boolean);
+  if(JSON.stringify(state.menus)!==JSON.stringify(normalized))changed=true;
+  state.menus=normalized;
+  return changed;
+}
+
+function getSettingsMenu(id){ensureMenuLibrary();return state.menus.find(menu=>menu.id===id)||null;}
+
+function addSettingsMenu(){
+  const input=document.getElementById('settings-menu-name');
+  const name=String(input?.value||'').trim();
+  if(!name){toast('Enter a menu name.',true);input?.focus();return;}
+  const menu={id:uid(),name,description:'',active:true,sourceFile:'',importedAt:'',items:[]};
+  state.menus.push(menu);
+  selectedSettingsMenuId=menu.id;
+  if(input)input.value='';
+  save();
   renderProductMenuSettings();
+  toast(`${name} created.`);
+}
+
+function selectSettingsMenu(id){
+  selectedSettingsMenuId=getSettingsMenu(id)?.id||null;
+  renderProductMenuSettings();
+  document.getElementById('settings-menu-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function closeSettingsMenuEditor(){selectedSettingsMenuId=null;renderProductMenuSettings();}
+
+function updateSettingsMenu(id,field,value){
+  const menu=getSettingsMenu(id);
+  if(!menu||!['name','description'].includes(field))return;
+  const next=String(value||'').trim();
+  if(field==='name'&&!next){toast('A menu needs a name.',true);renderProductMenuSettings();return;}
+  menu[field]=next;
+  save();
+  renderProductMenuSettings();
+  toast('Menu updated.');
+}
+
+function toggleSettingsMenuActive(id,active,checkbox){
+  const menu=getSettingsMenu(id);
+  if(!menu)return;
+  menu.active=!!active;
+  save();
+  const label=checkbox?.closest('.menu-active-toggle');
+  const row=checkbox?.closest('.menu-setting-row');
+  if(label?.querySelector('span'))label.querySelector('span').textContent=menu.active?'Active':'Inactive';
+  if(row)row.classList.toggle('is-inactive',!menu.active);
+  toast(menu.active?'Menu activated.':'Menu deactivated.');
+}
+
+function moveSettingsMenu(id,direction){
+  ensureMenuLibrary();
+  const index=state.menus.findIndex(menu=>menu.id===id);
+  const target=index+direction;
+  if(index<0||target<0||target>=state.menus.length)return;
+  [state.menus[index],state.menus[target]]=[state.menus[target],state.menus[index]];
+  save();
+  renderProductMenuSettings();
+}
+
+function deleteSettingsMenu(id){
+  const menu=getSettingsMenu(id);
+  if(!menu||!confirm(`Delete “${menu.name}” and its ${menu.items.length} item${menu.items.length===1?'':'s'}?`))return;
+  state.menus=state.menus.filter(entry=>entry.id!==id);
+  if(selectedSettingsMenuId===id)selectedSettingsMenuId=null;
+  save();
+  renderProductMenuSettings();
+  toast('Menu deleted.');
+}
+
+function menuCatalogOptions(){
+  const drinks=(state.drinks||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  const products=(state.products||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  return`<option value="">Choose a drink or product…</option>
+    <optgroup label="Drinks">${drinks.map(item=>`<option value="drink:${item.id}">${escapeHtml(item.name)}</option>`).join('')}</optgroup>
+    <optgroup label="Products">${products.map(item=>`<option value="product:${item.id}">${escapeHtml(item.name)}</option>`).join('')}</optgroup>`;
+}
+
+function recipeFromCatalogDrink(drink){
+  const sections=[];
+  if((drink.ingredients||[]).length)sections.push(`Ingredients:\n${drink.ingredients.map(item=>`• ${item}`).join('\n')}`);
+  if(drink.method)sections.push(`Method: ${drink.method}`);
+  if(drink.glassware)sections.push(`Glassware: ${drink.glassware}`);
+  return sections.join('\n');
+}
+
+function addCatalogItemToSettingsMenu(){
+  const menu=getSettingsMenu(selectedSettingsMenuId);
+  const select=document.getElementById('settings-menu-catalog-add');
+  if(!menu||!select?.value){toast('Choose a drink or product first.',true);return;}
+  const [kind,id]=select.value.split(':');
+  const source=kind==='drink'?(state.drinks||[]).find(item=>item.id===id):getProduct(id);
+  if(!source)return;
+  menu.items.push(normalizeMenuLibraryItem({
+    id:uid(),
+    name:source.name,
+    category:kind==='drink'?(source.family||'Drink'):(source.category||'Product'),
+    description:kind==='drink'?'':(source.subcategory||''),
+    recipe:kind==='drink'?recipeFromCatalogDrink(source):'',
+    source:`catalog-${kind}`
+  },menu.items.length));
+  save();
+  renderProductMenuSettings();
+  toast(`${source.name} added as an independent menu item.`);
+}
+
+function addBlankSettingsMenuItem(){
+  const menu=getSettingsMenu(selectedSettingsMenuId);
+  if(!menu)return;
+  const item=normalizeMenuLibraryItem({id:uid(),name:'New menu item'},menu.items.length);
+  menu.items.push(item);
+  save();
+  renderProductMenuSettings();
+  document.querySelector(`[data-menu-item-id="${item.id}"] input[data-menu-item-field="name"]`)?.select();
+}
+
+function updateSettingsMenuItem(menuId,itemId,field,value){
+  const item=getSettingsMenu(menuId)?.items.find(entry=>entry.id===itemId);
+  if(!item||!['name','category','description','recipe','price'].includes(field))return;
+  item[field]=String(value||'').trim();
+  save();
+}
+
+function moveSettingsMenuItem(menuId,itemId,direction){
+  const menu=getSettingsMenu(menuId);
+  if(!menu)return;
+  const index=menu.items.findIndex(item=>item.id===itemId);
+  const target=index+direction;
+  if(index<0||target<0||target>=menu.items.length)return;
+  [menu.items[index],menu.items[target]]=[menu.items[target],menu.items[index]];
+  save();
+  renderProductMenuSettings();
+}
+
+function deleteSettingsMenuItem(menuId,itemId){
+  const menu=getSettingsMenu(menuId);
+  if(!menu)return;
+  menu.items=menu.items.filter(item=>item.id!==itemId);
+  save();
+  renderProductMenuSettings();
+  toast('Menu item removed.');
+}
+
+function renderSettingsMenuEditor(menu){
+  const editor=document.getElementById('settings-menu-editor');
+  if(!editor)return;
+  if(!menu){editor.hidden=true;editor.innerHTML='';return;}
+  editor.hidden=false;
+  editor.innerHTML=`
+    <div class="menu-editor-heading">
+      <div><h3>Edit Menu</h3><p>Recipes here belong only to this menu. Editing them will not change another menu or the master catalog.</p></div>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="closeSettingsMenuEditor()">Close</button>
+    </div>
+    <div class="menu-editor-fields">
+      <label><span>Menu name</span><input type="text" value="${escapeHtml(menu.name)}" onchange="updateSettingsMenu('${menu.id}','name',this.value)"></label>
+      <label><span>Description</span><input type="text" value="${escapeHtml(menu.description)}" placeholder="Season, location, or notes" onchange="updateSettingsMenu('${menu.id}','description',this.value)"></label>
+    </div>
+    <div class="menu-item-toolbar">
+      <select id="settings-menu-catalog-add" aria-label="Choose a catalog item">${menuCatalogOptions()}</select>
+      <button class="btn btn-primary btn-sm" type="button" onclick="addCatalogItemToSettingsMenu()">＋ Add Selected</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="addBlankSettingsMenuItem()">＋ Blank Item</button>
+    </div>
+    <div class="menu-item-settings-list">
+      ${menu.items.length?menu.items.map((item,index)=>`<div class="menu-item-setting-row" data-menu-item-id="${item.id}">
+        <div class="menu-item-order"><span aria-hidden="true">⋮⋮</span><button type="button" title="Move up" ${index===0?'disabled':''} onclick="moveSettingsMenuItem('${menu.id}','${item.id}',-1)">↑</button><button type="button" title="Move down" ${index===menu.items.length-1?'disabled':''} onclick="moveSettingsMenuItem('${menu.id}','${item.id}',1)">↓</button></div>
+        <div class="menu-item-fields">
+          <input type="text" data-menu-item-field="name" aria-label="Menu item name" value="${escapeHtml(item.name)}" placeholder="Drink or item name" onchange="updateSettingsMenuItem('${menu.id}','${item.id}','name',this.value)">
+          <input type="text" data-menu-item-field="category" aria-label="Menu item category" value="${escapeHtml(item.category)}" placeholder="Category or section" onchange="updateSettingsMenuItem('${menu.id}','${item.id}','category',this.value)">
+          <textarea data-menu-item-field="description" aria-label="Menu item description" placeholder="Guest-facing description" onchange="updateSettingsMenuItem('${menu.id}','${item.id}','description',this.value)">${escapeHtml(item.description)}</textarea>
+          <textarea data-menu-item-field="recipe" aria-label="Menu item recipe" placeholder="Ingredients, quantities, method, and glassware" onchange="updateSettingsMenuItem('${menu.id}','${item.id}','recipe',this.value)">${escapeHtml(item.recipe)}</textarea>
+          <label class="menu-price-field"><span>$</span><input type="text" inputmode="decimal" data-menu-item-field="price" aria-label="Menu item price" value="${escapeHtml(item.price)}" placeholder="Price" onchange="updateSettingsMenuItem('${menu.id}','${item.id}','price',this.value)"></label>
+        </div>
+        <button class="btn btn-ghost-danger btn-sm menu-item-delete" type="button" onclick="deleteSettingsMenuItem('${menu.id}','${item.id}')">Delete</button>
+      </div>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Add from the drink/product catalog, create a blank item, or import a file.</span></div>'}
+    </div>`;
 }
 
 function renderProductMenuSettings(){
-  const list=document.getElementById('settings-product-menu-list');
+  const list=document.getElementById('settings-menu-list');
   if(!list)return;
-  ensureProductMenuSettings();
-  if(!getDepartment(settingsProductMenuWorkspace)||getDepartment(settingsProductMenuWorkspace).archived)settingsProductMenuWorkspace=activeDepartments()[0]?.id||'bar';
-  const workspaceTabs=document.getElementById('settings-product-menu-workspace');
-  if(workspaceTabs)workspaceTabs.innerHTML=activeDepartments().map(department=>`<button type="button" class="${department.id===settingsProductMenuWorkspace?'active':''}" data-settings-product-workspace="${department.id}" onclick="setSettingsProductMenuWorkspace('${department.id}')">${escapeHtml(department.name)}</button>`).join('');
-  const entries=productMenuEntries(settingsProductMenuWorkspace);
-  list.innerHTML=entries.map((item,index)=>{
-    const definition=PRODUCT_MENU_DEFINITIONS[item.view];
-    return`<div class="product-menu-setting-row">
-      <span class="product-menu-drag" aria-hidden="true">⋮⋮</span>
-      <div class="product-menu-setting-copy"><input type="text" value="${escapeHtml(item.label)}" aria-label="Menu label" onchange="updateProductMenuLabel('${item.view}',this.value)"><small>${escapeHtml(definition.description)}</small></div>
-      <label class="product-menu-visible"><input type="checkbox" ${item.visible?'checked':''} onchange="toggleProductMenuVisibility('${item.view}',this.checked,this)"><span>Show</span></label>
-      <div class="product-menu-order-actions"><button class="btn btn-secondary btn-sm" type="button" title="Move up" ${index===0?'disabled':''} onclick="moveProductMenuItem('${item.view}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" title="Move down" ${index===entries.length-1?'disabled':''} onclick="moveProductMenuItem('${item.view}',1)">↓</button></div>
-    </div>`;
-  }).join('');
-  const drinkGroup=document.getElementById('settings-drink-classification-group');
-  if(drinkGroup)drinkGroup.hidden=settingsProductMenuWorkspace!=='bar';
-  if(settingsProductMenuWorkspace==='bar')renderDrinkClassificationSettings();
+  ensureMenuLibrary();
+  if(selectedSettingsMenuId&&!getSettingsMenu(selectedSettingsMenuId))selectedSettingsMenuId=null;
+  list.innerHTML=state.menus.length?state.menus.map((menu,index)=>`<div class="menu-setting-row ${menu.active?'':'is-inactive'}">
+    <span class="menu-setting-drag" aria-hidden="true">⋮⋮</span>
+    <button class="menu-setting-main" type="button" onclick="selectSettingsMenu('${menu.id}')"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></button>
+    <label class="menu-active-toggle"><input type="checkbox" aria-label="Menu active" ${menu.active?'checked':''} onchange="toggleSettingsMenuActive('${menu.id}',this.checked,this)"><span>${menu.active?'Active':'Inactive'}</span></label>
+    <div class="menu-setting-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="selectSettingsMenu('${menu.id}')">Edit</button><button class="btn btn-secondary btn-sm" type="button" title="Move up" ${index===0?'disabled':''} onclick="moveSettingsMenu('${menu.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" title="Move down" ${index===state.menus.length-1?'disabled':''} onclick="moveSettingsMenu('${menu.id}',1)">↓</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deleteSettingsMenu('${menu.id}')">Delete</button></div>
+  </div>`).join(''):'<div class="menu-empty-state"><strong>No menus yet</strong><span>Create a menu from scratch or import an existing menu file.</span></div>';
+  renderSettingsMenuEditor(getSettingsMenu(selectedSettingsMenuId));
 }
 
-function updateProductMenuLabel(view,value){
-  const item=productMenuEntries(settingsProductMenuWorkspace).find(entry=>entry.view===view);
-  if(!item)return;
-  item.label=String(value||'').trim()||PRODUCT_MENU_DEFINITIONS[view].label;
-  save();
-  renderProductMenuSettings();
-  refreshProductCatalogIfVisible();
-  toast('Product menu updated.');
+function setMenuImportStatus(message,error=false){
+  const status=document.getElementById('settings-menu-import-status');
+  if(!status)return;
+  status.hidden=!message;
+  status.classList.toggle('error',!!error);
+  status.textContent=message||'';
 }
 
-function toggleProductMenuVisibility(view,visible,checkbox){
-  const entries=productMenuEntries(settingsProductMenuWorkspace);
-  const item=entries.find(entry=>entry.view===view);
-  if(!item)return;
-  if(!visible&&entries.filter(entry=>entry.visible).length<=1){
-    if(checkbox)checkbox.checked=true;
-    toast('Keep at least one menu item visible.',true);
-    return;
+function menuNameFromFile(fileName){
+  const name=String(fileName||'Imported Menu').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();
+  return name||'Imported Menu';
+}
+
+function textRowsForMenu(text){
+  return String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>[line]);
+}
+
+async function ocrMenuImage(image){
+  if(typeof Tesseract==='undefined')throw new Error('The image reader did not load. Refresh and try again.');
+  const result=await Tesseract.recognize(image,'eng',{logger:event=>{
+    if(event.status==='recognizing text')setMenuImportStatus(`Scanning menu… ${Math.round((event.progress||0)*100)}%`);
+  }});
+  return textRowsForMenu(result?.data?.text||'');
+}
+
+async function readMenuPdfRows(file){
+  try{
+    return await readUsagePdfRows(await file.arrayBuffer());
+  }catch(readError){
+    const pdfjs=window.pdfjsLib;
+    if(!pdfjs||typeof Tesseract==='undefined')throw readError;
+    setMenuImportStatus('This PDF looks scanned. Running text recognition…');
+    if(pdfjs.GlobalWorkerOptions&&!pdfjs.GlobalWorkerOptions.workerSrc)pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const doc=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+    const rows=[];
+    for(let pageNumber=1;pageNumber<=doc.numPages;pageNumber++){
+      setMenuImportStatus(`Scanning PDF page ${pageNumber} of ${doc.numPages}…`);
+      const page=await doc.getPage(pageNumber);
+      const viewport=page.getViewport({scale:1.6});
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.ceil(viewport.width);
+      canvas.height=Math.ceil(viewport.height);
+      await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+      rows.push(...await ocrMenuImage(canvas));
+    }
+    return rows;
   }
-  item.visible=!!visible;
-  save();
-  renderProductMenuSettings();
-  refreshProductCatalogIfVisible();
 }
 
-function moveProductMenuItem(view,direction){
-  const entries=productMenuEntries(settingsProductMenuWorkspace);
-  const index=entries.findIndex(entry=>entry.view===view);
-  const target=index+direction;
-  if(index<0||target<0||target>=entries.length)return;
-  [entries[index],entries[target]]=[entries[target],entries[index]];
-  save();
-  renderProductMenuSettings();
-  refreshProductCatalogIfVisible();
+async function readMenuImportData(file){
+  const lowerName=String(file.name||'').toLowerCase();
+  if(file.type==='application/json'||lowerName.endsWith('.json')){
+    const parsed=JSON.parse(await file.text());
+    if(Array.isArray(parsed))return{items:parsed};
+    if(Array.isArray(parsed?.items))return{name:parsed.name,description:parsed.description,items:parsed.items};
+    throw new Error('The JSON file needs an items array.');
+  }
+  if(file.type.startsWith('image/'))return{rows:await ocrMenuImage(file)};
+  if(file.type==='application/pdf'||lowerName.endsWith('.pdf'))return{rows:await readMenuPdfRows(file)};
+  if(file.type.startsWith('text/')||lowerName.endsWith('.txt'))return{rows:textRowsForMenu(await file.text())};
+  return{rows:readUsageSpreadsheetRows(await file.arrayBuffer())};
 }
 
-function resetProductMenuSettings(){
-  const defaults=defaultProductMenuSettings();
-  state.productMenus[settingsProductMenuWorkspace]=defaults[settingsProductMenuWorkspace];
-  save();
-  renderProductMenuSettings();
-  refreshProductCatalogIfVisible();
-  toast(`${departmentName(settingsProductMenuWorkspace)} product menu restored.`);
+function menuHeaderKey(value){
+  const text=String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ');
+  if(/^(menu )?(item|item name|drink|drink name|name|title|product)$/.test(text))return'name';
+  if(/recipe|ingredient|preparation|method|build/.test(text))return'recipe';
+  if(/description|detail|note/.test(text))return'description';
+  if(/price|cost/.test(text))return'price';
+  if(/category|section|type|course|group/.test(text))return'category';
+  return'';
+}
+
+function menuPriceValue(value){
+  const match=String(value||'').trim().match(/(?:\$|CAD\s*)?(\d+(?:\.\d{1,2})?)\s*$/i);
+  return match?match[1]:'';
+}
+
+function menuItemsFromRows(rawRows){
+  const rows=(Array.isArray(rawRows)?rawRows:[]).map(row=>(Array.isArray(row)?row:[row]).map(cell=>String(cell??'').replace(/\s+/g,' ').trim()).filter(Boolean)).filter(row=>row.length);
+  if(!rows.length)return[];
+  let headerIndex=-1;
+  let columns={};
+  rows.slice(0,12).some((row,index)=>{
+    const mapped=row.map(menuHeaderKey);
+    if(mapped.includes('name')&&mapped.filter(Boolean).length>=2){
+      headerIndex=index;
+      mapped.forEach((key,column)=>{if(key&&columns[key]===undefined)columns[key]=column;});
+      return true;
+    }
+    return false;
+  });
+
+  const items=[];
+  if(headerIndex>=0){
+    rows.slice(headerIndex+1).forEach(row=>{
+      const name=String(row[columns.name]||'').trim();
+      if(!name)return;
+      const recipeParts=[];
+      if(columns.recipe!==undefined&&row[columns.recipe])recipeParts.push(row[columns.recipe]);
+      row.forEach((value,index)=>{
+        if(!value||Object.values(columns).includes(index))return;
+        if(/ingredients?|method|glassware/i.test(value))recipeParts.push(value);
+      });
+      items.push(normalizeMenuLibraryItem({
+        name,
+        category:columns.category!==undefined?row[columns.category]:'',
+        description:columns.description!==undefined?row[columns.description]:'',
+        recipe:recipeParts.join('\n'),
+        price:columns.price!==undefined?menuPriceValue(row[columns.price]):'',
+        source:'import'
+      },items.length));
+    });
+    return items;
+  }
+
+  rows.forEach(row=>{
+    const cells=[...row];
+    let price='';
+    const finalCell=cells.at(-1)||'';
+    const parsedPrice=menuPriceValue(finalCell);
+    if(parsedPrice&&(cells.length>1||/[\$]|\d+\.\d{2}\s*$/.test(finalCell))){
+      price=parsedPrice;
+      cells[cells.length-1]=finalCell.replace(/(?:\$|CAD\s*)?\d+(?:\.\d{1,2})?\s*$/i,'').trim();
+      if(!cells.at(-1))cells.pop();
+    }
+    const clean=cells.filter(Boolean);
+    if(!clean.length)return;
+    if(clean.length===1){
+      const line=clean[0];
+      const looksLikeRecipe=items.length>0&&(/^[•·\-*]/.test(line)||/^(ingredients?|method|glassware|preparation)\s*:/i.test(line)||line.includes(',')||/^\d+(?:\.\d+)?\s*(oz|ml|cl|dash|drop|tsp|tbsp)\b/i.test(line));
+      if(looksLikeRecipe){
+        items.at(-1).recipe=[items.at(-1).recipe,line].filter(Boolean).join('\n');
+        return;
+      }
+      const split=line.split(/\s+(?:—|–|\||-{2,})\s+/).map(part=>part.trim()).filter(Boolean);
+      items.push(normalizeMenuLibraryItem({name:split[0],description:split.slice(1).join(' '),price,source:'import'},items.length));
+      return;
+    }
+    items.push(normalizeMenuLibraryItem({name:clean[0],description:clean.slice(1).join(' · '),price,source:'import'},items.length));
+  });
+  return items;
+}
+
+async function handleMenuImport(event){
+  const input=event.target;
+  const file=input.files?.[0];
+  if(!file)return;
+  setMenuImportStatus(`Reading ${file.name}…`);
+  try{
+    const imported=await readMenuImportData(file);
+    const items=Array.isArray(imported.items)?imported.items.map(normalizeMenuLibraryItem):menuItemsFromRows(imported.rows);
+    if(!items.length)throw new Error('No menu items could be identified in this file.');
+    const menu={
+      id:uid(),
+      name:String(imported.name||menuNameFromFile(file.name)).trim(),
+      description:String(imported.description||'Imported menu — review item names, prices, and recipes before activating.').trim(),
+      active:false,
+      sourceFile:file.name,
+      importedAt:new Date().toISOString(),
+      items
+    };
+    state.menus.push(menu);
+    selectedSettingsMenuId=menu.id;
+    save();
+    renderProductMenuSettings();
+    setMenuImportStatus(`Imported ${items.length} item${items.length===1?'':'s'} from ${file.name}. Review the draft below, then activate it when ready.`);
+    toast('Menu imported as an inactive draft.');
+  }catch(error){
+    setMenuImportStatus(error?.message||'The menu could not be imported.',true);
+    toast('Menu import failed.',true);
+  }finally{
+    input.value='';
+  }
 }
 
 function renderDepartmentSettings(){

@@ -56,13 +56,72 @@ function toggleSidebar(){
 }
 initSidebar();
 
-function closeAllMenus(){document.querySelectorAll('.drop-menu,.col-menu,.profile-menu').forEach(m=>m.classList.remove('open'));}
+function resetFloatingMenuPosition(menu){
+  menu.style.removeProperty('top');
+  menu.style.removeProperty('right');
+  menu.style.removeProperty('bottom');
+  menu.style.removeProperty('left');
+  menu.style.removeProperty('max-height');
+  menu.style.removeProperty('visibility');
+}
+function closeAllMenus(){
+  document.querySelectorAll('.drop-menu,.col-menu,.profile-menu').forEach(menu=>{
+    if(typeof menu.hidePopover==='function'&&menu.matches(':popover-open'))menu.hidePopover();
+    menu.classList.remove('open');
+    resetFloatingMenuPosition(menu);
+  });
+}
 function activateFilePicker(event,inputId){
   if(event.key!=='Enter'&&event.key!==' ')return;
   event.preventDefault();
   document.getElementById(inputId)?.click();
 }
-function toggleMenu(id){const m=document.getElementById(id);const was=m.classList.contains('open');closeAllMenus();if(!was)m.classList.add('open');}
+function positionFloatingMenu(menu,trigger){
+  if(window.innerWidth<=820){
+    resetFloatingMenuPosition(menu);
+    return;
+  }
+  const gap=6;
+  const edge=12;
+  const triggerRect=trigger.getBoundingClientRect();
+  const menuRect=menu.getBoundingClientRect();
+  const roomBelow=window.innerHeight-triggerRect.bottom-gap-edge;
+  const roomAbove=triggerRect.top-gap-edge;
+  const openUp=menuRect.height>roomBelow&&roomAbove>roomBelow;
+  const top=openUp
+    ?Math.max(edge,triggerRect.top-gap-menuRect.height)
+    :Math.min(triggerRect.bottom+gap,window.innerHeight-menuRect.height-edge);
+  const left=Math.min(
+    Math.max(edge,triggerRect.right-menuRect.width),
+    Math.max(edge,window.innerWidth-menuRect.width-edge)
+  );
+
+  menu.style.top=`${top}px`;
+  menu.style.right='auto';
+  menu.style.bottom='auto';
+  menu.style.left=`${left}px`;
+  menu.style.maxHeight=`${window.innerHeight-edge*2}px`;
+  menu.style.visibility='visible';
+}
+function toggleMenu(id){
+  const menu=document.getElementById(id);
+  if(!menu)return;
+  const wasOpen=menu.classList.contains('open');
+  closeAllMenus();
+  if(wasOpen)return;
+
+  const trigger=(document.activeElement instanceof HTMLElement&&document.activeElement.closest('.drop-wrap,.col-wrap'))
+    ?document.activeElement
+    :menu.closest('.drop-wrap,.col-wrap')?.querySelector('button');
+  menu.classList.add('open');
+
+  if(trigger&&menu.matches('.drop-menu,.col-menu')&&typeof menu.showPopover==='function'){
+    menu.setAttribute('popover','manual');
+    menu.style.visibility='hidden';
+    menu.showPopover();
+    positionFloatingMenu(menu,trigger);
+  }
+}
 function toggleProfileMenu(){toggleMenu('profile-menu');}
 function openCurrentProfileSettings(){
   closeAllMenus();
@@ -357,7 +416,7 @@ function renderSettings(){
     item.style.display=canUseSettings||item.dataset.settingsKey==='profiles'?'flex':'none';
   });
   document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.settingsPane===activeSettingsSection));
-  document.getElementById('settings-app')?.classList.toggle('detail-open',window.innerWidth>820);
+  if(window.innerWidth>820)document.getElementById('settings-app')?.classList.add('detail-open');
   if(typeof renderFloorPlanRooms==='function')renderFloorPlanRooms();
   if(typeof renderDepartmentSettings==='function')renderDepartmentSettings();
   if(typeof renderProductMenuSettings==='function')renderProductMenuSettings();
@@ -379,6 +438,17 @@ function renderAccessControlledNav(){
     item.classList.toggle('access-disabled',!allowed);
     item.title=allowed?'':'You do not have access to this area.';
   });
+  document.querySelectorAll('[data-mobile-page]').forEach(item=>{
+    const allowed=profileCanAccessPage(profile,item.dataset.mobilePage);
+    item.disabled=!allowed;
+    item.title=allowed?'':'You do not have access to this area.';
+  });
+  const actionAllowed=MOBILE_ACTION_PAGES.some(page=>profileCanAccessPage(profile,page));
+  const moreAllowed=MOBILE_MORE_PAGES.some(page=>profileCanAccessPage(profile,page));
+  const actionButton=document.getElementById('mobile-nav-actions');
+  const moreButton=document.getElementById('mobile-nav-more');
+  if(actionButton)actionButton.disabled=!actionAllowed;
+  if(moreButton)moreButton.disabled=!moreAllowed;
 }
 
 function buildColPicker(containerId,cols,renderFnName){
@@ -401,6 +471,47 @@ function refreshLiveInventoryIfVisible(){
   if(document.getElementById('page-live-inventory')?.classList.contains('active'))renderLiveInventoryPage();
 }
 
+const MOBILE_ACTION_PAGES=['inventory','orders','usage','reports'];
+const MOBILE_MORE_PAGES=['products','insights','suppliers','settings'];
+
+function closeMobileNavMenus(){
+  document.querySelectorAll('.mobile-nav-popover.open').forEach(menu=>menu.classList.remove('open'));
+  ['actions','more'].forEach(group=>document.getElementById(`mobile-nav-${group}`)?.setAttribute('aria-expanded','false'));
+}
+
+function toggleMobileNavMenu(group,event){
+  event?.stopPropagation();
+  const menu=document.getElementById(`mobile-${group}-menu`);
+  const trigger=document.getElementById(`mobile-nav-${group}`);
+  if(!menu||!trigger)return;
+  const shouldOpen=!menu.classList.contains('open');
+  closeMobileNavMenus();
+  if(shouldOpen){menu.classList.add('open');trigger.setAttribute('aria-expanded','true');}
+}
+
+function mobileNavigate(page){
+  closeMobileNavMenus();
+  showPage(page);
+}
+
+function mobileNavGroupForPage(page){
+  if(page==='dashboard')return'home';
+  if(page==='live-inventory')return'live';
+  if(MOBILE_ACTION_PAGES.includes(page))return'actions';
+  if(MOBILE_MORE_PAGES.includes(page))return'more';
+  return'home';
+}
+
+function updateMobileNavigation(page){
+  const group=mobileNavGroupForPage(page);
+  document.querySelectorAll('.mobile-nav-item').forEach(item=>{
+    const active=item.id===`mobile-nav-${group}`;
+    item.classList.toggle('active',active);
+    if(active)item.setAttribute('aria-current','page');else item.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.mobile-nav-popover [data-mobile-page]').forEach(item=>item.classList.toggle('active',item.dataset.mobilePage===page));
+}
+
 function updateMobileNavOverflow(){
   const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
   if(window.innerWidth>820){sidebar.classList.remove('has-overflow-left','has-overflow-right');return;}
@@ -409,15 +520,39 @@ function updateMobileNavOverflow(){
   sidebar.classList.toggle('has-overflow-right',sidebar.scrollLeft<maxScroll-4);
 }
 function revealActiveMobileNav(item){
-  if(!item||window.innerWidth>820)return;
-  item.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
-  requestAnimationFrame(updateMobileNavOverflow);
+  if(!item)return;
+  updateMobileNavigation(item.id.replace('nav-',''));
 }
 function initMobileNavigation(){
-  const sidebar=document.querySelector('.sidebar');if(!sidebar)return;
-  sidebar.addEventListener('scroll',updateMobileNavOverflow,{passive:true});
-  window.addEventListener('resize',updateMobileNavOverflow);
-  updateMobileNavOverflow();
+  const activePage=document.querySelector('.page.active')?.id?.replace('page-','')||'dashboard';
+  updateMobileNavigation(activePage);
+  const nav=document.querySelector('.mobile-nav');
+  if(nav&&!nav.dataset.navigationBound){
+    nav.dataset.navigationBound='true';
+    nav.addEventListener('click',event=>{
+      const control=event.target.closest('button');
+      if(!control||control.disabled)return;
+      if(control.dataset.mobilePage){mobileNavigate(control.dataset.mobilePage);return;}
+      if(control.id==='mobile-nav-actions')toggleMobileNavMenu('actions',event);
+      else if(control.id==='mobile-nav-more')toggleMobileNavMenu('more',event);
+    });
+  }
+  window.addEventListener('resize',()=>{if(window.innerWidth>820)closeMobileNavMenus();});
+}
+
+function recoverMobileNavTap(event){
+  if(window.innerWidth>820||document.querySelector('.modal-overlay.open')||event.target.closest('.mobile-nav'))return;
+  const nav=document.querySelector('.mobile-nav');
+  if(!nav)return;
+  const bounds=nav.getBoundingClientRect();
+  if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)return;
+  const destinations=['mobile-nav-home','mobile-nav-actions','mobile-nav-live','mobile-nav-more'];
+  const column=Math.max(0,Math.min(3,Math.floor((event.clientX-bounds.left)/(bounds.width/4))));
+  const destination=document.getElementById(destinations[column]);
+  if(!destination||destination.disabled)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  destination.click();
 }
 
 function showPage(name,options={}){
@@ -444,9 +579,25 @@ function showPage(name,options={}){
   else if(name==='insights')renderInsights();
   else if(name==='suppliers'){buildColPicker('sup-col-checks',SUP_COLS,'renderSuppliers');renderSuppliers();}
   else if(name==='reports'){renderReportHeader();renderReport();populateValueDates();renderValueReport();renderOrdersReport();}
-  else if(name==='settings')renderSettings();
+  else if(name==='settings'){
+    if(window.innerWidth<=820)document.getElementById('settings-app')?.classList.remove('detail-open');
+    renderSettings();
+  }
   else if(name==='dashboard')renderDashboard();
+  annotateResponsiveTables(document.getElementById('page-'+name));
 }
+
+function annotateResponsiveTables(root=document){
+  root.querySelectorAll('table').forEach(table=>{
+    const headings=Array.from(table.querySelectorAll('thead th')).map(cell=>cell.textContent.trim());
+    table.querySelectorAll('tbody tr').forEach(row=>{
+      Array.from(row.children).forEach((cell,index)=>{
+        if(cell.matches('td')&&!cell.hasAttribute('data-mobile-label'))cell.setAttribute('data-mobile-label',headings[index]||'');
+      });
+    });
+  });
+}
+
 function closeModal(id){
   if(typeof beforeModalClose==='function'&&beforeModalClose(id)===false)return;
   if(id==='modal-inventory-template-upload'&&typeof resetInventoryTemplatePreview==='function')resetInventoryTemplatePreview();
@@ -462,6 +613,14 @@ function openModal(id){
   modal.classList.add('open');
 }
 document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)closeModal(ov.id);}));
-window.addEventListener('load',initMobileNavigation);
+document.addEventListener('click',recoverMobileNavTap,true);
+document.addEventListener('click',event=>{
+  if(!event.target.closest('.mobile-nav'))closeMobileNavMenus();
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMobileNavMenus();});
+window.addEventListener('load',()=>{
+  initMobileNavigation();
+  annotateResponsiveTables();
+});
 
 // PRODUCTS — fixed checkbox logic

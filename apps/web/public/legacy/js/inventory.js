@@ -358,6 +358,11 @@ function renderInventoryRooms(){
     const active=room.id===currentInvRoomId?'active':'';
     return`<button class="room-tab ${active}" type="button" onclick="switchInventoryRoom('${room.id}')"><span>${escapeHtml(room.name)}</span><strong>${count}</strong></button>`;
   }).join('');
+  const select=document.getElementById('inv-room-select');
+  if(select){
+    select.innerHTML=rooms.map(room=>`<option value="${room.id}" ${room.id===currentInvRoomId?'selected':''}>${escapeHtml(room.name)} · ${Object.keys(room.items||{}).length} counted</option>`).join('');
+    select.value=currentInvRoomId||rooms[0]?.id||'';
+  }
 }
 function switchInventoryRoom(roomId){
   captureCurrentRoomCounts();
@@ -765,8 +770,18 @@ function openInventoryRoomSelect(){
   document.getElementById('room-count-date').value=today();
   document.getElementById('room-count-label').value='';
   const list=document.getElementById('room-count-list');
-  list.innerHTML=rooms.map(room=>`<button class="room-select-card" type="button" onclick="startRoomCount('${room.id}')"><strong>${escapeHtml(room.name)}</strong><span>Count this room</span></button>`).join('')||`<div class="empty-cell">No rooms assigned to your profile.</div>`;
+  list.innerHTML=rooms.map(room=>`<button class="room-select-card" type="button" onclick="startRoomCount('${room.id}')"><strong>${escapeHtml(room.name)}</strong></button>`).join('')||`<div class="empty-cell">No rooms assigned to your profile.</div>`;
   openModal('modal-inv-room-select');
+}
+function continueMobileCountSetup(){
+  const date=document.getElementById('room-count-date').value||today();
+  const label=document.getElementById('room-count-label').value.trim();
+  if(!date){toast('Select a date.',true);return;}
+  if(!label){toast('Name this count before continuing.',true);document.getElementById('room-count-label').focus();return;}
+  const rooms=typeof accessibleFloorPlanRooms==='function'?accessibleFloorPlanRooms():activeFloorPlanRooms();
+  if(!rooms.length){toast('Add a room in Settings before starting a count.',true);return;}
+  closeModal('modal-inv-room-select');
+  openInventoryModal(null,rooms[0].id,date,label);
 }
 function startRoomCount(roomId){
   if(typeof profileCanAccessRoom==='function'&&!profileCanAccessRoom(currentProfile(),roomId)){toast('You do not have access to that room.',true);return;}
@@ -864,11 +879,26 @@ function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate=
     }
   }
   document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';document.getElementById('inv-show-f').value='all';document.getElementById('inv-sort-f').value='category';
+  document.getElementById('mobile-count-label').textContent=document.getElementById('inv-label').value||'Inventory Count';
+  document.getElementById('mobile-count-date').textContent=fmtDate(document.getElementById('inv-date').value);
+  closeInventoryFilterSheet();
   renderInventoryRooms();renderInvRows(true);openModal('modal-inventory');
+}
+function openInventoryFilterSheet(){document.getElementById('inv-filter-sheet')?.classList.add('open');}
+function closeInventoryFilterSheet(){document.getElementById('inv-filter-sheet')?.classList.remove('open');}
+function updateInventoryFilterSummary(){
+  const summary=document.getElementById('inv-filter-summary');
+  if(!summary)return;
+  const cat=document.getElementById('inv-cat-f')?.value||'';
+  const sub=document.getElementById('inv-sub-f')?.value||'';
+  const show=document.getElementById('inv-show-f')?.value||'all';
+  const sort=document.getElementById('inv-sort-f')?.value||'category';
+  const active=[cat,sub,show!=='all'?show:'',sort!=='category'?sort:''].filter(Boolean).length;
+  summary.textContent=active?`${active} active`:'Default';
 }
 function updateInvProgress(){
   const products=currentRoomProducts();
-  const total=products.length;const filled=products.filter(product=>{const v=liveInvCounts[product.id];return v!==''&&v!==null&&v!==undefined;}).length;const pct=total>0?Math.round(filled/total*100):0;
+  const total=products.length;const filled=products.filter(product=>{const v=liveInvCounts[product.id];return v!==''&&v!==null&&v!==undefined;}).length;const pct=total>0&&filled>0?Math.max(1,Math.round(filled/total*100)):0;
   document.getElementById('inv-prog-bar').style.width=pct+'%';document.getElementById('inv-prog-label').textContent=`${filled} of ${total} (${pct}%)`;
   document.getElementById('inv-prog-pills').innerHTML=`<span class="filled-pill"><span class="filled-dot"></span>${filled}</span><span class="missing-pill"><span class="missing-dot"></span>${total-filled} missing</span>`;
 }
@@ -876,6 +906,7 @@ function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentRoomProducts();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
   const search=document.getElementById('inv-search').value.toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
+  updateInventoryFilterSummary();
   let prods=roomScopedProducts.filter(p=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!search||p.name.toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||(p.subcategory||'').toLowerCase().includes(search)));
   if(show==='missing')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v===''||v===null||v===undefined;});
   if(show==='filled')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v!==''&&v!==null&&v!==undefined;});
@@ -886,7 +917,7 @@ function renderInvRows(skipCapture=false){
   const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
-    const collapsed=!expandedInventorySections.has(sectionToken);
+    const collapsed=window.innerWidth>820&&!expandedInventorySections.has(sectionToken);
     const filledCount=g.items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
     html+=`<section class="inv-count-section ${collapsed?'collapsed':''}">
       <button class="inv-section-header" type="button" aria-expanded="${!collapsed}" onclick="toggleInventorySection('${sectionToken}')">
@@ -1053,3 +1084,44 @@ function singleInvExcel(){
   xlDown(sheets,`inventory_count_${inv.date}.xlsx`);
 }
 function singleInvPrint(){const id=document.getElementById('single-inv-sel').value;const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('No count selected.',true);return;}normalizeInventoryRooms(inv);closeModal('modal-single-inv');let tot=0;const bodyRows=Object.entries(inv.items).map(([pid,qty])=>{const p=getProduct(pid);if(!p)return null;const val=p.cost*qty;tot+=val;return[p.name,p.category,p.subcategory||'',qty,p.unit,p.par||'—',p.cost>0?fmt(p.cost):'—',fmt(val)];}).filter(Boolean);printTable(`Count — ${inv.label||fmtDate(inv.date)}`,`Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Merged Total: ${fmt(tot)}`,['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value'],bodyRows);}
+
+document.getElementById('mobile-count-continue')?.addEventListener('click',continueMobileCountSetup);
+document.addEventListener('click',event=>{
+  const setup=document.getElementById('modal-inv-room-select');
+  const button=document.getElementById('mobile-count-continue');
+  if(!setup?.classList.contains('open')||!button)return;
+  const bounds=button.getBoundingClientRect();
+  if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  continueMobileCountSetup();
+},true);
+document.getElementById('inv-filter-done')?.addEventListener('click',closeInventoryFilterSheet);
+document.addEventListener('click',event=>{
+  const sheet=document.getElementById('inv-filter-sheet');
+  const button=document.getElementById('inv-filter-done');
+  if(!sheet?.classList.contains('open')||!button)return;
+  const bounds=button.getBoundingClientRect();
+  if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  closeInventoryFilterSheet();
+},true);
+document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>closeModal('modal-inventory'));
+document.getElementById('inventory-count-finish')?.addEventListener('click',saveInventory);
+document.addEventListener('click',event=>{
+  if(!document.getElementById('modal-inventory')?.classList.contains('open'))return;
+  const actions=[
+    {button:document.getElementById('inventory-count-cancel'),run:()=>closeModal('modal-inventory')},
+    {button:document.getElementById('inventory-count-finish'),run:saveInventory}
+  ];
+  const action=actions.find(item=>{
+    if(!item.button)return false;
+    const bounds=item.button.getBoundingClientRect();
+    return event.clientX>=bounds.left&&event.clientX<=bounds.right&&event.clientY>=bounds.top&&event.clientY<=bounds.bottom;
+  });
+  if(!action)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  action.run();
+},true);
