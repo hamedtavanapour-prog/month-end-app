@@ -2,7 +2,8 @@
 
 let state={products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[]};
 let editingProductId=null,editingOrderId=null,editingSupId=null;
-let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null;
+let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
+let mobileExpandedInventoryId=null;
 let showArchivedInventories=false;
 let currentInvRoomId=null;
 let currentInvMergedView=false;

@@ -499,7 +499,7 @@ function productMenuHtml(product,menuId){
   const archiveLabel=product.archived?'Restore':'Archive';
   const archiveAction=product.archived?`archiveProduct('${product.id}',false)`:`archiveProduct('${product.id}',true)`;
   return`<div class="drop-wrap product-actions">
-    <button class="btn btn-secondary btn-sm icon-btn" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Product actions">...</button>
+    <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Product actions" aria-label="Product actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
     <div class="drop-menu" id="${menuId}">
       <button onclick="event.stopPropagation();closeAllMenus();openProductModal('${product.id}')">Edit</button>
       <button onclick="event.stopPropagation();${archiveAction}">${archiveLabel}</button>

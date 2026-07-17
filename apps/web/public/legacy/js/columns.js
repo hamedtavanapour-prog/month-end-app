@@ -23,7 +23,7 @@ const INV_COLS=[
   {key:'counted',label:'Items Counted',visible:true,sort:'counted'},
   {key:'missing',label:'Missing',visible:true,sort:'missing'},
   {key:'value',label:'Total Value',visible:true,sort:'value'},
-  {key:'actions',label:'Actions',visible:true,sort:null,fixed:true},
+  {key:'actions',label:'',visible:true,sort:null,fixed:true},
 ];
 const ORD_COLS=[
   {key:'invoiceNumber',label:'Invoice #',visible:true,sort:'invoiceNumber'},

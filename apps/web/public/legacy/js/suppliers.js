@@ -203,7 +203,7 @@ function openSupplierViewFromSearch(id){
 
 function supplierMenuHtml(supplier,menuId){
   return`<div class="drop-wrap">
-    <button class="btn btn-secondary btn-sm icon-btn" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Supplier actions">...</button>
+    <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Supplier actions" aria-label="Supplier actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
     <div class="drop-menu" id="${menuId}">
       <button onclick="event.stopPropagation();closeAllMenus();openSupplierModal('${supplier.id}')">Edit</button>
       <button onclick="event.stopPropagation();closeAllMenus();archiveSupplier('${supplier.id}',${supplier.archived?'false':'true'})">${supplier.archived?'Restore':'Archive'}</button>

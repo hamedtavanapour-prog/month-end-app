@@ -185,12 +185,19 @@
     <div class="page-header-text"><h2>Counts</h2><p>File and review count logs. New counts reset the live inventory baseline.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <div class="col-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('inv-col-menu')"> Columns ▾</button><div class="col-menu" id="inv-col-menu"><h4>Visible Columns</h4><div id="inv-col-checks"></div></div></div>
-      <div class="drop-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('inv-exp')">Export</button><div class="drop-menu" id="inv-exp"><button onclick="printPage('Counts','page-inventory')">Print / PDF</button><button onclick="xlInventorySummary()">Excel / CSV</button><div class="drop-divider"></div><button onclick="openSingleInvExport()">Export Single Count…</button></div></div>
       <button class="btn btn-secondary btn-sm" id="inv-archive-toggle" onclick="toggleArchivedInventories()">Archived (0)</button>
-      <button class="btn btn-primary" onclick="openInventoryRoomSelect()">＋ New Count</button>
+      <button class="btn btn-primary count-new-button" onclick="openInventoryRoomSelect()">＋ New Count</button>
+      <div class="drop-wrap counts-mobile-more">
+        <button class="btn btn-secondary" type="button" aria-haspopup="menu" aria-controls="counts-mobile-more-menu" onclick="toggleMenu('counts-mobile-more-menu')">More</button>
+        <div class="drop-menu" id="counts-mobile-more-menu" role="menu"><button id="inv-mobile-archive-toggle" role="menuitem" onclick="toggleArchivedInventories()">Archived counts (0)</button></div>
+      </div>
     </div>
   </div>
-  <div class="card"><div class="table-wrap"><table><thead id="inv-thead"><tr></tr></thead><tbody id="inv-tbody"></tbody></table></div></div>
+  <div class="inventory-list-context" id="inventory-list-context" hidden></div>
+  <div class="card inventory-table-card">
+    <div class="table-wrap inventory-table-desktop"><table><thead id="inv-thead"><tr></tr></thead><tbody id="inv-tbody"></tbody></table></div>
+    <div class="inventory-mobile-list" id="inventory-mobile-list"></div>
+  </div>
 </div>
 
 <!-- ORDERS -->
@@ -451,14 +458,9 @@
     <div class="form-group"><label for="room-count-date">Date</label><input type="date" id="room-count-date"></div>
     <div class="form-group"><label for="room-count-label">Label</label><input type="text" id="room-count-label" placeholder="e.g. Month End June"></div>
   </div>
-  <div class="room-select-grid" id="room-count-list"></div>
-  <div class="modal-actions room-select-desktop-actions">
+  <div class="modal-actions room-select-actions">
     <button class="btn btn-secondary" onclick="closeModal('modal-inv-room-select')">Cancel</button>
-    <button class="btn btn-primary" onclick="createCountDraft()">Create Draft</button>
-  </div>
-  <div class="modal-actions room-select-phone-actions">
-    <button class="btn btn-secondary" onclick="closeModal('modal-inv-room-select')">Cancel</button>
-    <button class="btn btn-primary" id="mobile-count-continue" type="button">Continue to Count →</button>
+    <button class="btn btn-primary" id="mobile-count-continue" type="button">Continue</button>
   </div>
 </div>
 </div>
@@ -468,8 +470,8 @@
 <div class="inv-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-count-title">
   <div class="inv-modal-header">
     <button class="modal-close" type="button" aria-label="Close inventory count" onclick="closeModal('modal-inventory')" style="position:absolute;top:14px;right:14px;">&times;</button>
-    <div class="count-setup-step mobile-only">Step 2 of 2</div>
-    <h3 id="inventory-count-title"><span class="desktop-only">File Inventory Count</span><span class="mobile-only">Count Items</span></h3>
+    <div class="count-setup-step count-step-two">Step 2 of 2</div>
+    <h3 id="inventory-count-title">Count Items</h3>
     <div class="mobile-count-context mobile-only"><strong id="mobile-count-label">Inventory Count</strong><span id="mobile-count-date"></span></div>
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group"><label for="inv-date">Date</label><input type="date" id="inv-date"></div>
@@ -477,7 +479,7 @@
     </div>
     <div class="inv-room-manager">
       <div class="inv-room-tabs" id="inv-room-tabs"></div>
-      <label class="inv-room-select-mobile mobile-only" for="inv-room-select"><span>Room</span><select id="inv-room-select" onchange="switchInventoryRoom(this.value)"></select></label>
+      <label class="inv-room-select-mobile" for="inv-room-select"><span>Room</span><select id="inv-room-select" onchange="switchInventoryRoom(this.value)"></select></label>
     </div>
   </div>
   <div class="inv-modal-filters">
@@ -579,7 +581,20 @@
 <div class="modal-overlay" id="modal-view-inv">
 <div class="modal view-inv-modal" role="dialog" aria-modal="true" aria-labelledby="view-inv-title">
   <button class="modal-close" type="button" aria-label="Close saved count preview" onclick="closeModal('modal-view-inv')">&times;</button>
-  <h3 id="view-inv-title">Inventory Count</h3>
+  <div class="view-inv-heading">
+    <h3 id="view-inv-title">Inventory Count</h3>
+    <div class="view-inv-heading-actions">
+      <button class="icon-btn view-inv-edit-count" type="button" aria-label="Edit count" title="Edit count" onclick="editViewedInventory()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+      </button>
+      <div class="drop-wrap">
+        <button class="icon-btn overflow-menu-button" type="button" aria-label="Count actions" title="Count actions" onclick="event.stopPropagation();toggleMenu('view-inventory-actions-menu')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg>
+        </button>
+        <div class="drop-menu" id="view-inventory-actions-menu"></div>
+      </div>
+    </div>
+  </div>
   <div class="view-inv-controls">
     <label class="form-group" for="view-inv-select"><span>View</span><select id="view-inv-select" onchange="switchViewInvTab(this.value)"></select></label>
     <label class="form-group" for="view-inv-search"><span>Search items</span><input type="search" id="view-inv-search" placeholder="Search by item name…" oninput="renderViewInvTable()"></label>
@@ -589,7 +604,7 @@
     <div class="view-inv-list mobile-only" id="view-inv-list"></div>
     <div class="view-inv-total" id="view-inv-total" aria-live="polite"></div>
   </div>
-  <div class="modal-actions view-inv-actions"><button class="btn btn-secondary" onclick="closeModal('modal-view-inv')">Close</button><button class="btn btn-primary" onclick="editViewedInventory()">Edit Count</button></div>
+  <div class="modal-actions view-inv-actions"><button class="btn btn-secondary" onclick="closeModal('modal-view-inv')">Close</button></div>
 </div>
 </div>
 

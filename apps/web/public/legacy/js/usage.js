@@ -1610,7 +1610,7 @@ function renderUsageLogs(){
       <td>${log.createdAt?new Date(log.createdAt).toLocaleString():'—'}</td>
       <td onclick="event.stopPropagation();">
         <div class="drop-wrap">
-          <button class="btn btn-secondary btn-sm icon-btn" onclick="toggleMenu('${menuId}')" title="Usage log actions">...</button>
+          <button class="icon-btn overflow-menu-button" type="button" onclick="toggleMenu('${menuId}')" title="Usage log actions" aria-label="Usage log actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
           <div class="drop-menu" id="${menuId}">
             <button onclick="closeAllMenus();downloadUsageLogSource('${log.id}')">Download source file</button>
             <button onclick="closeAllMenus();editUsageLog('${log.id}')">Edit</button>

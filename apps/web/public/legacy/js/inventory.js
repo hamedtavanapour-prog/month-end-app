@@ -808,11 +808,8 @@ function sortedInventoryProducts(products,mode){
   );
 }
 function openInventoryRoomSelect(){
-  const rooms=typeof accessibleFloorPlanRooms==='function'?accessibleFloorPlanRooms():activeFloorPlanRooms();
   document.getElementById('room-count-date').value=today();
   document.getElementById('room-count-label').value='';
-  const list=document.getElementById('room-count-list');
-  list.innerHTML=rooms.map(room=>`<button class="room-select-card" type="button" onclick="startRoomCount('${room.id}')"><strong>${escapeHtml(room.name)}</strong></button>`).join('')||`<div class="empty-cell">No rooms assigned to your profile.</div>`;
   openModal('modal-inv-room-select');
 }
 function continueMobileCountSetup(){
@@ -914,7 +911,7 @@ function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate=
   if(ex)ensureInventoryHasFloorPlanRooms(ex);
   document.getElementById('inv-date').value=ex?ex.date:(presetDate||today());document.getElementById('inv-label').value=ex?ex.label||'':presetLabel;
   initLiveCounts(ex);
-  currentInvMergedView=!!ex&&window.innerWidth<=820;
+  currentInvMergedView=!!ex;
   if(currentInvMergedView)liveInvCounts={...ex.items};
   document.getElementById('inv-search').value='';document.getElementById('inv-cat-f').value='';
   if(!ex&&selectedFloorRoomId){
@@ -1109,22 +1106,55 @@ function renderInventoryTable(){
     archiveToggle.textContent=`Archived (${archivedCount})`;
     archiveToggle.classList.toggle('active',showArchivedInventories);
   }
+  const mobileArchiveToggle=document.getElementById('inv-mobile-archive-toggle');
+  if(mobileArchiveToggle)mobileArchiveToggle.textContent=showArchivedInventories?'View current counts':`Archived counts (${archivedCount})`;
+  const listContext=document.getElementById('inventory-list-context');
+  if(listContext){
+    listContext.hidden=!showArchivedInventories;
+    listContext.innerHTML=showArchivedInventories?`<strong>Archived counts</strong><span>${archivedCount?`${archivedCount} saved count${archivedCount===1?' is':'s are'} archived. Restore one from its More menu to return it to current counts.`:'There are no archived counts yet.'}</span>`:'';
+  }
   document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;return sortableTableHeader(c.label,'inventories',c.sort);}).join('')+'</tr>';
   let rows=state.inventories.filter(inv=>showArchivedInventories?!!inv.archived:!inv.archived).map(inv=>{normalizeInventoryRooms(inv);const total=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);const expected=expectedInventoryProductIds(inv);const counted=Object.keys(inv.items).filter(id=>expected.has(id)).length,missing=Math.max(expected.size-counted,0);const roomsCount=inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length;return{...inv,counted,missing,roomsCount,value:total};});
   rows=sortArr(rows,sortState.inventories.col,sortState.inventories.dir);
   const tbody=document.getElementById('inv-tbody');
+  const mobileList=document.getElementById('inventory-mobile-list');
   if(!rows.length){
     const emptyState=showArchivedInventories
       ?`<div class="table-empty-state"><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
       :`<div class="table-empty-state"><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
     tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;
+    if(mobileList)mobileList.innerHTML=emptyState;
     return;
   }
-  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="viewInventory('${inv.id}')">View</button>${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
+  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions">${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
+  if(mobileList)mobileList.innerHTML=rows.map((inv,index)=>mobileInventoryCardHtml(inv,index)).join('');
+}
+function mobileInventoryCardHtml(inv,index){
+  const expanded=mobileExpandedInventoryId===inv.id;
+  const label=inv.label||'Inventory Count';
+  return`<article class="inventory-mobile-card ${expanded?'expanded':''} ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')" role="button" tabindex="0" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();viewInventory('${inv.id}')}" aria-label="View ${escapeHtml(label)} from ${fmtDate(inv.date)}">
+    <div class="inventory-mobile-card-head">
+      <div class="inventory-mobile-card-title"><strong>${escapeHtml(label)}</strong><time datetime="${inv.date}">${fmtDate(inv.date)}</time></div>
+      <button class="inventory-mobile-expand" type="button" aria-label="${expanded?'Hide':'Show'} count details" aria-expanded="${expanded}" onclick="event.stopPropagation();toggleMobileInventoryDetails('${inv.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+    </div>
+    ${expanded?`<div class="inventory-mobile-details">
+      <div><span>Rooms counted</span><strong>${inv.roomsCount}</strong></div>
+      <div><span>Items counted</span><strong>${inv.counted}</strong></div>
+      <div><span>Items missing</span><strong class="${inv.missing?'danger-text':''}">${inv.missing}</strong></div>
+      <div><span>Total value</span><strong>${fmt(inv.value)}</strong></div>
+      ${inv.draft?'<span class="inventory-mobile-status">Draft</span>':''}${inv.archived?'<span class="inventory-mobile-status">Archived</span>':''}
+      <div class="inventory-mobile-card-actions" onclick="event.stopPropagation()">${inventoryMenuHtml(inv,`inventory-mobile-menu-${index}`)}</div>
+    </div>`:''}
+  </article>`;
+}
+function toggleMobileInventoryDetails(id){
+  mobileExpandedInventoryId=mobileExpandedInventoryId===id?null:id;
+  closeAllMenus();
+  renderInventoryTable();
 }
 function inventoryMenuHtml(inv,menuId){
   return`<div class="drop-wrap inventory-actions">
-    <button class="btn btn-secondary btn-sm icon-btn" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Count actions">...</button>
+    <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Count actions" aria-label="Count actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
     <div class="drop-menu" id="${menuId}">
       <button onclick="event.stopPropagation();closeAllMenus();openInventoryModal('${inv.id}')">Edit</button>
       <button onclick="event.stopPropagation();archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore':'Archive'}</button>
@@ -1137,13 +1167,22 @@ function toggleArchivedInventories(){showArchivedInventories=!showArchivedInvent
 function archiveInventory(id,archived=true){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);if(!inv)return;
-  inv.archived=archived;save();renderInventoryTable();refreshLiveInventoryIfVisible();toast(archived?'Count archived.':'Count restored.');
+  inv.archived=archived;save();renderInventoryTable();refreshLiveInventoryIfVisible();
+  if(viewInvId===id){
+    document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
+    renderViewInventoryActions(inv);
+  }
+  toast(archived?'Count archived.':'Count restored.');
 }
 function viewInventory(id){
-  viewInvId=id;viewInvTab='all';viewInvExpandedProductId=null;const inv=state.inventories.find(i=>i.id===id);normalizeInventoryRooms(inv);
+  viewInvId=id;viewInvTab='all';viewInvExpandedProductId=null;viewInvEditingProductId=null;const inv=state.inventories.find(i=>i.id===id);if(!inv)return;normalizeInventoryRooms(inv);
   document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
   document.getElementById('view-inv-search').value='';
-  renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
+  renderViewInventoryActions(inv);renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
+}
+function renderViewInventoryActions(inv){
+  const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
+  menu.innerHTML=`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="exportViewedInventoryExcel()">Export Excel / CSV</button><button onclick="printViewedInventory()">Print / PDF</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button><button onclick="deleteInventory('${inv.id}')">Delete count</button>`;
 }
 function editViewedInventory(){const id=viewInvId;if(!id)return;const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openInventoryModal(id);if(selectedRoom)switchInventoryRoom(selectedRoom);}
 function renderViewInvTabs(inv){
@@ -1151,7 +1190,7 @@ function renderViewInvTabs(inv){
   select.innerHTML=`<option value="all">Merged Total</option><option value="missing">Not Counted</option>${inv.rooms.map(room=>`<option value="${room.id}">${escapeHtml(room.name)}</option>`).join('')}`;
   select.value=viewInvTab;
 }
-function switchViewInvTab(tab){viewInvTab=tab;viewInvExpandedProductId=null;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
+function switchViewInvTab(tab){viewInvTab=tab;viewInvExpandedProductId=null;viewInvEditingProductId=null;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
 function roomQtyBreakdown(inv,productId){
   return inv.rooms.map(room=>({name:room.name,qty:room.items?.[productId]}))
     .filter(item=>item.qty!==undefined&&item.qty!==null&&item.qty!=='')
@@ -1160,14 +1199,23 @@ function roomQtyBreakdown(inv,productId){
 }
 function toggleViewInvProduct(productId){
   viewInvExpandedProductId=viewInvExpandedProductId===productId?null:productId;
+  viewInvEditingProductId=null;
   renderViewInvTable();
 }
+function setViewInvItemEditMode(productId,editing=true){
+  viewInvExpandedProductId=productId;
+  viewInvEditingProductId=editing?productId:null;
+  renderViewInvTable();
+  if(editing)setTimeout(()=>document.querySelector(`[data-view-product-id="${productId}"] input`)?.focus(),0);
+}
 function viewInvItemDetailHtml(inv,product){
+  const editing=viewInvEditingProductId===product.id;
   const roomFields=inv.rooms.map(room=>{
     const value=room.items?.[product.id];
-    return`<label class="view-inv-room-field"><span>${escapeHtml(room.name)}</span><input type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" autocomplete="off" data-view-room-id="${room.id}" value="${value===undefined||value===null?'':value}" placeholder="Not counted"></label>`;
+    const displayValue=value===undefined||value===null||value===''?'Not counted':liveQty(value);
+    return`<div class="view-inv-room-field"><span>${escapeHtml(room.name)}</span>${editing?`<input type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" autocomplete="off" data-view-room-id="${room.id}" value="${value===undefined||value===null?'':value}" placeholder="Not counted">`:`<output>${displayValue}</output>`}</div>`;
   }).join('');
-  return`<div class="view-inv-item-detail" data-view-product-id="${product.id}" onclick="event.stopPropagation()"><div class="view-inv-room-grid">${roomFields}</div><button class="btn btn-primary" type="button" onclick="saveViewedInventoryItem('${product.id}',this)">Save Item</button></div>`;
+  return`<div class="view-inv-item-detail ${editing?'is-editing':''}" data-view-product-id="${product.id}" onclick="event.stopPropagation()"><div class="view-inv-item-detail-head"><strong>Room breakdown</strong><div class="view-inv-item-edit-control">${editing?'<span>Editing</span>':''}<button class="icon-btn view-inv-item-edit" type="button" aria-label="${editing?'Stop editing':'Edit room counts'}" title="${editing?'Editing room counts':'Edit room counts'}" onclick="setViewInvItemEditMode('${product.id}',${editing?'false':'true'})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button></div></div><div class="view-inv-room-grid">${roomFields}</div>${editing?`<button class="btn btn-primary" type="button" onclick="saveViewedInventoryItem('${product.id}',this)">Save Item</button>`:''}</div>`;
 }
 function saveViewedInventoryItem(productId,button){
   const inv=state.inventories.find(item=>item.id===viewInvId);if(!inv)return;
@@ -1180,6 +1228,7 @@ function saveViewedInventoryItem(productId,button){
   });
   inv.items=mergeInventoryRoomItems(inv.rooms);
   inv.draft=!Object.keys(inv.items).length;
+  viewInvExpandedProductId=null;viewInvEditingProductId=null;
   save();renderInventoryTable();refreshLiveInventoryIfVisible();renderViewInvTable();toast('Item count updated.');
 }
 function renderViewInvTable(){
@@ -1210,10 +1259,10 @@ function renderViewInvTable(){
 }
 function deleteInventory(id){closeAllMenus();if(!confirm('Delete?'))return;state.inventories=state.inventories.filter(i=>i.id!==id);save();closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}
 function openSingleInvExport(){closeAllMenus();const sel=document.getElementById('single-inv-sel');sel.innerHTML=state.inventories.map(inv=>`<option value="${inv.id}">${fmtDate(inv.date)}${inv.label?' — '+inv.label:''}</option>`).join('');openModal('modal-single-inv');}
-function singleInvExcel(){
-  const id=document.getElementById('single-inv-sel').value;const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('No count selected.',true);return;}
+function exportInventoryExcel(id){
+  const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
-  closeModal('modal-single-inv');
+  closeAllMenus();
   const rows=[['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value']];let tot=0;
   Object.entries(inv.items).forEach(([pid,qty])=>{const p=getProduct(pid);if(!p)return;const val=+(p.cost*qty).toFixed(2);tot+=val;rows.push([p.name,p.category,p.subcategory||'',qty,p.unit,p.par||0,p.cost||0,val]);});
   rows.push(['','','','','','','TOTAL',+tot.toFixed(2)]);
@@ -1226,7 +1275,11 @@ function singleInvExcel(){
   });
   xlDown(sheets,`inventory_count_${inv.date}.xlsx`);
 }
-function singleInvPrint(){const id=document.getElementById('single-inv-sel').value;const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('No count selected.',true);return;}normalizeInventoryRooms(inv);closeModal('modal-single-inv');let tot=0;const bodyRows=Object.entries(inv.items).map(([pid,qty])=>{const p=getProduct(pid);if(!p)return null;const val=p.cost*qty;tot+=val;return[p.name,p.category,p.subcategory||'',qty,p.unit,p.par||'—',p.cost>0?fmt(p.cost):'—',fmt(val)];}).filter(Boolean);printTable(`Count — ${inv.label||fmtDate(inv.date)}`,`Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Merged Total: ${fmt(tot)}`,['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value'],bodyRows);}
+function printInventoryCount(id){const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}normalizeInventoryRooms(inv);closeAllMenus();let tot=0;const bodyRows=Object.entries(inv.items).map(([pid,qty])=>{const p=getProduct(pid);if(!p)return null;const val=p.cost*qty;tot+=val;return[p.name,p.category,p.subcategory||'',qty,p.unit,p.par||'—',p.cost>0?fmt(p.cost):'—',fmt(val)];}).filter(Boolean);printTable(`Count — ${inv.label||fmtDate(inv.date)}`,`Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Merged Total: ${fmt(tot)}`,['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value'],bodyRows);}
+function exportViewedInventoryExcel(){if(viewInvId)exportInventoryExcel(viewInvId);}
+function printViewedInventory(){if(viewInvId)printInventoryCount(viewInvId);}
+function singleInvExcel(){const id=document.getElementById('single-inv-sel').value;closeModal('modal-single-inv');exportInventoryExcel(id);}
+function singleInvPrint(){const id=document.getElementById('single-inv-sel').value;closeModal('modal-single-inv');printInventoryCount(id);}
 
 document.getElementById('mobile-count-continue')?.addEventListener('click',continueMobileCountSetup);
 document.addEventListener('click',event=>{
