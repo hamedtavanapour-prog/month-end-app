@@ -1,5 +1,7 @@
 // inventory.js — counting sessions, progress, saved counts, single-count export.
 
+let inventoryCountSaving=false;
+
 function latestInventoryCount(){
   return [...state.inventories].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0]||null;
 }
@@ -712,7 +714,7 @@ function initLiveCounts(ex){
   currentInvRoomId=currentInvRooms[0].id;
   currentRoomProducts().forEach(p=>{liveInvCounts[p.id]='';});
 }
-function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');const section=row.closest('.inv-count-section');if(section){const inputs=[...section.querySelectorAll('input[data-count-input="true"]')];const filled=inputs.filter(input=>input.value!=='').length;const count=section.querySelector('.inv-section-summary-count');if(count)count.textContent=`${filled}/${inputs.length}`;}updateInvProgress();}
+function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);hideInventoryFinishMessage();const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');const section=row.closest('.inv-count-section');if(section){const inputs=[...section.querySelectorAll('input[data-count-input="true"]')];const filled=inputs.filter(input=>input.value!=='').length;const count=section.querySelector('.inv-section-summary-count');if(count)count.textContent=`${filled}/${inputs.length}`;}updateInvProgress();}
 function invQtyInputs(){return[...document.querySelectorAll('#inv-rows input[data-count-input="true"]')].filter(input=>!input.closest('[hidden]'));}
 function focusInvQtyInput(current,step=1){
   const inputs=invQtyInputs();
@@ -866,6 +868,8 @@ function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate=
   dirtyInventoryRoomIds=new Set();
   deletedInventoryRoomIds=new Set();
   expandedInventorySections=new Set();
+  hideInventoryFinishMessage();
+  setInventoryFinishSaving(false);
   currentInvEdit=existingId;const ex=existingId?state.inventories.find(i=>i.id===existingId):null;
   if(ex)ensureInventoryHasFloorPlanRooms(ex);
   document.getElementById('inv-date').value=ex?ex.date:(presetDate||today());document.getElementById('inv-label').value=ex?ex.label||'':presetLabel;
@@ -902,6 +906,40 @@ function updateInvProgress(){
   document.getElementById('inv-prog-bar').style.width=pct+'%';document.getElementById('inv-prog-label').textContent=`${filled} of ${total} (${pct}%)`;
   document.getElementById('inv-prog-pills').innerHTML=`<span class="filled-pill"><span class="filled-dot"></span>${filled}</span><span class="missing-pill"><span class="missing-dot"></span>${total-filled} missing</span>`;
 }
+function hideInventoryFinishMessage(){
+  const message=document.getElementById('inventory-finish-message');
+  if(message)message.hidden=true;
+}
+function showInventoryFinishMessage(text){
+  const message=document.getElementById('inventory-finish-message');
+  if(message){message.textContent=text;message.hidden=false;}
+}
+function inventoryCountHasEntries(){
+  const liveHasEntries=Object.values(liveInvCounts||{}).some(value=>value!==''&&value!==null&&value!==undefined&&!isNaN(value));
+  if(liveHasEntries)return true;
+  const rooms=currentInvEdit?(state.inventories.find(inv=>inv.id===currentInvEdit)?.rooms||[]):currentInvRooms;
+  return(rooms||[]).some(room=>Object.keys(room.items||{}).length>0);
+}
+function focusFirstInventoryQuantity(){
+  const firstSection=document.querySelector('#inv-rows .inv-count-section');
+  if(firstSection?.classList.contains('collapsed'))firstSection.querySelector('.inv-section-header')?.click();
+  setTimeout(()=>{
+    const firstInput=document.querySelector('#inv-rows input[data-count-input="true"]:not([disabled])');
+    firstInput?.focus();
+    firstInput?.select();
+  },0);
+}
+function setInventoryFinishSaving(saving){
+  inventoryCountSaving=saving;
+  const button=document.getElementById('inventory-count-finish');
+  if(!button)return;
+  button.disabled=saving;
+  button.setAttribute('aria-busy',String(saving));
+  const desktopLabel=button.querySelector('.desktop-only');
+  const mobileLabel=button.querySelector('.mobile-only');
+  if(desktopLabel)desktopLabel.textContent=saving?'Saving…':'Finish Count';
+  if(mobileLabel)mobileLabel.textContent=saving?'Saving…':'Finish & View Report';
+}
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentRoomProducts();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
@@ -914,10 +952,10 @@ function renderInvRows(skipCapture=false){
   const groups={};prods.forEach(p=>{const k=p.category+'|||'+(p.subcategory||'Other');if(!groups[k])groups[k]={cat:p.category,sub:p.subcategory||'Other',items:[]};groups[k].items.push(p);});
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
-    const collapsed=window.innerWidth>820&&!expandedInventorySections.has(sectionToken);
+    const collapsed=!expandedInventorySections.has(sectionToken);
     const filledCount=g.items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
     html+=`<section class="inv-count-section ${collapsed?'collapsed':''}">
       <button class="inv-section-header" type="button" aria-expanded="${!collapsed}" onclick="toggleInventorySection('${sectionToken}')">
@@ -936,7 +974,18 @@ function toggleInventorySection(sectionToken){
   renderInvRows();
 }
 async function saveInventory(){
+  if(inventoryCountSaving)return;
   const date=document.getElementById('inv-date').value;if(!date){toast('Select a date.',true);return;}
+  if(!inventoryCountHasEntries()){
+    const message='Enter at least one quantity before finishing. Use 0 when an item was counted but is empty.';
+    showInventoryFinishMessage(message);
+    toast(message,true);
+    focusFirstInventoryQuantity();
+    return;
+  }
+  hideInventoryFinishMessage();
+  setInventoryFinishSaving(true);
+  try{
   const label=document.getElementById('inv-label').value.trim();
   let rooms;
   let activeRoom=null;
@@ -996,6 +1045,13 @@ async function saveInventory(){
   dirtyInventoryRoomIds=new Set();
   deletedInventoryRoomIds=new Set();
   viewInventory(savedId);
+  }catch(error){
+    console.error('Inventory save failed:',error);
+    showInventoryFinishMessage('The count could not be saved. Please try again.');
+    toast('The count could not be saved. Please try again.',true);
+  }finally{
+    setInventoryFinishSaving(false);
+  }
 }
 function renderInventoryTable(){
   renderFloorPlanRooms();

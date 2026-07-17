@@ -527,6 +527,7 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
 .inv-modal-header{padding:20px 24px 0;flex-shrink:0;}
 .inv-modal-filters{padding:0 24px 10px;flex-shrink:0;border-bottom:1px solid var(--border);}
 .inv-modal-progress{padding:8px 24px;flex-shrink:0;border-bottom:1px solid var(--border);}
+.inventory-finish-message{margin:8px 0 0;padding:8px 10px;border:1px solid color-mix(in srgb,var(--danger) 55%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--danger) 10%,var(--surface));color:var(--danger);font-size:.72rem;font-weight:750;line-height:1.35;}
 .inv-modal-body{flex:1;overflow-y:auto;padding:8px 24px;}
 .inv-modal-footer{padding:14px 24px;border-top:1px solid var(--border);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;background:var(--surface);}
 .inv-room-manager{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;flex-wrap:wrap;}
@@ -1303,7 +1304,8 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   #modal-inv-room-select .room-select-grid,#modal-inv-room-select .room-select-desktop-actions{display:none;}
   #modal-inv-room-select .room-select-phone-actions{position:static;display:grid;grid-template-columns:minmax(96px,.7fr) minmax(0,1.3fr);gap:10px;margin:20px 0 0;padding:14px 0 0;background:transparent;}
   #modal-inv-room-select .room-select-phone-actions .btn{width:100%;justify-content:center;}
-  .mobile-count-context{margin:-2px 42px 12px 0;padding:9px 11px;border:1px solid var(--border);border-radius:11px;background:var(--surface2);}
+  .count-setup-step.mobile-only,.mobile-count-context.mobile-only{display:block;}
+  .mobile-count-context{margin:8px 42px 16px 0;padding:0;border:0;background:transparent;}
   .mobile-count-context strong,.mobile-count-context span{display:block;}
   .mobile-count-context strong{font-size:.82rem;overflow-wrap:anywhere;}
   .mobile-count-context span{margin-top:2px;color:var(--text-muted);font-size:.7rem;}
