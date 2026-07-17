@@ -23,10 +23,19 @@
       archived:false
     };
 
+    if(access.preferences?.theme&&typeof setTheme==='function')setTheme(access.preferences.theme,false);
+    if(Array.isArray(access.managers)){
+      const managerProfiles=access.managers.map(manager=>({id:manager.id,userId:manager.userId,name:manager.name,email:manager.email,role:manager.role,status:'active',archived:false,serverManaged:true}));
+      const localProfiles=(state.profiles||[]).filter(item=>!item.serverManaged&&!managerProfiles.some(manager=>manager.id===item.id||manager.email===item.email));
+      state.profiles=[...managerProfiles,...localProfiles];
+      if(typeof renderSettingsProfiles==='function')renderSettingsProfiles();
+      if(typeof renderDepartmentSettings==='function')renderDepartmentSettings();
+    }
+
     window.currentProfile=()=>profile;
     window.profileCanAccessPage=(_profile,page)=>allowedPage(page);
     window.profileCanManageProfiles=()=>Boolean(access.canManageUsers);
-    window.openCurrentProfileSettings=()=>{window.top.location.href=access.canManageUsers?'/app/team':'/app';};
+    window.openCurrentProfileSettings=()=>{if(access.canManageUsers&&typeof setSettingsSection==='function'){showPage('settings');setSettingsSection('profiles');}};
     window.logoutProfile=async()=>{
       try{await fetch('/api/sign-out',{method:'POST',credentials:'include'});}catch(e){}
       window.top.location.href='/login';
@@ -55,11 +64,11 @@
     document.querySelectorAll('[data-settings-key="profiles"]').forEach(button=>{
       button.textContent='';
       button.innerHTML='<span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 5a3 3 0 0 1 0 6M17 14c2.6.4 4 2.3 4 5"/></svg></span><span>Users & Access</span>';
-      button.onclick=()=>{window.top.location.href='/app/team';};
+      button.onclick=()=>{showPage('settings');setSettingsSection('profiles');};
       button.style.display=access.canManageUsers?'flex':'none';
     });
     const accountButton=document.querySelector('.settings-account');
-    if(accountButton)accountButton.onclick=()=>{window.top.location.href=access.canManageUsers?'/app/team':'/app';};
+    if(accountButton)accountButton.onclick=window.openCurrentProfileSettings;
     const menuButtons=document.querySelectorAll('#profile-menu button');
     if(menuButtons[0]){menuButtons[0].textContent=access.canManageUsers?'Manage users & access':'My account';menuButtons[0].onclick=window.openCurrentProfileSettings;}
 
@@ -81,6 +90,8 @@
       applyAccess();
     }catch(error){console.error('Could not load account access.',error);}
   }
+
+  window.recordServerEvent=(event)=>fetch('/api/audit-events',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(event)}).catch(()=>null);
 
   window.addEventListener('load',loadAccess);
 })();

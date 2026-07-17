@@ -1038,6 +1038,9 @@ async function saveInventory(){
   setInventoryFinishSaving(true);
   try{
   const label=document.getElementById('inv-label').value.trim();
+  const wasEditing=Boolean(currentInvEdit);
+  const auditActor=window.serverAccessContext?.user||{};
+  const auditStamp={id:auditActor.id||'',name:auditActor.name||'Team member',role:auditActor.jobTitle||auditActor.role||'Team member'};
   let rooms;
   let activeRoom=null;
   let savedId=currentInvEdit;
@@ -1081,9 +1084,9 @@ async function saveInventory(){
   }
   const items=mergeInventoryRoomItems(rooms);
   if(!Object.keys(items).length){toast('No quantities entered.',true);return;}
-  if(currentInvEdit){const i=state.inventories.findIndex(x=>x.id===currentInvEdit);state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false};savedId=state.inventories[i].id;}
-  else if(!savedId){savedId=uid();state.inventories.push({id:savedId,date,label,items,rooms});}
-  else{const i=state.inventories.findIndex(x=>x.id===savedId);if(i>=0)state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false};}
+  if(currentInvEdit){const i=state.inventories.findIndex(x=>x.id===currentInvEdit);state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false,updatedBy:auditStamp,updatedAt:new Date().toISOString()};savedId=state.inventories[i].id;}
+  else if(!savedId){savedId=uid();state.inventories.push({id:savedId,date,label,items,rooms,createdBy:auditStamp,createdAt:new Date().toISOString()});}
+  else{const i=state.inventories.findIndex(x=>x.id===savedId);if(i>=0)state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false,createdBy:state.inventories[i].createdBy||auditStamp,createdAt:state.inventories[i].createdAt||new Date().toISOString(),updatedBy:auditStamp,updatedAt:new Date().toISOString()};}
   state.inventories.sort((a,b)=>a.date<b.date?1:-1);
   save();
   const pushed=typeof cloudPushNow==='function'?await cloudPushNow():true;
@@ -1092,6 +1095,7 @@ async function saveInventory(){
     toast('Saved on this device, but cloud saving failed. Keep this window open and try again.',true);
     return;
   }
+  window.recordServerEvent?.({action:wasEditing?'count.updated':'count.created',entityType:'count',entityId:savedId,details:{label,date,rooms:rooms.length,items:Object.keys(items).length,actor:auditStamp}});
   closeModal('modal-inventory');renderInventoryTable();refreshLiveInventoryIfVisible();toast(`Saved — ${Object.keys(items).length} items.`);
   dirtyInventoryRoomIds=new Set();
   deletedInventoryRoomIds=new Set();
@@ -1133,7 +1137,7 @@ function renderInventoryTable(){
     if(mobileList)mobileList.innerHTML=emptyState;
     return;
   }
-  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions">${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
+  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.createdBy?.name?`<small class="count-audit-line">Created by ${escapeHtml(inv.createdBy.name)} · ${escapeHtml(inv.createdBy.role||'')}</small>`:''}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions">${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
   if(mobileList)mobileList.innerHTML=rows.map((inv,index)=>mobileInventoryCardHtml(inv,index)).join('');
 }
 function mobileInventoryCardHtml(inv,index){
@@ -1149,6 +1153,7 @@ function mobileInventoryCardHtml(inv,index){
       <div class="inventory-mobile-detail-row"><span>Items counted</span><strong>${inv.counted}</strong></div>
       <div class="inventory-mobile-detail-row"><span>Items missing</span><strong class="${inv.missing?'danger-text':''}">${inv.missing}</strong></div>
       <div class="inventory-mobile-detail-row"><span>Total value</span><strong>${fmt(inv.value)}</strong></div>
+      ${inv.createdBy?.name?`<div class="inventory-mobile-detail-row count-created-by"><span>Created by</span><strong>${escapeHtml(inv.createdBy.name)}<small>${escapeHtml(inv.createdBy.role||'')}</small></strong></div>`:''}
       ${inv.draft?'<span class="inventory-mobile-status">Draft</span>':''}${inv.archived?'<span class="inventory-mobile-status">Archived</span>':''}
       <div class="inventory-mobile-card-actions" onclick="event.stopPropagation()"><button class="btn btn-secondary inventory-mobile-view-more" type="button" onclick="event.stopPropagation();viewInventory('${inv.id}')">View More</button>${inventoryMenuHtml(inv,`inventory-mobile-menu-${index}`)}</div>
     </div>`:''}
@@ -1175,6 +1180,7 @@ function archiveInventory(id,archived=true){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);if(!inv)return;
   inv.archived=archived;save();renderInventoryTable();refreshLiveInventoryIfVisible();
+  window.recordServerEvent?.({action:archived?'count.archived':'count.restored',entityType:'count',entityId:id,details:{label:inv.label||'',date:inv.date}});
   if(viewInvId===id){
     document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
     renderViewInventoryActions(inv);
@@ -1184,6 +1190,7 @@ function archiveInventory(id,archived=true){
 function viewInventory(id){
   viewInvId=id;viewInvTab='all';viewInvExpandedProductId=null;viewInvEditingProductId=null;const inv=state.inventories.find(i=>i.id===id);if(!inv)return;normalizeInventoryRooms(inv);
   document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
+  const attribution=document.getElementById('view-inv-attribution');if(attribution){attribution.textContent=inv.createdBy?.name?`Created by ${inv.createdBy.name} · ${inv.createdBy.role||'Team member'}${inv.createdAt?` · ${new Date(inv.createdAt).toLocaleString()}`:''}`:'';attribution.hidden=!attribution.textContent;}
   document.getElementById('view-inv-search').value='';
   renderViewInventoryActions(inv);renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
 }
@@ -1264,7 +1271,7 @@ function renderViewInvTable(){
   document.getElementById('view-inv-list').innerHTML=mobileCards||`<p class="empty-cell">${emptyText}</p>`;
   document.getElementById('view-inv-total').textContent=viewInvTab!=='missing'?`Total: ${fmt(total)}`:'';
 }
-function deleteInventory(id){closeAllMenus();if(!confirm('Delete?'))return;state.inventories=state.inventories.filter(i=>i.id!==id);save();closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}
+function deleteInventory(id){closeAllMenus();if(!confirm('Delete?'))return;const inv=state.inventories.find(i=>i.id===id);state.inventories=state.inventories.filter(i=>i.id!==id);save();window.recordServerEvent?.({action:'count.deleted',entityType:'count',entityId:id,details:{label:inv?.label||'',date:inv?.date||''}});closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}
 function openSingleInvExport(){closeAllMenus();const sel=document.getElementById('single-inv-sel');sel.innerHTML=state.inventories.map(inv=>`<option value="${inv.id}">${fmtDate(inv.date)}${inv.label?' — '+inv.label:''}</option>`).join('');openModal('modal-single-inv');}
 function exportInventoryExcel(id){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}

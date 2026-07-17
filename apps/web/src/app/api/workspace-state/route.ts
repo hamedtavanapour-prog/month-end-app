@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 
@@ -42,35 +43,18 @@ async function getMembershipContext(): Promise<
   | { error: NextResponse }
 > {
   const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
-
-  if (!userId) return { error: jsonResponse({ error: "Unauthorized" }, 401) };
-
-  const { data: membership, error } = await supabase
-    .from("memberships")
-    .select("id, organization_id, role")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !membership) {
+  const access = await getAccessContext();
+  if (!access) {
     return { error: jsonResponse({ error: "No active workspace" }, 403) };
   }
 
-  const { data: permissionRows } = await supabase
-    .from("membership_permissions")
-    .select("permission_key, allowed")
-    .eq("membership_id", membership.id);
-
   return {
     context: {
-      membershipId: membership.id,
-      organizationId: membership.organization_id,
-      permissionKeys: permissionRows?.filter((row) => row.allowed).map((row) => row.permission_key) ?? [],
-      role: membership.role,
-      userId,
+      membershipId: access.membershipId,
+      organizationId: access.organizationId,
+      permissionKeys: access.permissionKeys,
+      role: access.role,
+      userId: access.userId,
     },
     supabase,
   };

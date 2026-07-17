@@ -113,7 +113,17 @@ input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance:
 .team-current-user span, .member-card summary > span, .pending-list > div > span { display: grid; min-width: 0; gap: 2px; }
 .team-current-user strong, .member-card summary strong, .pending-list strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .team-current-user small, .member-card summary small, .pending-list small { color: var(--muted); font-size: 12px; text-transform: capitalize; }
-.team-content { min-width: 0; width: min(1080px, 100%); margin: 0 auto; padding: 38px 42px 80px; }
+.team-content { display: flex; min-width: 0; width: min(1080px, 100%); margin: 0 auto; padding: 38px 42px 80px; flex-direction: column; }
+.active-team-card { order: 1; }
+.prepared-account-card { order: 2; }
+.pending-invitations-card { order: 3; }
+.access-details { border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.access-details > summary { cursor: pointer; color: #334155; font-size: 14px; font-weight: 800; }
+.access-details[open] > summary { margin-bottom: 20px; }
+.team-shell-embedded { display: block; min-height: 100%; background: transparent; }
+.team-shell-embedded .team-sidebar { display: none; }
+.team-shell-embedded .team-content { width: 100%; padding: 8px 0 48px; }
+.team-shell-embedded .team-header { display: none; }
 .team-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .team-header h1 { margin: 0; font-size: 36px; letter-spacing: -.045em; }
 .team-header p:last-child { margin: 8px 0 0; color: var(--muted); }

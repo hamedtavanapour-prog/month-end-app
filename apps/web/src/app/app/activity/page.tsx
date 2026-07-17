@@ -15,6 +15,14 @@ const actionLabels: Record<string, string> = {
   "user.invitation_revoked": "Revoked an invitation",
   "user.access_updated": "Updated user access",
   "workspace.saved": "Saved workspace changes",
+  "organization.created": "Created a restaurant workspace",
+  "user.precreated": "Prepared a user account",
+  "user.first_login_completed": "Completed first sign in",
+  "count.created": "Created a count",
+  "count.updated": "Updated a count",
+  "count.archived": "Archived a count",
+  "count.restored": "Restored a count",
+  "count.deleted": "Deleted a count",
 };
 
 function initials(name: string) {
@@ -25,11 +33,13 @@ export default async function ActivityPage() {
   const context = await requireAccessContext();
   if (!(["owner", "admin", "manager"] as string[]).includes(context.role)) redirect("/app");
   const supabase = await createClient();
-  const [{ data: logs }, { data: profiles }] = await Promise.all([
+  const [{ data: logs }, { data: profiles }, { data: memberships }] = await Promise.all([
     supabase.from("audit_logs").select("id, actor_user_id, action, entity_type, entity_id, after_data, created_at").eq("organization_id", context.organizationId).order("created_at", { ascending: false }).limit(200),
     supabase.from("profiles").select("id, display_name, email"),
+    supabase.from("memberships").select("user_id, job_title, role").eq("organization_id", context.organizationId),
   ]);
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const titleMap = new Map((memberships ?? []).map((membership) => [membership.user_id, membership.job_title || membership.role]));
 
   return <main className="team-shell">
     <aside className="team-sidebar">
@@ -43,7 +53,7 @@ export default async function ActivityPage() {
         <div className="activity-list">{logs?.length ? logs.map((log) => {
           const profile = log.actor_user_id ? profileMap.get(log.actor_user_id) : null;
           const actor = profile?.display_name || profile?.email || "System";
-          return <article key={log.id}><b>{initials(actor)}</b><div><strong>{actor}</strong><span>{actionLabels[log.action] || log.action}</span><small>{log.entity_type}{log.entity_id ? ` · ${log.entity_id.slice(0, 8)}` : ""}</small></div><time dateTime={log.created_at}>{new Date(log.created_at).toLocaleString("en-CA", { dateStyle: "medium", timeStyle: "short" })}</time></article>;
+          return <article key={log.id}><b>{initials(actor)}</b><div><strong>{actor}</strong><span>{actionLabels[log.action] || log.action}</span><small>{log.actor_user_id ? `${titleMap.get(log.actor_user_id) || "Team member"} · ` : ""}{log.entity_type}{log.entity_id ? ` · ${log.entity_id.slice(0, 8)}` : ""}</small></div><time dateTime={log.created_at}>{new Date(log.created_at).toLocaleString("en-CA", { dateStyle: "medium", timeStyle: "short" })}</time></article>;
         }) : <div className="activity-empty">No activity has been recorded yet.</div>}</div>
       </section>
     </section>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { login } from "./actions";
+import { login, selectWorkspace } from "./actions";
 
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
@@ -11,28 +11,29 @@ export const dynamic = "force-dynamic";
 const errors: Record<string, string> = {
   invalid_form: "Enter your email address and password.",
   invalid_credentials: "That email address or password is not correct.",
+  invalid_workspace: "Enter the restaurant or workspace name.",
+  workspace_access: "This account does not have access to that restaurant.",
   confirmation_failed: "That verification link could not be completed. Please try signing in or request a new link.",
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ email?: string; error?: string; next?: string; reset?: string; status?: string }>;
+  searchParams: Promise<{ email?: string; error?: string; next?: string; reset?: string; status?: string; workspace?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  if (data?.claims) redirect("/app");
-
   const params = await searchParams;
+  if (data?.claims && !params.workspace) redirect("/app");
   const errorMessage = params.error ? errors[params.error] : null;
   const next = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/app";
 
   return (
     <main className="login-page">
-      <section className="login-story" aria-label="Keg Bar introduction">
+      <section className="login-story" aria-label="Month's End introduction">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">ME</span>
-          <span>Keg Bar</span>
+          <span>Month&apos;s End</span>
         </div>
         <div className="story-copy">
           <p className="eyebrow">Inventory Manager</p>
@@ -47,18 +48,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
       <section className="login-panel">
         <div className="login-card">
-          <div>
-            <p className="eyebrow">Welcome back</p>
-            <h2>Sign in to your workspace</h2>
-            <p className="muted">Use the account provided by your manager.</p>
-          </div>
+          <div><p className="eyebrow">Welcome back</p><h2>{params.workspace ? params.workspace : "Find your restaurant"}</h2><p className="muted">{params.workspace ? "Use the account provided by your manager." : "Enter your restaurant or workspace name first."}</p></div>
 
           {errorMessage ? <div className="form-alert" role="alert">{errorMessage}</div> : null}
           {params.reset ? <div className="success-alert">Your password has been updated. Sign in to continue.</div> : null}
           {params.status === "account_ready" ? <div className="success-alert">Your account is ready. Sign in with your new password.</div> : null}
+          {params.status === "prepared" ? <div className="success-alert">Your account is ready. Sign in with the temporary password from your manager.</div> : null}
 
-          <form action={login} className="auth-form">
+          {!params.workspace ? <form action={selectWorkspace} className="auth-form">
+            <label><span>Restaurant or workspace</span><input name="workspace" autoCapitalize="words" autoComplete="organization" placeholder="e.g. The Keg" required /></label>
+            <button type="submit">Continue</button>
+          </form> : <form action={login} className="auth-form">
             <input name="next" type="hidden" value={next} />
+            <input name="workspace" type="hidden" value={params.workspace} />
             <label>
               <span>Email address</span>
               <input name="email" type="email" autoComplete="email" defaultValue={params.email ?? ""} required />
@@ -69,11 +71,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </label>
             <div className="password-help"><Link href="/forgot-password">Forgot password?</Link></div>
             <button type="submit">Sign in</button>
-          </form>
+            <Link className="auth-switch-workspace" href="/login">Use a different restaurant</Link>
+          </form>}
 
           <div className="login-help">
             <p>Need an account?</p>
-            <span>Your administrator or department manager can send you a private invitation.</span>
+            <span>Your administrator or manager can prepare one for you.</span>
           </div>
         </div>
       </section>

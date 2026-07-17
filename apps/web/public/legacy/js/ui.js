@@ -28,11 +28,12 @@ document.addEventListener('keydown',event=>{
   if((event.key==='ArrowUp'||event.key==='ArrowDown')&&event.target?.matches?.('input[type="number"]'))event.preventDefault();
 },true);
 
-function setTheme(theme){
+function setTheme(theme,savePreference=true){
   const nextTheme=APP_THEMES.includes(theme)?theme:'slate';
   document.documentElement.dataset.theme=nextTheme;
   try{localStorage.setItem(THEME_STORAGE_KEY,nextTheme);}catch(e){}
   updateThemeToggle(nextTheme);
+  if(savePreference&&window.serverAccessContext){fetch('/api/user-preferences',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:nextTheme})}).catch(()=>{});}
 }
 
 function updateThemeToggle(theme=document.documentElement.dataset.theme||'slate'){

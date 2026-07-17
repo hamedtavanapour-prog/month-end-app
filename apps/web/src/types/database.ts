@@ -321,6 +321,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          job_title: string | null
+          last_login_at: string | null
+          must_change_password: boolean
           organization_id: string
           reports_to_membership_id: string | null
           role: string
@@ -332,6 +335,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          job_title?: string | null
+          last_login_at?: string | null
+          must_change_password?: boolean
           organization_id: string
           reports_to_membership_id?: string | null
           role: string
@@ -343,6 +349,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          job_title?: string | null
+          last_login_at?: string | null
+          must_change_password?: boolean
           organization_id?: string
           reports_to_membership_id?: string | null
           role?: string
@@ -361,6 +370,45 @@ export type Database = {
           {
             foreignKeyName: "memberships_reports_to_membership_id_fkey"
             columns: ["reports_to_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      department_managers: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          department_id: string
+          is_primary: boolean
+          membership_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          department_id: string
+          is_primary?: boolean
+          membership_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          department_id?: string
+          is_primary?: boolean
+          membership_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_managers_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_managers_membership_id_fkey"
+            columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
@@ -483,6 +531,38 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          organization_id: string
+          preferences: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          preferences?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          preferences?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -505,6 +585,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_restaurant_workspace: {
+        Args: { p_name: string; p_owner_user_id: string; p_slug: string }
+        Returns: string
+      }
       get_invitation_details: {
         Args: { p_token_hash: string }
         Returns: {
@@ -520,8 +604,41 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: undefined
       }
+      complete_first_login: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
+      provision_team_member: {
+        Args: {
+          p_department_ids: string[]
+          p_display_name: string
+          p_email: string
+          p_job_title: string
+          p_must_change_password?: boolean
+          p_organization_id: string
+          p_permission_keys: string[]
+          p_role: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      record_app_event: {
+        Args: {
+          p_action: string
+          p_after_data?: Json | null
+          p_department_id: string | null
+          p_entity_id: string
+          p_entity_type: string
+          p_organization_id: string
+        }
+        Returns: number
+      }
       revoke_team_invitation: {
         Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      set_department_primary_manager: {
+        Args: { p_department_id: string; p_membership_id: string | null }
         Returns: undefined
       }
       update_team_member: {

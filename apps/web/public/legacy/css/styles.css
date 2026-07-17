@@ -1633,3 +1633,7 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   .view-inv-actions{position:static!important;display:grid;grid-template-columns:1fr;gap:10px;margin:0 -12px;padding:12px max(12px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));border-top:1px solid var(--border);background:var(--surface);}
   .view-inv-actions .btn{width:100%;justify-content:center;}
 }
+.settings-users-frame{display:block;width:100%;min-height:1100px;border:0;background:transparent;}
+@media(max-width:820px){.settings-users-frame{min-height:1400px;}}
+.count-audit-line,.view-inv-attribution{display:block;margin-top:4px;color:var(--text-muted);font-size:.72rem;font-weight:500;}
+.count-created-by strong{display:grid;text-align:right}.count-created-by small{color:var(--text-muted);font-size:.72rem;font-weight:500;}

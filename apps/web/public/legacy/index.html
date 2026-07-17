@@ -411,28 +411,7 @@
         <div class="settings-group menu-editor" id="settings-menu-editor" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="profiles">
-        <div class="settings-section-head"><h3>Profiles</h3><p>Invite managers, assign room access, and control what each person can work on.</p></div>
-        <div class="settings-group">
-          <div class="invite-form">
-            <div class="form-grid">
-              <div class="form-group"><label>Name</label><input type="text" id="settings-profile-name" placeholder="Assistant Manager"></div>
-              <div class="form-group"><label>Email</label><input type="email" id="settings-profile-email" placeholder="manager@example.com"></div>
-              <div class="form-group"><label>Role</label><select id="settings-profile-role"><option>Assistant Manager</option><option>Bar Manager</option><option>Inventory Counter</option><option>Owner</option></select></div>
-            </div>
-            <div class="permission-block">
-              <div class="permission-head"><strong>Room Access</strong><button class="btn btn-secondary btn-sm" type="button" onclick="selectInviteRooms('all')">All Rooms</button></div>
-              <div class="permission-grid" id="settings-profile-room-access"></div>
-            </div>
-            <div class="permission-block">
-              <div class="permission-head"><strong>Page Access</strong><button class="btn btn-secondary btn-sm" type="button" onclick="selectInvitePages('manager')">Manager Default</button></div>
-              <div class="permission-grid" id="settings-profile-page-access"></div>
-            </div>
-            <div class="modal-actions profile-invite-actions">
-              <button class="btn btn-primary" type="button" onclick="inviteProfile()">Send Invite</button>
-            </div>
-          </div>
-          <div class="settings-list" id="settings-profile-list"></div>
-        </div>
+        <iframe class="settings-users-frame" src="/app/team?embedded=1" title="Users and access settings"></iframe>
       </div>
       <div class="settings-pane" data-settings-pane="appearance">
         <div class="settings-section-head"><h3>Appearance</h3><p>Choose a saved visual theme for this device.</p></div>
@@ -594,7 +573,7 @@
 <div class="modal view-inv-modal" role="dialog" aria-modal="true" aria-labelledby="view-inv-title">
   <button class="modal-close" type="button" aria-label="Close saved count preview" onclick="closeModal('modal-view-inv')">&times;</button>
   <div class="view-inv-heading">
-    <h3 id="view-inv-title">Inventory Count</h3>
+    <div><h3 id="view-inv-title">Inventory Count</h3><p class="view-inv-attribution" id="view-inv-attribution" hidden></p></div>
     <div class="view-inv-heading-actions">
       <button class="icon-btn view-inv-edit-count" type="button" aria-label="Edit count" title="Edit count" onclick="editViewedInventory()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>

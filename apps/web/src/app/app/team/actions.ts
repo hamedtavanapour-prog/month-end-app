@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireAccessContext } from "@/lib/auth/context";
 import { sendInvitationSetupEmail } from "@/lib/auth/invitation-email";
+import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
 
 function values(formData: FormData, key: string) {
@@ -19,6 +20,13 @@ function invitationError(message?: string) {
   return "invite_failed";
 }
 
+function teamUrl(formData: FormData, values: Record<string, string> = {}) {
+  const params = new URLSearchParams(values);
+  if (formData.get("embedded") === "1") params.set("embedded", "1");
+  const query = params.toString();
+  return `/app/team${query ? `?${query}` : ""}`;
+}
+
 export async function createInvitation(formData: FormData) {
   const context = await requireAccessContext();
   const displayName = String(formData.get("displayName") ?? "").trim();
@@ -28,7 +36,7 @@ export async function createInvitation(formData: FormData) {
   const permissionKeys = values(formData, "permissions");
 
   if (!displayName || !email || !email.includes("@") || !permissionKeys.length) {
-    redirect("/app/team?error=invalid_invitation");
+    redirect(teamUrl(formData, { error: "invalid_invitation" }));
   }
 
   const token = randomBytes(32).toString("base64url");
@@ -45,7 +53,7 @@ export async function createInvitation(formData: FormData) {
     p_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   });
 
-  if (error) redirect(`/app/team?error=${invitationError(error.message)}`);
+  if (error) redirect(teamUrl(formData, { error: invitationError(error.message) }));
 
   const { error: emailError } = await sendInvitationSetupEmail({
     displayName,
@@ -54,7 +62,41 @@ export async function createInvitation(formData: FormData) {
   });
 
   revalidatePath("/app/team");
-  redirect(`/app/team?created=${encodeURIComponent(displayName)}&token=${encodeURIComponent(token)}&delivery=${emailError ? "failed" : "email"}`);
+  redirect(teamUrl(formData, { created: displayName, token, delivery: emailError ? "failed" : "email" }));
+}
+
+export async function createPreparedAccount(formData: FormData) {
+  const context = await requireAccessContext();
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const temporaryPassword = String(formData.get("temporaryPassword") ?? "");
+  const role = String(formData.get("role") ?? "staff");
+  const jobTitle = String(formData.get("jobTitle") ?? "Team Member").trim();
+  const departmentIds = values(formData, "departments");
+  const permissionKeys = values(formData, "permissions");
+  if (!displayName || !email.includes("@") || temporaryPassword.length < 12 || !jobTitle || !permissionKeys.length) {
+    redirect(teamUrl(formData, { error: "invalid_prepared_account" }));
+  }
+
+  const supabase = await createClient();
+  const loginUrl = `${getPublicAppUrl()}/login?workspace=${encodeURIComponent(context.organizationSlug)}&email=${encodeURIComponent(email)}&status=prepared`;
+  const { data, error } = await supabase.functions.invoke("create-prepared-user", { body: {
+    organizationId: context.organizationId,
+    email,
+    displayName,
+    temporaryPassword,
+    role,
+    jobTitle,
+    departmentIds,
+    permissionKeys,
+    loginUrl,
+  } });
+  if (error || !data?.created) {
+    const code = data?.error === "account_exists" ? "account_exists" : invitationError(data?.error || error?.message);
+    redirect(teamUrl(formData, { error: code }));
+  }
+  revalidatePath("/app/team");
+  redirect(teamUrl(formData, { prepared: displayName, delivery: data.emailDelivered ? "email" : "failed" }));
 }
 
 export async function updateTeamMember(formData: FormData) {
@@ -74,9 +116,9 @@ export async function updateTeamMember(formData: FormData) {
     p_permission_keys: permissionKeys,
   });
 
-  if (error) redirect("/app/team?error=update_failed");
+  if (error) redirect(teamUrl(formData, { error: "update_failed" }));
   revalidatePath("/app/team");
-  redirect("/app/team?updated=1");
+  redirect(teamUrl(formData, { updated: "1" }));
 }
 
 export async function revokeInvitation(formData: FormData) {
@@ -87,7 +129,7 @@ export async function revokeInvitation(formData: FormData) {
     p_invitation_id: invitationId,
   });
 
-  if (error) redirect("/app/team?error=revoke_failed");
+  if (error) redirect(teamUrl(formData, { error: "revoke_failed" }));
   revalidatePath("/app/team");
-  redirect("/app/team?revoked=1");
+  redirect(teamUrl(formData, { revoked: "1" }));
 }

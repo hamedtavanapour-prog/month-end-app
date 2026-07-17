@@ -1550,6 +1550,7 @@ function updateDepartmentManager(id,managerId){
   department.managerId=managerId||'';
   if(managerId&&!department.userIds.includes(managerId))department.userIds.push(managerId);
   save();renderDepartmentSettings();
+  fetch('/api/department-manager',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({department:department.id||department.name,membershipId:managerId||null})}).catch(()=>{});
 }
 
 function toggleDepartmentRoom(id,roomId,assigned){
