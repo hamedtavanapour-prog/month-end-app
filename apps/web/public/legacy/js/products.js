@@ -196,8 +196,23 @@ function setProductCatalogView(view){
   renderProducts();
 }
 
-function openProductFilterSheet(){document.getElementById('product-filter-sheet')?.classList.add('open');}
-function closeProductFilterSheet(){document.getElementById('product-filter-sheet')?.classList.remove('open');}
+function openProductFilterSheet(){
+  closeAllMenus();
+  const sheet=document.getElementById('product-filter-sheet');
+  if(!sheet)return;
+  const page=document.getElementById('page-products');
+  if(window.innerWidth<=820&&page&&sheet.parentElement!==page)page.appendChild(sheet);
+  sheet.scrollTop=0;
+  sheet.classList.add('open');
+  syncMobileSheetBackdrop();
+}
+function closeProductFilterSheet(){
+  const sheet=document.getElementById('product-filter-sheet');
+  sheet?.classList.remove('open');
+  const home=document.querySelector('#page-products .product-filter-row');
+  if(sheet&&home&&sheet.parentElement!==home)home.appendChild(sheet);
+  syncMobileSheetBackdrop();
+}
 function setProductSort(value){const[col='name',dir='asc']=String(value||'name:asc').split(':');sortState.products={col,dir};renderProducts();}
 function updateProductFilterSummary(){
   const summary=document.getElementById('product-filter-summary');if(!summary)return;

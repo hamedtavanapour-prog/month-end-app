@@ -82,6 +82,22 @@ function closeAllMenus(){
     menu.classList.remove('open');
     resetFloatingMenuPosition(menu);
   });
+  syncMobileSheetBackdrop();
+}
+function syncMobileSheetBackdrop(){
+  const backdrop=document.getElementById('mobile-sheet-backdrop');
+  if(!backdrop)return;
+  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.drop-menu.open,.col-menu.open,.product-filter-sheet.open,.inv-filter-sheet.open');
+  backdrop.classList.toggle('open',hasOpenSheet);
+  backdrop.setAttribute('aria-hidden',String(!hasOpenSheet));
+}
+function closeMobileSheets(){
+  closeAllMenus();
+  if(typeof closeProductFilterSheet==='function')closeProductFilterSheet();
+  else document.getElementById('product-filter-sheet')?.classList.remove('open');
+  if(typeof closeInventoryFilterSheet==='function')closeInventoryFilterSheet();
+  else document.getElementById('inv-filter-sheet')?.classList.remove('open');
+  syncMobileSheetBackdrop();
 }
 function activateFilePicker(event,inputId){
   if(event.key!=='Enter'&&event.key!==' ')return;
@@ -126,6 +142,7 @@ function toggleMenu(id){
     ?document.activeElement
     :menu.closest('.drop-wrap,.col-wrap')?.querySelector('button');
   menu.classList.add('open');
+  syncMobileSheetBackdrop();
 
   if(trigger&&menu.matches('.drop-menu,.col-menu')&&typeof menu.showPopover==='function'){
     menu.setAttribute('popover','manual');

@@ -928,8 +928,15 @@ function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate=
   closeInventoryFilterSheet();
   renderInventoryRooms();renderInvRows(true);openModal('modal-inventory');
 }
-function openInventoryFilterSheet(){document.getElementById('inv-filter-sheet')?.classList.add('open');}
-function closeInventoryFilterSheet(){document.getElementById('inv-filter-sheet')?.classList.remove('open');}
+function openInventoryFilterSheet(){
+  closeAllMenus();
+  const sheet=document.getElementById('inv-filter-sheet');
+  if(!sheet)return;
+  sheet.scrollTop=0;
+  sheet.classList.add('open');
+  syncMobileSheetBackdrop();
+}
+function closeInventoryFilterSheet(){document.getElementById('inv-filter-sheet')?.classList.remove('open');syncMobileSheetBackdrop();}
 function updateInventoryFilterSummary(){
   const summary=document.getElementById('inv-filter-summary');
   if(!summary)return;
