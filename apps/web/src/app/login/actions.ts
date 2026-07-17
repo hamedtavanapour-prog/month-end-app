@@ -3,13 +3,17 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-import { normalizeWorkspace, WORKSPACE_COOKIE, workspaceMatches } from "@/lib/auth/context";
+import { normalizeWorkspace, WORKSPACE_COOKIE } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 
 export async function selectWorkspace(formData: FormData) {
   const workspace = String(formData.get("workspace") ?? "").trim();
   if (workspace.length < 2) redirect("/login?error=invalid_workspace");
-  redirect(`/login?workspace=${encodeURIComponent(workspace)}`);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("resolve_workspace", { p_identifier: workspace });
+  const match = data?.[0];
+  if (error || !match) redirect(`/login?error=workspace_not_found&workspaceQuery=${encodeURIComponent(workspace)}`);
+  redirect(`/login?workspace=${encodeURIComponent(match.name)}`);
 }
 
 export async function login(formData: FormData) {
@@ -37,25 +41,24 @@ export async function login(formData: FormData) {
     redirect(`/login?workspace=${encodeURIComponent(workspace)}&error=invalid_credentials`);
   }
 
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
-  const { data: memberships } = userId ? await supabase
-    .from("memberships")
-    .select("id, must_change_password, organizations(name, slug)")
-    .eq("user_id", userId)
-    .eq("status", "active") : { data: [] };
-  const matching = (memberships ?? []).filter((membership) => {
-    const organization = Array.isArray(membership.organizations) ? membership.organizations[0] : membership.organizations;
-    return organization ? workspaceMatches(workspace, organization) : false;
-  });
-  if (matching.length !== 1) {
+  const { data: memberships, error: membershipError } = await supabase.rpc("get_my_workspace_membership", { p_identifier: workspace });
+  const membership = memberships?.[0];
+  if (membershipError || !membership) {
     await supabase.auth.signOut();
     redirect(`/login?workspace=${encodeURIComponent(workspace)}&error=workspace_access`);
   }
 
-  const organization = Array.isArray(matching[0].organizations) ? matching[0].organizations[0] : matching[0].organizations;
+  if (membership.status === "suspended") {
+    await supabase.auth.signOut();
+    redirect(`/login?workspace=${encodeURIComponent(workspace)}&error=account_suspended`);
+  }
+  if (membership.status !== "active") {
+    await supabase.auth.signOut();
+    redirect(`/login?workspace=${encodeURIComponent(workspace)}&error=workspace_access`);
+  }
+
   const cookieStore = await cookies();
-  cookieStore.set(WORKSPACE_COOKIE, normalizeWorkspace(organization?.slug || workspace), {
+  cookieStore.set(WORKSPACE_COOKIE, normalizeWorkspace(membership.organization_slug || workspace), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -63,7 +66,7 @@ export async function login(formData: FormData) {
     maxAge: 60 * 60 * 24 * 365,
   });
 
-  if (matching[0].must_change_password) redirect("/change-password");
+  if (membership.must_change_password) redirect("/change-password");
 
   redirect(next);
 }

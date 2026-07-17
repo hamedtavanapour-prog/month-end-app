@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
-const ALLOWED_KEYS = new Set(["theme", "sidebarCollapsed", "density", "defaultDepartmentId", "defaultPage"]);
+const ALLOWED_KEYS = new Set(["theme", "sidebarCollapsed", "settingsSidebarCollapsed", "density", "defaultDepartmentId", "defaultPage"]);
 
 export async function GET() {
   const context = await getAccessContext();

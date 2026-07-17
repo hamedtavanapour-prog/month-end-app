@@ -33,7 +33,31 @@ function setTheme(theme,savePreference=true){
   document.documentElement.dataset.theme=nextTheme;
   try{localStorage.setItem(THEME_STORAGE_KEY,nextTheme);}catch(e){}
   updateThemeToggle(nextTheme);
+  syncEmbeddedTheme(nextTheme);
   if(savePreference&&window.serverAccessContext){fetch('/api/user-preferences',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:nextTheme})}).catch(()=>{});}
+}
+
+function syncEmbeddedTheme(theme=document.documentElement.dataset.theme||'slate'){
+  const frame=document.querySelector('.settings-users-frame');
+  if(!frame?.contentWindow)return;
+  frame.contentWindow.postMessage({type:'month-end-theme',theme},window.location.origin);
+}
+window.addEventListener('message',event=>{
+  if(event.origin===window.location.origin&&event.data?.type==='month-end-theme-ready')syncEmbeddedTheme();
+});
+
+function setSettingsSidebarCollapsed(collapsed,savePreference=true){
+  const app=document.getElementById('settings-app');if(!app)return;
+  const next=Boolean(collapsed)&&window.innerWidth>820;
+  app.classList.toggle('settings-sidebar-collapsed',next);
+  const button=app.querySelector('.settings-sidebar-toggle');
+  if(button){button.setAttribute('aria-label',next?'Expand settings navigation':'Collapse settings navigation');button.title=next?'Expand settings navigation':'Collapse settings navigation';}
+  try{localStorage.setItem('month_end_settings_sidebar_collapsed',String(next));}catch(e){}
+  if(savePreference&&window.serverAccessContext)fetch('/api/user-preferences',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({settingsSidebarCollapsed:next})}).catch(()=>{});
+}
+function toggleSettingsSidebar(){
+  const app=document.getElementById('settings-app');
+  setSettingsSidebarCollapsed(!app?.classList.contains('settings-sidebar-collapsed'));
 }
 
 function updateThemeToggle(theme=document.documentElement.dataset.theme||'slate'){

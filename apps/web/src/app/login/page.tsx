@@ -12,12 +12,14 @@ const errors: Record<string, string> = {
   invalid_form: "Enter your email address and password.",
   invalid_credentials: "That email address or password is not correct.",
   invalid_workspace: "Enter the restaurant or workspace name.",
+  workspace_not_found: "We couldn’t find that restaurant or workspace. Check the name and try again.",
   workspace_access: "This account does not have access to that restaurant.",
+  account_suspended: "Your account has been suspended. Contact your manager or administrator for help.",
   confirmation_failed: "That verification link could not be completed. Please try signing in or request a new link.",
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ email?: string; error?: string; next?: string; reset?: string; status?: string; workspace?: string }>;
+  searchParams: Promise<{ email?: string; error?: string; next?: string; reset?: string; status?: string; workspace?: string; workspaceQuery?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -56,7 +58,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {params.status === "prepared" ? <div className="success-alert">Your account is ready. Sign in with the temporary password from your manager.</div> : null}
 
           {!params.workspace ? <form action={selectWorkspace} className="auth-form">
-            <label><span>Restaurant or workspace</span><input name="workspace" autoCapitalize="words" autoComplete="organization" placeholder="e.g. The Keg" required /></label>
+            <label><span>Restaurant or workspace</span><input name="workspace" autoCapitalize="words" autoComplete="organization" defaultValue={params.workspaceQuery ?? ""} placeholder="e.g. The Keg" required /></label>
             <button type="submit">Continue</button>
           </form> : <form action={login} className="auth-form">
             <input name="next" type="hidden" value={next} />

@@ -6,7 +6,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=mobile-count-5"/>
+<link rel="stylesheet" href="css/styles.css?v=settings-layout-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -331,6 +331,7 @@
   </div>
   <div class="settings-app" id="settings-app">
     <aside class="settings-sidebar">
+      <button class="settings-sidebar-toggle" type="button" onclick="toggleSettingsSidebar()" aria-label="Collapse settings navigation" title="Collapse settings navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="settings-search"><span>⌕</span><input type="text" id="settings-search" placeholder="Search" oninput="filterSettingsNav()"></div>
       <button class="settings-account" type="button" onclick="setSettingsSection('profiles')">
         <span class="profile-avatar small" id="settings-profile-avatar">M</span>
@@ -411,7 +412,7 @@
         <div class="settings-group menu-editor" id="settings-menu-editor" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="profiles">
-        <iframe class="settings-users-frame" src="/app/team?embedded=1" title="Users and access settings"></iframe>
+        <iframe class="settings-users-frame" src="/app/team?embedded=1" title="Users and access settings" onload="syncEmbeddedTheme(document.documentElement.dataset.theme||'slate')"></iframe>
       </div>
       <div class="settings-pane" data-settings-pane="appearance">
         <div class="settings-section-head"><h3>Appearance</h3><p>Choose a saved visual theme for this device.</p></div>
@@ -849,7 +850,7 @@
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
-<script src="js/ui.js?v=mobile-nav-6"></script>
+<script src="js/ui.js?v=settings-layout-1"></script>
 <script src="js/products.js"></script>
 <script src="js/inventory.js?v=mobile-count-5"></script>
 <script src="js/orders.js"></script>
@@ -859,6 +860,6 @@
 <script src="js/export-tools.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/main.js"></script>
-<script src="js/access.js"></script>
+<script src="js/access.js?v=settings-layout-1"></script>
 </body>
 </html>

@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { requireAccessContext } from "@/lib/auth/context";
 import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
-import { createPreparedAccount, revokeInvitation, updateTeamMember } from "./actions";
+import { revokeInvitation, updateTeamMember } from "./actions";
+import { PreparedAccountWizard } from "./prepared-account-wizard";
+import { ThemeBridge } from "./theme-bridge";
 
 export const metadata: Metadata = { title: "Users & access" };
 export const dynamic = "force-dynamic";
@@ -81,6 +83,7 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
 
   return (
     <main className={`team-shell ${params.embedded === "1" ? "team-shell-embedded" : ""}`}>
+      <ThemeBridge />
       <aside className="team-sidebar">
         <Link className="legacy-brand" href="/app"><strong>ME / Keg Bar</strong><span>Inventory Manager</span></Link>
         <nav>
@@ -115,40 +118,12 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
           </div>
         ) : null}
 
-        <section className="access-card invite-access-card prepared-account-card">
-          <div className="access-card-heading"><div><h2>Add a user</h2><p>Create the account now. They will replace the temporary password on first sign in.</p></div></div>
-          <form action={createPreparedAccount} className="team-form">
-            {params.embedded === "1" ? <input name="embedded" type="hidden" value="1" /> : null}
-            <div className="team-form-grid">
-              <label><span>Name</span><input name="displayName" placeholder="e.g. Alex Morgan" required /></label>
-              <label><span>Email</span><input name="email" type="email" placeholder="name@example.com" required /></label>
-              <label><span>Role</span><select name="role" defaultValue={context.role === "manager" ? "staff" : "manager"}>
-                {context.role === "owner" ? <option value="admin">Administrator</option> : null}
-                {context.role !== "manager" ? <option value="manager">Manager</option> : null}
-                <option value="staff">Staff</option>
-              </select></label>
-              <label><span>Position</span><select name="jobTitle" defaultValue="Bar Manager">
-                <option>General Manager</option><option>Bar Manager</option><option>Culinary Manager</option><option>Dining Room Manager</option><option>Assistant Manager</option><option>Inventory Manager</option><option>Team Member</option>
-              </select></label>
-              <label><span>Temporary password</span><input name="temporaryPassword" type="password" autoComplete="new-password" minLength={12} placeholder="12+ characters" required /></label>
-            </div>
-            <details className="access-details"><summary>Departments and permissions</summary><fieldset><legend>Departments</legend><div className="choice-grid">
-              {departments.filter((department) => context.role !== "manager" || context.departmentIds.includes(department.id)).map((department) => (
-                <label className="choice" key={department.id}><input name="departments" type="checkbox" value={department.id} defaultChecked /><span>{department.name}</span></label>
-              ))}
-            </div></fieldset>
-            <fieldset><legend>Page and action permissions</legend><div className="permission-sections">
-              {Array.from(new Set(assignablePermissions.map((permission) => permission.area))).map((area) => (
-                <div key={area}><h3>{area}</h3><div className="choice-grid">
-                  {assignablePermissions.filter((permission) => permission.area === area).map((permission) => (
-                    <label className="choice permission-choice" key={permission.key}><input name="permissions" type="checkbox" value={permission.key} defaultChecked /><span><strong>{permission.label}</strong><small>{permission.description}</small></span></label>
-                  ))}
-                </div></div>
-              ))}
-            </div></fieldset></details>
-            <div className="team-form-actions"><button type="submit">Create account</button></div>
-          </form>
-        </section>
+        <PreparedAccountWizard
+          departments={departments.filter((department) => context.role !== "manager" || context.departmentIds.includes(department.id))}
+          permissions={assignablePermissions}
+          creatorRole={context.role}
+          embedded={params.embedded === "1"}
+        />
 
         <section className="access-card active-team-card">
           <div className="access-card-heading"><div><h2>Active team</h2><p>{memberships.length} people currently visible to you.</p></div></div>

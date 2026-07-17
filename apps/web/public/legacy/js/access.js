@@ -24,6 +24,7 @@
     };
 
     if(access.preferences?.theme&&typeof setTheme==='function')setTheme(access.preferences.theme,false);
+    if(typeof setSettingsSidebarCollapsed==='function')setSettingsSidebarCollapsed(Boolean(access.preferences?.settingsSidebarCollapsed),false);
     if(Array.isArray(access.managers)){
       const managerProfiles=access.managers.map(manager=>({id:manager.id,userId:manager.userId,name:manager.name,email:manager.email,role:manager.role,status:'active',archived:false,serverManaged:true}));
       const localProfiles=(state.profiles||[]).filter(item=>!item.serverManaged&&!managerProfiles.some(manager=>manager.id===item.id||manager.email===item.email));

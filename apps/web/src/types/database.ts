@@ -600,9 +600,26 @@ export type Database = {
           status: string
         }[]
       }
+      get_my_workspace_membership: {
+        Args: { p_identifier: string }
+        Returns: {
+          id: string
+          must_change_password: boolean
+          organization_name: string
+          organization_slug: string
+          status: string
+        }[]
+      }
       record_workspace_save: {
         Args: { p_organization_id: string }
         Returns: undefined
+      }
+      resolve_workspace: {
+        Args: { p_identifier: string }
+        Returns: {
+          name: string
+          slug: string
+        }[]
       }
       complete_first_login: {
         Args: { p_membership_id: string }

@@ -1241,6 +1241,31 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
 .settings-detail{padding:34px;background:color-mix(in srgb,var(--bg) 96%,var(--surface));}
 .settings-group{padding:20px;border-radius:16px;box-shadow:0 16px 34px -30px var(--shadow);}
 
+@media(min-width:821px){
+  #page-settings.active{display:flex;height:calc(100dvh - 94px);min-height:0;flex-direction:column;overflow:hidden;}
+  #page-settings>.page-header{flex:0 0 auto;}
+  #page-settings>.settings-app{flex:1 1 auto;min-height:0;}
+  .settings-sidebar{position:relative;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;}
+  .settings-detail{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;}
+}
+.settings-app{transition:grid-template-columns .2s ease;}
+.settings-sidebar-toggle{display:grid;width:34px;height:34px;margin:0 0 12px auto;place-items:center;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text-muted);cursor:pointer;}
+.settings-sidebar-toggle:hover,.settings-sidebar-toggle:focus-visible{color:var(--text);background:var(--surface3);outline:none;}
+.settings-sidebar-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s ease;}
+.settings-app.settings-sidebar-collapsed{grid-template-columns:76px minmax(0,1fr);}
+.settings-app.settings-sidebar-collapsed .settings-sidebar{padding-inline:12px;}
+.settings-app.settings-sidebar-collapsed .settings-sidebar-toggle{margin-inline:auto;}
+.settings-app.settings-sidebar-collapsed .settings-sidebar-toggle svg{transform:rotate(180deg);}
+.settings-app.settings-sidebar-collapsed .settings-search input,
+.settings-app.settings-sidebar-collapsed .settings-account>span:last-child,
+.settings-app.settings-sidebar-collapsed .settings-nav-item>span:last-child{display:none;}
+.settings-app.settings-sidebar-collapsed .settings-search{justify-content:center;padding-inline:0;}
+.settings-app.settings-sidebar-collapsed .settings-search>span{font-size:1.05rem;}
+.settings-app.settings-sidebar-collapsed .settings-account,
+.settings-app.settings-sidebar-collapsed .settings-nav-item{justify-content:center;padding-inline:0;}
+.settings-app.settings-sidebar-collapsed .settings-account{padding-bottom:14px;}
+.settings-app.settings-sidebar-collapsed .settings-icon{margin:0;}
+
 .modal-overlay{padding:24px;background:rgba(3,7,12,.76);backdrop-filter:blur(8px);}
 .modal,.inv-modal{
   border-color:color-mix(in srgb,var(--border) 70%,var(--text-muted));
@@ -1412,6 +1437,15 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   .drop-menu button{min-height:50px;border-radius:12px;padding:12px 14px;font-size:.92rem;font-weight:750;white-space:normal;}
   .drop-menu .drop-divider{margin:5px 8px;}
   #page-settings>.settings-app{min-height:calc(100dvh - 118px);}
+  .settings-sidebar-toggle{display:none;}
+  .settings-app.settings-sidebar-collapsed{display:block;}
+  .settings-app.settings-sidebar-collapsed .settings-sidebar{padding:20px;}
+  .settings-app.settings-sidebar-collapsed .settings-search{justify-content:flex-start;padding-inline:12px;}
+  .settings-app.settings-sidebar-collapsed .settings-search input{display:block;}
+  .settings-app.settings-sidebar-collapsed .settings-account>span:last-child{display:flex;}
+  .settings-app.settings-sidebar-collapsed .settings-nav-item>span:last-child{display:inline;}
+  .settings-app.settings-sidebar-collapsed .settings-account,
+  .settings-app.settings-sidebar-collapsed .settings-nav-item{justify-content:flex-start;padding-inline:10px;}
   .mobile-back-button{display:inline-grid!important;width:42px!important;min-width:42px!important;height:42px!important;min-height:42px!important;place-items:center!important;flex:0 0 42px!important;border-radius:12px!important;padding:0!important;}
   .mobile-back-button>span{display:none!important;}
   .settings-back.mobile-back-button{margin:0 0 12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);}
