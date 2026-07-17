@@ -1,6 +1,7 @@
 // inventory.js — counting sessions, progress, saved counts, single-count export.
 
 let inventoryCountSaving=false;
+let countDraftSaving=false;
 
 function latestInventoryCount(){
   return [...state.inventories].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0]||null;
@@ -812,15 +813,33 @@ function openInventoryRoomSelect(){
   document.getElementById('room-count-label').value='';
   openModal('modal-inv-room-select');
 }
-function continueMobileCountSetup(){
+function setCountDraftSaving(saving){
+  countDraftSaving=saving;
+  const button=document.getElementById('mobile-count-continue');
+  if(!button)return;
+  button.disabled=saving;
+  button.setAttribute('aria-busy',String(saving));
+  button.textContent=saving?'Creating…':'Create Draft';
+}
+async function continueMobileCountSetup(){
+  if(countDraftSaving)return;
   const date=document.getElementById('room-count-date').value||today();
   const label=document.getElementById('room-count-label').value.trim();
   if(!date){toast('Select a date.',true);return;}
-  if(!label){toast('Name this count before continuing.',true);document.getElementById('room-count-label').focus();return;}
+  if(!label){toast('Name this count before creating the draft.',true);document.getElementById('room-count-label').focus();return;}
   const rooms=typeof accessibleFloorPlanRooms==='function'?accessibleFloorPlanRooms():activeFloorPlanRooms();
   if(!rooms.length){toast('Add a room in Settings before starting a count.',true);return;}
-  closeModal('modal-inv-room-select');
-  openInventoryModal(null,rooms[0].id,date,label);
+  setCountDraftSaving(true);
+  try{
+    const draft=await createCountDraft(date,label,rooms);
+    if(!draft)return;
+    closeModal('modal-inv-room-select');
+    openInventoryModal(draft.id);
+    const selectedRoom=draft.rooms.find(room=>room.roomId===rooms[0].id)||draft.rooms[0];
+    if(selectedRoom)switchInventoryRoom(selectedRoom.id);
+  }finally{
+    setCountDraftSaving(false);
+  }
 }
 function startRoomCount(roomId){
   if(typeof profileCanAccessRoom==='function'&&!profileCanAccessRoom(currentProfile(),roomId)){toast('You do not have access to that room.',true);return;}
@@ -829,33 +848,34 @@ function startRoomCount(roomId){
   closeModal('modal-inv-room-select');
   openInventoryModal(null,roomId,date,label);
 }
-function draftRoomsFromFloorPlan(){
-  return activeFloorPlanRooms().map(room=>({id:uid(),roomId:room.id,name:room.name,items:{}}));
+function draftRoomsFromFloorPlan(floorRooms=activeFloorPlanRooms()){
+  return floorRooms.map(room=>({id:uid(),roomId:room.id,name:room.name,items:{}}));
 }
-function createCountDraft(){
-  const date=document.getElementById('room-count-date').value;
-  if(!date){toast('Select a date.',true);return;}
-  const label=document.getElementById('room-count-label').value.trim();
+async function createCountDraft(date,label,floorRooms=activeFloorPlanRooms()){
   const existing=findInventorySession(date,label);
   if(existing){
     ensureInventoryHasFloorPlanRooms(existing);
     existing.items=mergeInventoryRoomItems(existing.rooms);
     save();
-    closeModal('modal-inv-room-select');
     renderInventoryTable();
-    toast('Draft already exists.');
-    return;
+    toast(existing.draft?'Opening the existing draft.':'Opening the existing count.');
+    return existing;
   }
-  const rooms=draftRoomsFromFloorPlan();
+  const rooms=draftRoomsFromFloorPlan(floorRooms);
   if(!rooms.length){toast('Add rooms in Settings first.',true);return;}
   const id=uid();
-  state.inventories.push({id,date,label,items:{},rooms,draft:true});
+  const actor=window.serverAccessContext?.user||{};
+  const createdBy={id:actor.id||'',name:actor.name||'Team member',role:actor.jobTitle||actor.role||'Team member'};
+  const draft={id,date,label,items:{},rooms,draft:true,createdBy,createdAt:new Date().toISOString()};
+  state.inventories.push(draft);
   state.inventories.sort((a,b)=>a.date<b.date?1:-1);
   save();
-  closeModal('modal-inv-room-select');
+  const pushed=typeof cloudPushNow==='function'?await cloudPushNow():true;
   renderInventoryTable();
   refreshLiveInventoryIfVisible();
-  toast('Count draft created.');
+  window.recordServerEvent?.({action:'count.draft_created',entityType:'count',entityId:id,details:{label,date,rooms:rooms.length,actor:createdBy}});
+  toast(pushed?'Count draft created.':'Draft saved on this device; cloud saving is still pending.',!pushed);
+  return draft;
 }
 function sameInventorySession(inv,date,label){
   return String(inv.date||'')===String(date||'')&&String(inv.label||'').trim().toLowerCase()===String(label||'').trim().toLowerCase();

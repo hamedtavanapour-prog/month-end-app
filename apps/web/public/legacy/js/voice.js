@@ -1,12 +1,10 @@
 // voice.js — OpenAI transcription-backed voice input for counts and orders.
 
-let recognition=null;
 let voiceRecorder=null;
 let voiceStream=null;
 let voiceContext=null;
 let voiceActive=false;
 let voiceFinal='';
-let voiceInterim='';
 let voiceChunks=[];
 let voiceStartedAt=0;
 let voicePendingTranscript='';
@@ -71,10 +69,6 @@ function preferredAudioMime(){
   return options.find(type=>window.MediaRecorder&&MediaRecorder.isTypeSupported(type))||'';
 }
 
-function browserSpeechRecognition(){
-  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
-}
-
 function reviewVoiceTranscript(transcript){
   const cleaned=String(transcript||'').trim();
   if(!cleaned){
@@ -85,7 +79,6 @@ function reviewVoiceTranscript(transcript){
   voiceFinal=cleaned;
   voicePendingTranscript=cleaned;
   voiceReviewPending=true;
-  recognition=null;
   voiceRecorder=null;
   setVoiceButtons(null);
   setVoiceModal(cleaned);
@@ -101,7 +94,6 @@ async function toggleVoice(ctx){
   }
   voiceContext=ctx;
   voiceFinal='';
-  voiceInterim='';
   voiceChunks=[];
   voicePendingTranscript='';
   voiceReviewPending=false;
@@ -109,46 +101,6 @@ async function toggleVoice(ctx){
 }
 
 async function startVoice(){
-  const Recognition=browserSpeechRecognition();
-  if(Recognition){
-    try{
-      recognition=new Recognition();
-      recognition.continuous=true;
-      recognition.interimResults=true;
-      recognition.lang='en-CA';
-      recognition.onresult=event=>{
-        let interim='';
-        for(let index=event.resultIndex;index<event.results.length;index++){
-          const phrase=event.results[index][0]?.transcript||'';
-          if(event.results[index].isFinal)voiceFinal+=(voiceFinal?' ':'')+phrase.trim();
-          else interim+=phrase;
-        }
-        voiceInterim=interim.trim();
-        setVoiceModal([voiceFinal,voiceInterim].filter(Boolean).join(' ')||'Listening...');
-      };
-      recognition.onerror=event=>{
-        const permissionError=event.error==='not-allowed'||event.error==='service-not-allowed';
-        const message=permissionError?'Microphone permission is required for voice.':'Voice recognition stopped. Try again.';
-        resetVoiceState();
-        toast(message,true);
-      };
-      recognition.onend=()=>{
-        const transcript=[voiceFinal,voiceInterim].filter(Boolean).join(' ').trim();
-        recognition=null;
-        voiceActive=false;
-        reviewVoiceTranscript(transcript);
-      };
-      voiceStartedAt=Date.now();
-      voiceActive=true;
-      setVoiceButtons(voiceContext);
-      setVoiceModal('Listening... Click Stop & Review when finished.');
-      setVoiceActionState('recording');
-      recognition.start();
-      return;
-    }catch(error){
-      recognition=null;
-    }
-  }
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
     toast('Voice recording needs a browser with microphone recording support.',true);
     return;
@@ -188,14 +140,6 @@ function stopVoice(){
   setVoiceButtons(null);
   setVoiceModal('Transcribing...');
   setVoiceActionState('transcribing');
-  if(recognition){
-    try{recognition.stop();}catch(error){
-      const transcript=[voiceFinal,voiceInterim].filter(Boolean).join(' ').trim();
-      recognition=null;
-      reviewVoiceTranscript(transcript);
-    }
-    return;
-  }
   if(voiceRecorder&&voiceRecorder.state!=='inactive'){
     voiceRecorder.stop();
   }else{
@@ -205,11 +149,6 @@ function stopVoice(){
 
 function resetVoiceState(){
   voiceActive=false;
-  if(recognition){
-    recognition.onend=null;
-    try{recognition.stop();}catch(error){}
-    recognition=null;
-  }
   if(voiceStream){
     voiceStream.getTracks().forEach(track=>track.stop());
     voiceStream=null;
@@ -243,10 +182,15 @@ async function transcribeVoiceRecording(){
   const type=chunks[0]?.type||preferredAudioMime()||'audio/webm';
   const audio=new Blob(chunks,{type});
   try{
+    const form=new FormData();
+    const extension=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';
+    form.append('audio',audio,`count-recording.${extension}`);
+    const products=voiceContext==='inventory'&&typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
+    const vocabulary=[...new Set(products.flatMap(product=>[product.name,product.inventoryName].filter(Boolean)))].join(', ');
+    form.append('vocabulary',vocabulary.slice(0,6000));
     const response=await fetch('/api/transcribe',{
       method:'POST',
-      headers:{'Content-Type':type},
-      body:audio
+      body:form
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||'Transcription failed.');
@@ -333,19 +277,40 @@ function normalizeVoiceNumberWords(value){
 function voiceNameTokens(value){return normalizeVoiceNumberWords(value).split(' ').filter(Boolean);}
 function voiceNumberTokens(value){return voiceNameTokens(value).filter(token=>/^\d+(?:\.\d+)?$/.test(token));}
 function voiceProductNames(product){
-  return[product.name,...String(product.aliases||'').split(',').map(alias=>alias.trim()).filter(Boolean)].map(normalizeVoiceNumberWords).filter(Boolean);
+  return[product.name,product.inventoryName,...String(product.aliases||'').split(',').map(alias=>alias.trim()).filter(Boolean)].map(normalizeVoiceNumberWords).filter(Boolean);
+}
+function voiceEditDistance(left,right){
+  const a=String(left||''),b=String(right||'');
+  const row=Array.from({length:b.length+1},(_,index)=>index);
+  for(let i=1;i<=a.length;i++){
+    let previous=row[0];
+    row[0]=i;
+    for(let j=1;j<=b.length;j++){
+      const saved=row[j];
+      row[j]=Math.min(row[j]+1,row[j-1]+1,previous+(a[i-1]===b[j-1]?0:1));
+      previous=saved;
+    }
+  }
+  return row[b.length];
+}
+function voiceWordSimilarity(queryWord,candidateWord){
+  if(queryWord===candidateWord)return 1;
+  if(Math.min(queryWord.length,candidateWord.length)>=3&&(candidateWord.startsWith(queryWord)||queryWord.startsWith(candidateWord))){
+    return Math.min(queryWord.length,candidateWord.length)/Math.max(queryWord.length,candidateWord.length);
+  }
+  if(Math.min(queryWord.length,candidateWord.length)<4)return 0;
+  const similarity=1-voiceEditDistance(queryWord,candidateWord)/Math.max(queryWord.length,candidateWord.length);
+  return similarity>=0.6?similarity:0;
 }
 function voiceTokenScore(queryName,candidateName){
   if(queryName===candidateName)return 1;
-  const qTokens=queryName.split(' ').filter(Boolean);
-  const cTokens=candidateName.split(' ').filter(Boolean);
+  const generic=new Set(['vodka','rum','gin','scotch','irish','rye','whisky','whiskey','tequila','aperitif','liqueur','wine','beer']);
+  const qTokens=queryName.split(' ').filter(token=>token&&!/^\d+(?:\.\d+)?$/.test(token)&&!generic.has(token));
+  const cTokens=candidateName.split(' ').filter(token=>token&&!/^\d+(?:\.\d+)?$/.test(token)&&!generic.has(token));
   if(!qTokens.length||!cTokens.length)return 0;
-  const exactMatches=qTokens.filter(token=>cTokens.includes(token)).length;
-  const prefixMatches=qTokens.filter(token=>cTokens.some(candidate=>candidate.startsWith(token)||token.startsWith(candidate))).length;
-  const coverage=exactMatches/qTokens.length;
-  const prefixCoverage=prefixMatches/Math.max(qTokens.length,cTokens.length);
-  const contains=candidateName.includes(queryName)||queryName.includes(candidateName)?Math.min(queryName.length,candidateName.length)/Math.max(queryName.length,candidateName.length):0;
-  return Math.max(coverage,prefixCoverage,contains);
+  const queryCoverage=qTokens.reduce((sum,token)=>sum+Math.max(...cTokens.map(candidate=>voiceWordSimilarity(token,candidate))),0)/qTokens.length;
+  const candidateCoverage=cTokens.reduce((sum,token)=>sum+Math.max(...qTokens.map(query=>voiceWordSimilarity(query,token))),0)/cTokens.length;
+  return(queryCoverage+candidateCoverage)/2;
 }
 function voiceProductMatch(query,products){
   const q=normalizeVoiceNumberWords(query);
@@ -358,7 +323,7 @@ function voiceProductMatch(query,products){
       if(qNums.length&&qNums.some(num=>!nameNums.includes(num)))return;
       if(!qNums.length&&nameNums.length&&q.split(' ').some(token=>/^\d/.test(token)))return;
       const score=voiceTokenScore(q,name);
-      if(score>=0.25)candidates.push({product,score,name});
+      if(score>=0.6)candidates.push({product,score,name});
     });
   });
   candidates.sort((a,b)=>b.score-a.score||a.name.length-b.name.length||a.product.name.localeCompare(b.product.name));

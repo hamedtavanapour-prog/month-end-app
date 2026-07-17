@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+const MAX_REQUEST_BYTES = MAX_AUDIO_BYTES + 64 * 1024;
+const MAX_VOCABULARY_CHARS = 6000;
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, {
@@ -25,19 +27,25 @@ export async function POST(request: Request) {
   }
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_AUDIO_BYTES) return json({ error: "Voice recording is too large." }, 413);
+  if (declaredLength > MAX_REQUEST_BYTES) return json({ error: "Voice recording is too large." }, 413);
 
   const contentType = request.headers.get("content-type")?.split(";", 1)[0] ?? "";
-  if (!contentType.startsWith("audio/")) return json({ error: "Unsupported voice recording." }, 415);
+  if (contentType !== "multipart/form-data") return json({ error: "Unsupported voice recording." }, 415);
 
-  const audio = await request.arrayBuffer();
-  if (!audio.byteLength) return json({ error: "Voice recording is empty." }, 400);
-  if (audio.byteLength > MAX_AUDIO_BYTES) return json({ error: "Voice recording is too large." }, 413);
+  const submitted = await request.formData();
+  const audio = submitted.get("audio");
+  if (!(audio instanceof File) || !audio.size) return json({ error: "Voice recording is empty." }, 400);
+  if (audio.size > MAX_AUDIO_BYTES) return json({ error: "Voice recording is too large." }, 413);
+  if (!audio.type.startsWith("audio/")) return json({ error: "Unsupported voice recording." }, 415);
+  const vocabulary = String(submitted.get("vocabulary") ?? "").replace(/[\r\n]+/g, " ").slice(0, MAX_VOCABULARY_CHARS);
 
-  const extension = contentType.includes("mp4") ? "m4a" : contentType.includes("ogg") ? "ogg" : "webm";
   const form = new FormData();
   form.append("model", "gpt-4o-mini-transcribe");
-  form.append("file", new File([audio], `count-recording.${extension}`, { type: contentType }));
+  form.append("language", "en");
+  if (vocabulary) {
+    form.append("prompt", `Restaurant beverage inventory count. Preserve product names and quantities. Product vocabulary: ${vocabulary}`);
+  }
+  form.append("file", audio, audio.name || "count-recording.webm");
 
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
