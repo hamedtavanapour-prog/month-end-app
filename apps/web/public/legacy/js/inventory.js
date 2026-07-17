@@ -15,7 +15,7 @@ function ensureFloorPlanRoom(name,id=null){
   const key=roomKey(clean);
   let room=state.rooms.find(item=>roomKey(item.name)===key);
   if(room)return room;
-  room={id:id||uid(),name:clean,archived:false,productIds:null};
+  room={id:id||uid(),name:clean,archived:false,productIds:null,departmentId:'bar'};
   state.rooms.push(room);
   return room;
 }
@@ -32,8 +32,8 @@ function normalizeFloorPlanRooms(){
     let clean=String(room.name||`Room ${index+1}`).trim()||`Room ${index+1}`;
     if(clean==='Unassigned')clean=defaultFloorPlanRoomName();
     const productIds=normalizeRoomProductIds(room);
-    const normalized={id:room.id||uid(),name:clean,archived:!!room.archived,productIds};
-    if(normalized.id!==room.id||normalized.name!==room.name||normalized.archived!==room.archived||JSON.stringify(productIds)!==JSON.stringify(room.productIds??null))changed=true;
+    const normalized={id:room.id||uid(),name:clean,archived:!!room.archived,productIds,departmentId:String(room.departmentId||'bar')};
+    if(normalized.id!==room.id||normalized.name!==room.name||normalized.archived!==room.archived||normalized.departmentId!==room.departmentId||JSON.stringify(productIds)!==JSON.stringify(room.productIds??null))changed=true;
     return normalized;
   }).filter(room=>{
     const key=roomKey(room.name);
@@ -49,7 +49,7 @@ function normalizeFloorPlanRooms(){
     });
   });
   if(!state.rooms.length){
-    state.rooms=[{id:uid(),name:defaultFloorPlanRoomName(),archived:false,productIds:null}];
+    state.rooms=[{id:uid(),name:defaultFloorPlanRoomName(),archived:false,productIds:null,departmentId:'bar'}];
     changed=true;
   }
   return changed;
@@ -63,7 +63,7 @@ function floorPlanRoomById(id){
   return state.rooms.find(room=>room.id===id);
 }
 function roomProductIds(room){
-  const products=state.products.filter(product=>!product.archived);
+  const products=state.products.filter(product=>!product.archived&&(!room?.departmentId||typeof productInDepartment!=='function'||productInDepartment(product,room.departmentId)));
   if(!room||!Array.isArray(room.productIds))return products.map(product=>product.id);
   const allowed=new Set(room.productIds);
   return products.filter(product=>allowed.has(product.id)).map(product=>product.id);

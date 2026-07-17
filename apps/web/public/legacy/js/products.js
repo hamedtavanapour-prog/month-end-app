@@ -14,8 +14,8 @@ const PRODUCT_MENU_DEFINITIONS={
 
 function defaultDepartments(){
   return[
-    {id:'bar',name:'Bar',archived:false},
-    {id:'kitchen',name:'Kitchen',archived:false}
+    {id:'bar',name:'Bar',archived:false,managerId:'',roomIds:[],userIds:[]},
+    {id:'kitchen',name:'Kitchen',archived:false,managerId:'',roomIds:[],userIds:[]}
   ];
 }
 
@@ -27,7 +27,14 @@ function ensureDepartments(){
   state.departments=state.departments.map((department,index)=>{
     if(!department||!department.id||seen.has(department.id)){changed=true;return null;}
     seen.add(department.id);
-    const normalized={id:String(department.id),name:String(department.name||`Department ${index+1}`).trim()||`Department ${index+1}`,archived:!!department.archived};
+    const normalized={
+      id:String(department.id),
+      name:String(department.name||`Department ${index+1}`).trim()||`Department ${index+1}`,
+      archived:!!department.archived,
+      managerId:String(department.managerId||''),
+      roomIds:[...new Set(Array.isArray(department.roomIds)?department.roomIds.filter(Boolean):[])],
+      userIds:[...new Set(Array.isArray(department.userIds)?department.userIds.filter(Boolean):[])]
+    };
     if(JSON.stringify(department)!==JSON.stringify(normalized))changed=true;
     return normalized;
   }).filter(Boolean);
@@ -39,6 +46,24 @@ function allDepartments(){ensureDepartments();return state.departments;}
 function activeDepartments(){return allDepartments().filter(department=>!department.archived);}
 function getDepartment(id){return allDepartments().find(department=>department.id===id)||null;}
 function departmentName(id){return getDepartment(id)?.name||'Department';}
+function ensureDepartmentAssignments(){
+  ensureDepartments();
+  let changed=false;
+  const before=JSON.stringify(allDepartments().map(department=>({id:department.id,roomIds:department.roomIds,userIds:department.userIds})));
+  const fallback=getDepartment('bar')||allDepartments()[0];
+  const departmentIds=new Set(allDepartments().map(department=>department.id));
+  allDepartments().forEach(department=>{
+    department.roomIds=[];
+    department.userIds=[...new Set([...(department.userIds||[]),department.managerId].filter(Boolean))];
+  });
+  (state.rooms||[]).forEach(room=>{
+    if(!departmentIds.has(room.departmentId)){room.departmentId=fallback?.id||'';changed=true;}
+    const department=getDepartment(room.departmentId);
+    if(department&&!department.roomIds.includes(room.id))department.roomIds.push(room.id);
+  });
+  if(before!==JSON.stringify(allDepartments().map(department=>({id:department.id,roomIds:department.roomIds,userIds:department.userIds}))))changed=true;
+  return changed;
+}
 function productDepartmentIds(product){
   const ids=Array.isArray(product?.departments)?product.departments.filter(Boolean):[product?.department].filter(Boolean);
   return[...new Set(ids.length?ids:['bar'])];
@@ -101,14 +126,30 @@ function renderProductDepartmentTabs(){
 function renderProductCatalogMenu(){
   const sidebar=document.getElementById('product-catalog-sidebar');
   if(!sidebar)return;
-  let entries=productMenuEntries(productDepartmentView,true);
-  if(!entries.length){
-    state.productMenus[productDepartmentView].find(item=>item.view==='products').visible=true;
-    entries=productMenuEntries(productDepartmentView,true);
-  }
-  if(!entries.some(item=>item.view===productCatalogView))productCatalogView=entries[0]?.view||'products';
-  sidebar.innerHTML=entries.map(item=>`<button class="catalog-nav ${item.view===productCatalogView?'active':''}" data-catalog-view="${item.view}" onclick="setProductCatalogView('${item.view}')"><span>${escapeHtml(item.label)}</span><strong id="catalog-count-${item.view}">0</strong></button>`).join('');
+  ensureMenuLibrary();
+  const activeMenus=state.menus.filter(menu=>menu.departmentId===productDepartmentView&&!menu.archived&&menu.active);
+  const selectedMenuId=productCatalogView.startsWith('menu:')?productCatalogView.slice(5):'';
+  if(selectedMenuId&&!activeMenus.some(menu=>menu.id===selectedMenuId))productCatalogView='products';
+  const menuSelected=productCatalogView.startsWith('menu:');
+  if(menuSelected)productCatalogMenuExpanded=true;
+  sidebar.innerHTML=`
+    <button class="catalog-nav ${productCatalogView==='products'?'active':''}" data-catalog-view="products" type="button" onclick="setProductCatalogView('products')"><span>Inventory</span><strong id="catalog-count-products">0</strong></button>
+    <div class="catalog-menu-group ${productCatalogMenuExpanded?'expanded':''}">
+      <button class="catalog-nav catalog-menu-toggle ${menuSelected?'active':''}" type="button" aria-expanded="${productCatalogMenuExpanded}" onclick="toggleProductCatalogMenu()"><span>Menu</span><span class="catalog-menu-meta"><strong>${activeMenus.length}</strong><i aria-hidden="true">⌄</i></span></button>
+      <div class="catalog-menu-children" ${productCatalogMenuExpanded?'':'hidden'}>
+        ${activeMenus.length?activeMenus.map(menu=>`<button class="catalog-nav catalog-nav-child ${productCatalogView===`menu:${menu.id}`?'active':''}" data-catalog-view="menu:${escapeHtml(menu.id)}" data-menu-id="${escapeHtml(menu.id)}" type="button" onclick="setProductCatalogMenuView(this.dataset.menuId)"><span>${escapeHtml(menu.name)}</span><strong>${menu.items.length}</strong></button>`).join(''):'<span class="catalog-menu-empty">No active menus</span>'}
+      </div>
+    </div>
+    <button class="catalog-nav ${productCatalogView==='import-backlog'?'active':''}" data-catalog-view="import-backlog" type="button" onclick="setProductCatalogView('import-backlog')"><span>Import Backlog</span><strong id="catalog-count-import-backlog">0</strong></button>
+    <button class="catalog-nav ${productCatalogView==='archived'?'active':''}" data-catalog-view="archived" type="button" onclick="setProductCatalogView('archived')"><span>Archived</span><strong id="catalog-count-archived">0</strong></button>`;
 }
+
+function toggleProductCatalogMenu(){
+  productCatalogMenuExpanded=!productCatalogMenuExpanded;
+  renderProductCatalogMenu();
+}
+
+function setProductCatalogMenuView(menuId){setProductCatalogView(`menu:${menuId}`);}
 
 function productColumnLabel(column){
   if(productDepartmentView!=='bar'&&column.key==='unit')return'Unit';
@@ -138,8 +179,9 @@ function setProductDepartmentView(department){
 
 function setProductCatalogView(view){
   productCatalogView=view;
+  if(view.startsWith('menu:'))productCatalogMenuExpanded=true;
   selectedProds.clear();
-  document.querySelectorAll('.catalog-nav').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===view));
+  document.querySelectorAll('.catalog-nav[data-catalog-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===view));
   document.getElementById('prod-sel-bar')?.classList.remove('show');
   renderProducts();
 }
@@ -521,10 +563,11 @@ function renderProducts(){
   if(help)help.textContent=`Items assigned to ${title}. Shared items may also appear in other departments.`;
   renderProductCatalogMenu();
   updateCatalogCounts();
-  document.querySelectorAll('.catalog-nav').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===productCatalogView));
+  document.querySelectorAll('.catalog-nav[data-catalog-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===productCatalogView));
   document.querySelectorAll('[data-product-department]').forEach(button=>button.classList.toggle('active',button.dataset.productDepartment===productDepartmentView));
   if(productCatalogView==='import-backlog')return renderImportBacklogCatalog();
   if(productCatalogView==='archived')return renderArchivedCatalog();
+  if(productCatalogView.startsWith('menu:'))return renderMenuCatalog(productCatalogView.slice(5));
   if(productCatalogView!=='products')return renderDrinkCatalog();
   const search=document.getElementById('prod-search').value.toLowerCase();
   const cat=document.getElementById('prod-cat-f').value;
@@ -585,6 +628,27 @@ function renderProducts(){
     }}).join('')}</tr>`;
   }).join('');
   syncHeaderCb();
+}
+
+function renderMenuCatalog(menuId){
+  const menu=getSettingsMenu(menuId);
+  if(!menu||menu.departmentId!==productDepartmentView||menu.archived||!menu.active){productCatalogView='products';renderProducts();return;}
+  const search=(document.getElementById('prod-search')?.value||'').trim().toLowerCase();
+  const tbody=document.getElementById('prod-tbody');
+  const thead=document.getElementById('prod-thead');
+  const items=menu.items.filter(item=>!search||[item.name,item.category,item.description,item.recipe,item.price].join(' ').toLowerCase().includes(search));
+  thead.innerHTML='<tr><th>Menu Item</th><th>Section</th><th>Description</th><th>Recipe</th><th>Price</th></tr>';
+  if(!items.length){
+    tbody.innerHTML=`<tr><td colspan="5" class="empty-cell">${search?'No menu items match this search.':'This menu has no items yet. Add items in Menu Settings.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=items.map(item=>`<tr class="menu-catalog-row">
+    <td data-mobile-label="Menu Item"><strong>${escapeHtml(item.name)}</strong></td>
+    <td data-mobile-label="Section">${escapeHtml(item.category||'—')}</td>
+    <td data-mobile-label="Description">${escapeHtml(item.description||'—')}</td>
+    <td data-mobile-label="Recipe"><span class="menu-catalog-recipe">${escapeHtml(item.recipe||'—')}</span></td>
+    <td data-mobile-label="Price">${item.price?`$${escapeHtml(item.price)}`:'—'}</td>
+  </tr>`).join('');
 }
 
 function resetProductFilters(shouldRender=true){
@@ -741,17 +805,39 @@ function normalizeMenuLibraryItem(item,index=0){
   };
 }
 
+function starterMenuItemFromDrink(drink){
+  return normalizeMenuLibraryItem({
+    id:uid(),
+    name:drink.name,
+    category:drink.family||'Drink',
+    recipe:recipeFromCatalogDrink(drink),
+    source:'starter-drink-catalog'
+  });
+}
+
+function starterMenuLibrary(){
+  const drinks=(state.drinks||[]).filter(drink=>!drink.archived);
+  return[
+    {id:'menu-all-drinks',departmentId:'bar',name:'All Drinks',description:'Complete drink catalog',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.map(starterMenuItemFromDrink)},
+    {id:'menu-core-drinks',departmentId:'bar',name:'Core Drinks',description:'Core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='core').map(starterMenuItemFromDrink)},
+    {id:'menu-non-core-drinks',departmentId:'bar',name:'Non-Core Drinks',description:'Non-core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='non-core').map(starterMenuItemFromDrink)}
+  ];
+}
+
 function ensureMenuLibrary(){
   let changed=false;
+  const libraryVersion=Number(state.menuLibraryVersion)||0;
   if(!Array.isArray(state.menus)){state.menus=[];changed=true;}
   const seen=new Set();
   const normalized=state.menus.map((menu,index)=>{
     if(!menu||seen.has(menu.id)){changed=true;return null;}
     const next={
       id:menu.id||uid(),
+      departmentId:getDepartment(menu.departmentId)?menu.departmentId:'bar',
       name:String(menu.name||`Menu ${index+1}`).trim()||`Menu ${index+1}`,
       description:String(menu.description||'').trim(),
       active:menu.active!==false,
+      archived:!!menu.archived,
       sourceFile:String(menu.sourceFile||''),
       importedAt:String(menu.importedAt||''),
       items:(Array.isArray(menu.items)?menu.items:[]).map(normalizeMenuLibraryItem)
@@ -761,7 +847,8 @@ function ensureMenuLibrary(){
     return next;
   }).filter(Boolean);
   if(JSON.stringify(state.menus)!==JSON.stringify(normalized))changed=true;
-  state.menus=normalized;
+  state.menus=libraryVersion<1&&!normalized.length?starterMenuLibrary():normalized;
+  if(libraryVersion<2){state.menuLibraryVersion=2;changed=true;}
   return changed;
 }
 
@@ -771,22 +858,28 @@ function addSettingsMenu(){
   const input=document.getElementById('settings-menu-name');
   const name=String(input?.value||'').trim();
   if(!name){toast('Enter a menu name.',true);input?.focus();return;}
-  const menu={id:uid(),name,description:'',active:true,sourceFile:'',importedAt:'',items:[]};
+  const menu={id:uid(),departmentId:settingsProductMenuWorkspace,name,description:'',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};
   state.menus.push(menu);
   selectedSettingsMenuId=menu.id;
+  settingsMenuEditMode=true;
   if(input)input.value='';
   save();
   renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
   toast(`${name} created.`);
 }
 
 function selectSettingsMenu(id){
-  selectedSettingsMenuId=getSettingsMenu(id)?.id||null;
+  const menu=getSettingsMenu(id);
+  selectedSettingsMenuId=menu?.departmentId===settingsProductMenuWorkspace?menu.id:null;
+  settingsMenuEditMode=false;
   renderProductMenuSettings();
   document.getElementById('settings-menu-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function closeSettingsMenuEditor(){selectedSettingsMenuId=null;renderProductMenuSettings();}
+function closeSettingsMenuEditor(){selectedSettingsMenuId=null;settingsMenuEditMode=false;renderProductMenuSettings();}
+
+function setSettingsMenuEditMode(editing){settingsMenuEditMode=!!editing;renderProductMenuSettings();}
 
 function updateSettingsMenu(id,field,value){
   const menu=getSettingsMenu(id);
@@ -796,29 +889,110 @@ function updateSettingsMenu(id,field,value){
   menu[field]=next;
   save();
   renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
   toast('Menu updated.');
 }
 
-function toggleSettingsMenuActive(id,active,checkbox){
+function toggleSettingsMenuActive(id,active){
   const menu=getSettingsMenu(id);
   if(!menu)return;
   menu.active=!!active;
   save();
-  const label=checkbox?.closest('.menu-active-toggle');
-  const row=checkbox?.closest('.menu-setting-row');
-  if(label?.querySelector('span'))label.querySelector('span').textContent=menu.active?'Active':'Inactive';
-  if(row)row.classList.toggle('is-inactive',!menu.active);
+  refreshProductCatalogIfVisible();
+  renderProductMenuSettings();
   toast(menu.active?'Menu activated.':'Menu deactivated.');
+}
+
+function archiveSettingsMenu(id,archived=true){
+  const menu=getSettingsMenu(id);
+  if(!menu)return;
+  menu.archived=!!archived;
+  if(selectedSettingsMenuId===id){selectedSettingsMenuId=null;settingsMenuEditMode=false;}
+  save();
+  renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
+  toast(menu.archived?'Menu archived.':'Menu restored.');
+}
+
+function beginSettingsMenuDrag(event,id){
+  draggedSettingsMenuId=id;
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('text/plain',id);
+  event.currentTarget.classList.add('is-dragging');
+}
+
+function dropSettingsMenu(event,targetId){
+  event.preventDefault();
+  const draggedId=draggedSettingsMenuId||event.dataTransfer.getData('text/plain');
+  const bounds=event.currentTarget.getBoundingClientRect();
+  reorderSettingsMenu(draggedId,targetId,event.clientY>bounds.top+bounds.height/2);
+  draggedSettingsMenuId=null;
+}
+
+function reorderSettingsMenu(draggedId,targetId,after=false){
+  if(!draggedId||draggedId===targetId)return;
+  const dragged=getSettingsMenu(draggedId);
+  const target=getSettingsMenu(targetId);
+  if(!dragged||!target||dragged.departmentId!==target.departmentId)return;
+  const from=state.menus.findIndex(menu=>menu.id===draggedId);
+  let to=state.menus.findIndex(menu=>menu.id===targetId);
+  const [menu]=state.menus.splice(from,1);
+  if(from<to)to--;
+  if(after)to++;
+  state.menus.splice(to,0,menu);
+  save();renderProductMenuSettings();refreshProductCatalogIfVisible();
+}
+
+function endSettingsMenuDrag(event){draggedSettingsMenuId=null;event.currentTarget.classList.remove('is-dragging');}
+
+function beginSettingsMenuPointerDrag(event,id){
+  if(event.button!==0)return;
+  draggedSettingsMenuId=id;
+  settingsMenuPointerTargetId=id;
+  settingsMenuPointerAfter=false;
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+  event.currentTarget.closest('.menu-overview-card')?.classList.add('is-dragging');
+  document.addEventListener('pointermove',moveSettingsMenuPointerDrag,{passive:false});
+  document.addEventListener('pointerup',endSettingsMenuPointerDrag,{once:true});
+}
+
+function moveSettingsMenuPointerDrag(event){
+  if(!draggedSettingsMenuId)return;
+  event.preventDefault();
+  const row=document.elementFromPoint(event.clientX,event.clientY)?.closest('.menu-overview-card');
+  if(!row||!row.dataset.menuId||row.dataset.menuId===draggedSettingsMenuId)return;
+  document.querySelectorAll('.menu-overview-card.drag-target').forEach(item=>item.classList.remove('drag-target','drop-after'));
+  const bounds=row.getBoundingClientRect();
+  settingsMenuPointerTargetId=row.dataset.menuId;
+  settingsMenuPointerAfter=event.clientY>bounds.top+bounds.height/2;
+  row.classList.add('drag-target');
+  row.classList.toggle('drop-after',settingsMenuPointerAfter);
+}
+
+function endSettingsMenuPointerDrag(){
+  document.removeEventListener('pointermove',moveSettingsMenuPointerDrag);
+  document.querySelectorAll('.menu-overview-card').forEach(item=>item.classList.remove('is-dragging','drag-target','drop-after'));
+  const draggedId=draggedSettingsMenuId;
+  const targetId=settingsMenuPointerTargetId;
+  const after=settingsMenuPointerAfter;
+  draggedSettingsMenuId=null;settingsMenuPointerTargetId=null;settingsMenuPointerAfter=false;
+  reorderSettingsMenu(draggedId,targetId,after);
 }
 
 function moveSettingsMenu(id,direction){
   ensureMenuLibrary();
-  const index=state.menus.findIndex(menu=>menu.id===id);
-  const target=index+direction;
-  if(index<0||target<0||target>=state.menus.length)return;
+  const menu=getSettingsMenu(id);
+  if(!menu)return;
+  const departmentMenus=state.menus.filter(entry=>entry.departmentId===menu.departmentId);
+  const departmentIndex=departmentMenus.findIndex(entry=>entry.id===id);
+  const targetMenu=departmentMenus[departmentIndex+direction];
+  if(departmentIndex<0||!targetMenu)return;
+  const index=state.menus.findIndex(entry=>entry.id===id);
+  const target=state.menus.findIndex(entry=>entry.id===targetMenu.id);
   [state.menus[index],state.menus[target]]=[state.menus[target],state.menus[index]];
   save();
   renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
 }
 
 function deleteSettingsMenu(id){
@@ -828,14 +1002,15 @@ function deleteSettingsMenu(id){
   if(selectedSettingsMenuId===id)selectedSettingsMenuId=null;
   save();
   renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
   toast('Menu deleted.');
 }
 
 function menuCatalogOptions(){
-  const drinks=(state.drinks||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name));
-  const products=(state.products||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  const drinks=settingsProductMenuWorkspace==='bar'?(state.drinks||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name)):[];
+  const products=(state.products||[]).filter(item=>!item.archived&&productInDepartment(item,settingsProductMenuWorkspace)).sort((a,b)=>a.name.localeCompare(b.name));
   return`<option value="">Choose a drink or product…</option>
-    <optgroup label="Drinks">${drinks.map(item=>`<option value="drink:${item.id}">${escapeHtml(item.name)}</option>`).join('')}</optgroup>
+    ${drinks.length?`<optgroup label="Drinks">${drinks.map(item=>`<option value="drink:${item.id}">${escapeHtml(item.name)}</option>`).join('')}</optgroup>`:''}
     <optgroup label="Products">${products.map(item=>`<option value="product:${item.id}">${escapeHtml(item.name)}</option>`).join('')}</optgroup>`;
 }
 
@@ -906,14 +1081,29 @@ function deleteSettingsMenuItem(menuId,itemId){
 
 function renderSettingsMenuEditor(menu){
   const editor=document.getElementById('settings-menu-editor');
-  if(!editor)return;
-  if(!menu){editor.hidden=true;editor.innerHTML='';return;}
+  const overview=document.getElementById('settings-menu-overview');
+  if(!editor||!overview)return;
+  if(!menu){overview.hidden=false;editor.hidden=true;editor.innerHTML='';return;}
+  overview.hidden=true;
   editor.hidden=false;
+  if(!settingsMenuEditMode){
+    editor.innerHTML=`
+      <div class="menu-editor-heading">
+        <button class="btn btn-secondary btn-sm" type="button" onclick="closeSettingsMenuEditor()">‹ Menus</button>
+        <div><h3>${escapeHtml(menu.name)}</h3><p>${escapeHtml(departmentName(menu.departmentId))} menu · ${menu.active?'Active':'Inactive'} · ${menu.items.length} item${menu.items.length===1?'':'s'}</p></div>
+        <button class="btn btn-secondary" type="button" onclick="setSettingsMenuEditMode(true)">Edit</button>
+      </div>
+      ${menu.description?`<p class="menu-view-description">${escapeHtml(menu.description)}</p>`:''}
+      <div class="menu-view-item-list">${menu.items.length?menu.items.map(item=>`<article class="menu-view-item"><div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.category||'Uncategorized')}${item.price?` · $${escapeHtml(item.price)}`:''}</span></div>${item.description?`<p>${escapeHtml(item.description)}</p>`:''}${item.recipe?`<pre>${escapeHtml(item.recipe)}</pre>`:''}</article>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Choose Edit to add the first item.</span></div>'}</div>`;
+    return;
+  }
   editor.innerHTML=`
     <div class="menu-editor-heading">
-      <div><h3>Edit Menu</h3><p>Recipes here belong only to this menu. Editing them will not change another menu or the master catalog.</p></div>
-      <button class="btn btn-secondary btn-sm" type="button" onclick="closeSettingsMenuEditor()">Close</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="setSettingsMenuEditMode(false)">‹ View</button>
+      <div><h3>Edit ${escapeHtml(menu.name)}</h3><p>${escapeHtml(departmentName(menu.departmentId))} menu</p></div>
+      <button class="btn btn-primary" type="button" onclick="setSettingsMenuEditMode(false)">Done</button>
     </div>
+    <div class="menu-edit-status"><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="toggleSettingsMenuActive('${menu.id}',this.checked)"><span>Active in Products</span></label><button class="btn btn-ghost-danger btn-sm" type="button" onclick="archiveSettingsMenu('${menu.id}',true)">Archive menu</button></div>
     <div class="menu-editor-fields">
       <label><span>Menu name</span><input type="text" value="${escapeHtml(menu.name)}" onchange="updateSettingsMenu('${menu.id}','name',this.value)"></label>
       <label><span>Description</span><input type="text" value="${escapeHtml(menu.description)}" placeholder="Season, location, or notes" onchange="updateSettingsMenu('${menu.id}','description',this.value)"></label>
@@ -940,16 +1130,34 @@ function renderSettingsMenuEditor(menu){
 
 function renderProductMenuSettings(){
   const list=document.getElementById('settings-menu-list');
-  if(!list)return;
+  const archivedList=document.getElementById('settings-archived-menus');
+  if(!list||!archivedList)return;
   ensureMenuLibrary();
-  if(selectedSettingsMenuId&&!getSettingsMenu(selectedSettingsMenuId))selectedSettingsMenuId=null;
-  list.innerHTML=state.menus.length?state.menus.map((menu,index)=>`<div class="menu-setting-row ${menu.active?'':'is-inactive'}">
-    <span class="menu-setting-drag" aria-hidden="true">⋮⋮</span>
-    <button class="menu-setting-main" type="button" onclick="selectSettingsMenu('${menu.id}')"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></button>
-    <label class="menu-active-toggle"><input type="checkbox" aria-label="Menu active" ${menu.active?'checked':''} onchange="toggleSettingsMenuActive('${menu.id}',this.checked,this)"><span>${menu.active?'Active':'Inactive'}</span></label>
-    <div class="menu-setting-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="selectSettingsMenu('${menu.id}')">Edit</button><button class="btn btn-secondary btn-sm" type="button" title="Move up" ${index===0?'disabled':''} onclick="moveSettingsMenu('${menu.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" title="Move down" ${index===state.menus.length-1?'disabled':''} onclick="moveSettingsMenu('${menu.id}',1)">↓</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deleteSettingsMenu('${menu.id}')">Delete</button></div>
-  </div>`).join(''):'<div class="menu-empty-state"><strong>No menus yet</strong><span>Create a menu from scratch or import an existing menu file.</span></div>';
+  if(!getDepartment(settingsProductMenuWorkspace)||getDepartment(settingsProductMenuWorkspace).archived)settingsProductMenuWorkspace=activeDepartments()[0]?.id||'bar';
+  const department=getDepartment(settingsProductMenuWorkspace);
+  const departmentMenus=state.menus.filter(menu=>menu.departmentId===settingsProductMenuWorkspace&&!menu.archived);
+  const archivedMenus=state.menus.filter(menu=>menu.departmentId===settingsProductMenuWorkspace&&menu.archived);
+  const tabs=document.getElementById('settings-menu-department-tabs');
+  if(tabs)tabs.innerHTML=activeDepartments().map(item=>`<button type="button" class="${item.id===settingsProductMenuWorkspace?'active':''}" data-menu-department="${escapeHtml(item.id)}" onclick="setSettingsMenuDepartment(this.dataset.menuDepartment)">${escapeHtml(item.name)}</button>`).join('');
+  const selectedMenu=getSettingsMenu(selectedSettingsMenuId);
+  if(selectedSettingsMenuId&&(selectedMenu?.departmentId!==settingsProductMenuWorkspace||selectedMenu.archived)){selectedSettingsMenuId=null;settingsMenuEditMode=false;}
+  list.innerHTML=departmentMenus.length?departmentMenus.map(menu=>`<div class="menu-overview-card ${menu.active?'':'is-inactive'}" data-menu-id="${escapeHtml(menu.id)}" draggable="true" ondragstart="beginSettingsMenuDrag(event,this.dataset.menuId)" ondragover="event.preventDefault()" ondrop="dropSettingsMenu(event,this.dataset.menuId)" ondragend="endSettingsMenuDrag(event)">
+    <span class="menu-setting-drag" aria-label="Drag to reorder" title="Hold and drag to reorder" onpointerdown="beginSettingsMenuPointerDrag(event,this.closest('.menu-overview-card').dataset.menuId)">⋮⋮</span>
+    <button class="menu-setting-main" type="button" onclick="selectSettingsMenu(this.closest('.menu-overview-card').dataset.menuId)"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></button>
+    <span class="menu-status-badge ${menu.active?'':'inactive'}">${menu.active?'Active':'Inactive'}</span><span class="menu-card-arrow" aria-hidden="true">›</span>
+  </div>`).join(''):`<div class="menu-empty-state"><strong>No ${escapeHtml(department?.name||'department')} menus yet</strong><span>Create a menu from scratch or import an existing menu file.</span></div>`;
+  archivedList.hidden=!archivedMenus.length;
+  archivedList.innerHTML=archivedMenus.length?`<h4>Archived menus</h4>${archivedMenus.map(menu=>`<div class="archived-settings-row"><span><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} stored item${menu.items.length===1?'':'s'}</small></span><button class="btn btn-secondary btn-sm" type="button" onclick="archiveSettingsMenu('${menu.id}',false)">Restore</button></div>`).join('')}`:'';
   renderSettingsMenuEditor(getSettingsMenu(selectedSettingsMenuId));
+}
+
+function setSettingsMenuDepartment(departmentId){
+  if(!getDepartment(departmentId)||getDepartment(departmentId).archived)return;
+  settingsProductMenuWorkspace=departmentId;
+  selectedSettingsMenuId=null;
+  settingsMenuEditMode=false;
+  setMenuImportStatus('');
+  renderProductMenuSettings();
 }
 
 function setMenuImportStatus(message,error=false){
@@ -1107,15 +1315,18 @@ async function handleMenuImport(event){
     if(!items.length)throw new Error('No menu items could be identified in this file.');
     const menu={
       id:uid(),
+      departmentId:settingsProductMenuWorkspace,
       name:String(imported.name||menuNameFromFile(file.name)).trim(),
       description:String(imported.description||'Imported menu — review item names, prices, and recipes before activating.').trim(),
       active:false,
+      archived:false,
       sourceFile:file.name,
       importedAt:new Date().toISOString(),
       items
     };
     state.menus.push(menu);
     selectedSettingsMenuId=menu.id;
+    settingsMenuEditMode=true;
     save();
     renderProductMenuSettings();
     setMenuImportStatus(`Imported ${items.length} item${items.length===1?'':'s'} from ${file.name}. Review the draft below, then activate it when ready.`);
@@ -1130,28 +1341,157 @@ async function handleMenuImport(event){
 
 function renderDepartmentSettings(){
   const list=document.getElementById('settings-department-list');
-  if(!list)return;
+  const overview=document.getElementById('settings-department-overview');
+  const detail=document.getElementById('settings-department-detail');
+  const archivedList=document.getElementById('settings-archived-departments');
+  if(!list||!overview||!detail||!archivedList)return;
   ensureDepartments();
-  list.innerHTML=allDepartments().map((department,index)=>{
+  list.innerHTML=activeDepartments().map(department=>{
     const productCount=(state.products||[]).filter(product=>productInDepartment(product,department.id)).length;
-    return`<div class="department-setting-row ${department.archived?'is-archived':''}">
-      <div class="department-setting-copy"><input type="text" value="${escapeHtml(department.name)}" aria-label="Department name" onchange="renameDepartment('${department.id}',this.value)"><small>${productCount} item${productCount===1?'':'s'} · ${department.archived?'Hidden from Products':'Visible in Products'}</small></div>
-      <div class="department-setting-actions"><button class="btn btn-secondary btn-sm" type="button" title="Move up" ${index===0?'disabled':''} onclick="moveDepartment('${department.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" title="Move down" ${index===state.departments.length-1?'disabled':''} onclick="moveDepartment('${department.id}',1)">↓</button><button class="btn btn-secondary btn-sm" type="button" onclick="toggleDepartmentArchived('${department.id}',${department.archived?'false':'true'})">${department.archived?'Restore':'Archive'}</button></div>
-    </div>`;
-  }).join('');
+    const menuCount=(state.menus||[]).filter(menu=>menu.departmentId===department.id&&!menu.archived).length;
+    return`<button class="department-select-card" type="button" data-department-id="${escapeHtml(department.id)}" onclick="selectDepartmentSettings(this.dataset.departmentId)">
+      <span><strong>${escapeHtml(department.name)}</strong><small>${productCount} inventory item${productCount===1?'':'s'} · ${menuCount} menu${menuCount===1?'':'s'}</small></span><span aria-hidden="true">›</span>
+    </button>`;
+  }).join('')||'<div class="menu-empty-state"><strong>No active departments</strong><span>Restore an archived department to continue.</span></div>';
+  const archivedDepartments=allDepartments().filter(department=>department.archived);
+  archivedList.hidden=!archivedDepartments.length;
+  archivedList.innerHTML=archivedDepartments.length?`<h4>Archived departments</h4>${archivedDepartments.map(department=>`<div class="archived-settings-row"><span><strong>${escapeHtml(department.name)}</strong><small>Inventory, menus, rooms, and access are safely stored.</small></span><button class="btn btn-secondary btn-sm" type="button" onclick="toggleDepartmentArchived('${department.id}',false)">Restore</button></div>`).join('')}`:'';
+  if(creatingSettingsDepartment){
+    overview.hidden=true;
+    detail.hidden=false;
+    const profiles=(state.profiles||[]).filter(profile=>!profile.archived);
+    const rooms=activeFloorPlanRooms();
+    detail.innerHTML=`
+      <div class="department-detail-head"><button class="btn btn-secondary btn-sm" type="button" onclick="cancelDepartmentCreation()">‹ Departments</button><div><h3>Create Department</h3><p>Define the team and rooms now; inventory can be added after creation.</p></div></div>
+      <div class="settings-group department-create-form">
+        <div class="form-group"><label for="settings-department-create-name">Department name</label><input type="text" id="settings-department-create-name" placeholder="e.g. Catering" autofocus></div>
+        <div class="form-group"><label for="settings-department-create-manager">Manager</label><select id="settings-department-create-manager"><option value="">No manager yet</option>${profiles.map(profile=>`<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)} · ${escapeHtml(profile.role)}</option>`).join('')}</select></div>
+        <fieldset class="department-assignment-field"><legend>Rooms</legend><p>Choose the rooms owned by this department. A room can belong to one department.</p><div class="department-assignment-options">${rooms.map(room=>`<label><input type="checkbox" name="department-create-room" value="${escapeHtml(room.id)}"><span><strong>${escapeHtml(room.name)}</strong><small>Currently ${escapeHtml(departmentName(room.departmentId))}</small></span></label>`).join('')||'<span class="empty-cell">No active rooms yet.</span>'}</div></fieldset>
+        <fieldset class="department-assignment-field"><legend>Users with access</legend><p>Select the people who can work in this department.</p><div class="department-assignment-options">${profiles.map(profile=>`<label><input type="checkbox" name="department-create-user" value="${escapeHtml(profile.id)}"><span><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.role)}</small></span></label>`).join('')||'<span class="empty-cell">No users are available.</span>'}</div></fieldset>
+        <div class="department-create-inventory-note"><strong>Inventory comes next</strong><span>After creating the department, its settings page will help you add or assign products.</span></div>
+        <div class="department-detail-actions"><button class="btn btn-secondary" type="button" onclick="cancelDepartmentCreation()">Cancel</button><button class="btn btn-primary" type="button" onclick="addDepartment()">Create Department</button></div>
+      </div>`;
+    return;
+  }
+  const department=getDepartment(selectedSettingsDepartmentId);
+  if(!department){selectedSettingsDepartmentId=null;overview.hidden=false;detail.hidden=true;detail.innerHTML='';return;}
+  const products=(state.products||[]).filter(product=>productInDepartment(product,department.id));
+  const menuCount=(state.menus||[]).filter(menu=>menu.departmentId===department.id&&!menu.archived).length;
+  const sharedCount=products.filter(product=>productDepartmentIds(product).length>1).length;
+  const profiles=(state.profiles||[]).filter(profile=>!profile.archived);
+  const manager=profiles.find(profile=>profile.id===department.managerId);
+  const rooms=activeFloorPlanRooms();
+  const assignedRooms=rooms.filter(room=>room.departmentId===department.id);
+  const assignedUsers=profiles.filter(profile=>department.userIds.includes(profile.id));
+  overview.hidden=true;
+  detail.hidden=false;
+  detail.innerHTML=`
+    <div class="department-detail-head"><button class="btn btn-secondary btn-sm" type="button" onclick="closeDepartmentSettings()">‹ Departments</button><div><h3>${escapeHtml(department.name)}</h3><p>Independent inventory and menu workspace</p></div><button class="btn ${departmentSettingsEditMode?'btn-primary':'btn-secondary'} department-detail-edit" type="button" onclick="setDepartmentSettingsEditMode(${departmentSettingsEditMode?'false':'true'})">${departmentSettingsEditMode?'Done':'Edit'}</button></div>
+    <div class="department-detail-stats">
+      <div class="department-detail-stat"><span>Inventory items</span><strong>${products.length}</strong></div>
+      <div class="department-detail-stat"><span>Menus</span><strong>${menuCount}</strong></div>
+      <div class="department-detail-stat"><span>Shared products</span><strong>${sharedCount}</strong></div>
+    </div>
+    ${products.length?'':`<div class="department-setup-warning"><span aria-hidden="true">!</span><div><strong>This department is missing inventory</strong><p>Add new products or assign existing shared products to finish setting up ${escapeHtml(department.name)}.</p></div><button class="btn btn-primary" type="button" onclick="openDepartmentInventory('${department.id}')">Set Up Inventory</button></div>`}
+    ${departmentSettingsEditMode?`<div class="settings-group">
+        <div class="form-group"><label>Department name</label><input type="text" value="${escapeHtml(department.name)}" onchange="renameDepartment('${department.id}',this.value)"></div>
+        <div class="form-group"><label>Manager</label><select onchange="updateDepartmentManager('${department.id}',this.value)"><option value="">No manager assigned</option>${profiles.map(profile=>`<option value="${escapeHtml(profile.id)}" ${profile.id===department.managerId?'selected':''}>${escapeHtml(profile.name)} · ${escapeHtml(profile.role)}</option>`).join('')}</select></div>
+        <fieldset class="department-assignment-field"><legend>Rooms</legend><p>Rooms assigned to ${escapeHtml(department.name)}.</p><div class="department-assignment-options">${rooms.map(room=>`<label><input type="checkbox" ${room.departmentId===department.id?'checked':''} onchange="toggleDepartmentRoom('${department.id}','${room.id}',this.checked)"><span><strong>${escapeHtml(room.name)}</strong><small>${room.departmentId===department.id?'Assigned here':`Currently ${escapeHtml(departmentName(room.departmentId))}`}</small></span></label>`).join('')||'<span class="empty-cell">No active rooms yet.</span>'}</div></fieldset>
+        <fieldset class="department-assignment-field"><legend>Users with access</legend><p>People allowed to work in ${escapeHtml(department.name)}.</p><div class="department-assignment-options">${profiles.map(profile=>`<label><input type="checkbox" ${department.userIds.includes(profile.id)?'checked':''} onchange="toggleDepartmentUser('${department.id}','${profile.id}',this.checked)"><span><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.role)}</small></span></label>`).join('')||'<span class="empty-cell">No users are available.</span>'}</div></fieldset>
+        <div class="department-detail-actions"><button class="btn btn-ghost-danger" type="button" onclick="toggleDepartmentArchived('${department.id}',true)">Archive department</button></div>
+      </div>`:`<div class="settings-group department-view-facts">
+        <div><span>Manager</span><strong>${escapeHtml(manager?.name||'Not assigned')}</strong></div>
+        <div><span>Rooms</span><strong>${assignedRooms.length?assignedRooms.map(room=>escapeHtml(room.name)).join(', '):'No rooms assigned'}</strong></div>
+        <div><span>Users with access</span><strong>${assignedUsers.length?assignedUsers.map(profile=>escapeHtml(profile.name)).join(', '):'No users assigned'}</strong></div>
+        <div class="department-detail-actions"><button class="btn btn-primary" type="button" onclick="openDepartmentMenus('${department.id}')">View ${escapeHtml(department.name)} menus</button></div>
+      </div>`}`;
+}
+
+function startDepartmentCreation(){
+  selectedSettingsDepartmentId=null;
+  creatingSettingsDepartment=true;
+  departmentSettingsEditMode=false;
+  renderDepartmentSettings();
+  document.getElementById('settings-department-create-name')?.focus();
+}
+
+function cancelDepartmentCreation(){creatingSettingsDepartment=false;renderDepartmentSettings();}
+
+function selectDepartmentSettings(id){
+  if(!getDepartment(id))return;
+  creatingSettingsDepartment=false;
+  departmentSettingsEditMode=false;
+  selectedSettingsDepartmentId=id;
+  renderDepartmentSettings();
+}
+
+function closeDepartmentSettings(){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;renderDepartmentSettings();}
+
+function setDepartmentSettingsEditMode(editing){departmentSettingsEditMode=!!editing;renderDepartmentSettings();}
+
+function openDepartmentMenus(id){
+  const department=getDepartment(id);
+  if(!department||department.archived){toast('Restore this department before managing its menus.',true);return;}
+  settingsProductMenuWorkspace=id;
+  selectedSettingsMenuId=null;
+  setSettingsSection('product-menus');
+}
+
+function openDepartmentInventory(id){
+  const department=getDepartment(id);
+  if(!department||department.archived)return;
+  productDepartmentView=id;
+  productCatalogView='products';
+  showPage('products');
+  setProductDepartmentView(id);
+  openProductModal();
 }
 
 function addDepartment(){
-  const input=document.getElementById('settings-department-name');
+  const input=document.getElementById('settings-department-create-name');
   const name=String(input?.value||'').trim();
-  if(!name){toast('Enter a department name.',true);return;}
+  if(!name){toast('Enter a department name.',true);input?.focus();return;}
   if(allDepartments().some(department=>department.name.toLowerCase()===name.toLowerCase())){toast('That department already exists.',true);return;}
   const id=`department-${uid()}`;
-  state.departments.push({id,name,archived:false});
+  const managerId=document.getElementById('settings-department-create-manager')?.value||'';
+  const roomIds=[...document.querySelectorAll('input[name="department-create-room"]:checked')].map(input=>input.value);
+  const userIds=[...document.querySelectorAll('input[name="department-create-user"]:checked')].map(input=>input.value);
+  if(managerId&&!userIds.includes(managerId))userIds.push(managerId);
+  state.departments.push({id,name,archived:false,managerId,roomIds:[],userIds});
+  (state.rooms||[]).forEach(room=>{if(roomIds.includes(room.id))room.departmentId=id;});
+  ensureDepartmentAssignments();
   ensureProductMenuSettings();
-  if(input)input.value='';
+  selectedSettingsDepartmentId=id;
+  creatingSettingsDepartment=false;
   save();renderDepartmentSettings();renderProductMenuSettings();renderProductDepartmentTabs();refreshProductCatalogIfVisible();
   toast(`${name} department added.`);
+}
+
+function updateDepartmentManager(id,managerId){
+  const department=getDepartment(id);
+  if(!department)return;
+  department.managerId=managerId||'';
+  if(managerId&&!department.userIds.includes(managerId))department.userIds.push(managerId);
+  save();renderDepartmentSettings();
+}
+
+function toggleDepartmentRoom(id,roomId,assigned){
+  const department=getDepartment(id);
+  const room=floorPlanRoomById(roomId);
+  if(!department||!room)return;
+  room.departmentId=assigned?id:'bar';
+  if(!assigned&&id==='bar')room.departmentId=activeDepartments().find(item=>item.id!==id)?.id||id;
+  ensureDepartmentAssignments();
+  save();renderDepartmentSettings();
+}
+
+function toggleDepartmentUser(id,userId,allowed){
+  const department=getDepartment(id);
+  if(!department)return;
+  if(allowed&&!department.userIds.includes(userId))department.userIds.push(userId);
+  if(!allowed)department.userIds=department.userIds.filter(id=>id!==userId);
+  if(department.managerId&&!department.userIds.includes(department.managerId))department.userIds.push(department.managerId);
+  save();renderDepartmentSettings();
 }
 
 function renameDepartment(id,value){
@@ -1165,10 +1505,12 @@ function renameDepartment(id,value){
 }
 
 function toggleDepartmentArchived(id,archived){
-  const department=getDepartment(id);
+  ensureDepartments();
+  const department=state.departments.find(item=>item.id===id);
   if(!department)return;
-  if(archived&&activeDepartments().length<=1){toast('Keep at least one department active.',true);return;}
+  if(archived&&state.departments.filter(item=>!item.archived).length<=1){toast('Keep at least one department active.',true);return;}
   department.archived=!!archived;
+  if(department.archived){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;}
   ensureCurrentDepartmentView();
   if(!getDepartment(settingsProductMenuWorkspace)||getDepartment(settingsProductMenuWorkspace).archived)settingsProductMenuWorkspace=activeDepartments()[0]?.id||'bar';
   save();renderDepartmentSettings();renderProductMenuSettings();renderProductDepartmentTabs();refreshProductCatalogIfVisible();

@@ -80,6 +80,7 @@ function compactStateForStorage(){
     products:state.products||[],
     drinks:state.drinks||[],
     menus:state.menus||[],
+    menuLibraryVersion:state.menuLibraryVersion||0,
     inventories:state.inventories||[],
     orders:state.orders||[],
     suppliers:state.suppliers||[],
@@ -306,13 +307,14 @@ function normalizeLoadedState(){
   if(typeof normalizeFloorPlanRooms==='function')roomsChanged=normalizeFloorPlanRooms();
   let profilesChanged=false;
   if(typeof normalizeProfiles==='function')profilesChanged=normalizeProfiles();
+  const departmentAssignmentsChanged=typeof ensureDepartmentAssignments==='function'?ensureDepartmentAssignments():false;
   const productsChanged=ensureProductCatalog();
   const suppliersChanged=ensureSupplierCatalog();
   const drinksChanged=ensureDrinkCatalog();
   const productMenusChanged=typeof ensureProductMenuSettings==='function'?ensureProductMenuSettings():false;
   const menusChanged=typeof ensureMenuLibrary==='function'?ensureMenuLibrary():false;
   syncAllSupplierProductLinks();
-  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged;
+  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
 }
 
 function load(){
@@ -328,6 +330,7 @@ function load(){
     ensureProductCatalog();
     ensureSupplierCatalog();
     ensureDrinkCatalog();
+    if(typeof ensureMenuLibrary==='function')ensureMenuLibrary();
     syncAllSupplierProductLinks();
     save();
   }

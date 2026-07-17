@@ -357,28 +357,28 @@
         </div>
       </div>
       <div class="settings-pane" data-settings-pane="departments">
-        <div class="settings-section-head"><h3>Departments</h3><p>Define the departments that share your master item catalog. An item can belong to more than one department.</p></div>
-        <div class="settings-group">
-          <div class="settings-inline-form">
-            <input type="text" id="settings-department-name" placeholder="e.g. Office Supply" onkeydown="if(event.key==='Enter')addDepartment()">
-            <button class="btn btn-primary btn-sm" type="button" onclick="addDepartment()">＋ Add Department</button>
-          </div>
-          <p class="settings-note">Archiving a department hides its Product workspace without deleting any items or assignments.</p>
+        <div id="settings-department-overview">
+          <div class="settings-section-head settings-section-head-row"><div><h3>Departments</h3><p>Set up each restaurant department as its own inventory and menu workspace.</p></div><button class="btn btn-primary" type="button" onclick="startDepartmentCreation()">＋ New Department</button></div>
+          <div class="settings-group">
           <div class="department-settings-list" id="settings-department-list"></div>
+          <div class="archived-settings-section" id="settings-archived-departments" hidden></div>
+          </div>
         </div>
+        <div id="settings-department-detail" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="product-menus">
-        <div class="settings-section-head"><h3>Menus</h3><p>Create independent menus for different seasons or locations. Each menu keeps its own items and recipes.</p></div>
-        <div class="settings-group">
+        <div class="settings-section-head"><h3>Menus</h3><p>Create independent menus for each department. Menus never appear in another department.</p></div>
+        <div class="settings-group" id="settings-menu-overview">
+          <div class="menu-department-picker"><span>Department</span><div class="segmented-control settings-product-menu-workspaces" id="settings-menu-department-tabs"></div></div>
           <div class="menu-create-bar">
             <input type="text" id="settings-menu-name" placeholder="e.g. Lobster Summer 2026" onkeydown="if(event.key==='Enter')addSettingsMenu()">
             <button class="btn btn-primary btn-sm" type="button" onclick="addSettingsMenu()">＋ Create Menu</button>
             <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('settings-menu-file').click()">⬆ Import Menu</button>
             <input type="file" id="settings-menu-file" accept=".xlsx,.xls,.csv,.pdf,.txt,.json,image/*" hidden onchange="handleMenuImport(event)">
           </div>
-          <p class="settings-note">Import Excel, CSV, PDF, text, JSON, or an image. Imported items become an editable draft so you can confirm names, prices, and recipes.</p>
           <div class="menu-import-status" id="settings-menu-import-status" hidden></div>
           <div class="menu-settings-list" id="settings-menu-list"></div>
+          <div class="archived-settings-section" id="settings-archived-menus" hidden></div>
         </div>
         <div class="settings-group menu-editor" id="settings-menu-editor" hidden></div>
       </div>
