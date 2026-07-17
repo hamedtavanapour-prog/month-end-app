@@ -1089,7 +1089,7 @@ function renderSettingsMenuEditor(menu){
   if(!settingsMenuEditMode){
     editor.innerHTML=`
       <div class="menu-editor-heading">
-        <button class="btn btn-secondary btn-sm" type="button" onclick="closeSettingsMenuEditor()">‹ Menus</button>
+        <button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="closeSettingsMenuEditor()" aria-label="Back to menus" title="Back to menus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Menus</span></button>
         <div><h3>${escapeHtml(menu.name)}</h3><p>${escapeHtml(departmentName(menu.departmentId))} menu · ${menu.active?'Active':'Inactive'} · ${menu.items.length} item${menu.items.length===1?'':'s'}</p></div>
         <button class="btn btn-secondary" type="button" onclick="setSettingsMenuEditMode(true)">Edit</button>
       </div>
@@ -1099,7 +1099,7 @@ function renderSettingsMenuEditor(menu){
   }
   editor.innerHTML=`
     <div class="menu-editor-heading">
-      <button class="btn btn-secondary btn-sm" type="button" onclick="setSettingsMenuEditMode(false)">‹ View</button>
+      <button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="setSettingsMenuEditMode(false)" aria-label="Back to menu view" title="Back to menu view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>View</span></button>
       <div><h3>Edit ${escapeHtml(menu.name)}</h3><p>${escapeHtml(departmentName(menu.departmentId))} menu</p></div>
       <button class="btn btn-primary" type="button" onclick="setSettingsMenuEditMode(false)">Done</button>
     </div>
@@ -1362,7 +1362,7 @@ function renderDepartmentSettings(){
     const profiles=(state.profiles||[]).filter(profile=>!profile.archived);
     const rooms=activeFloorPlanRooms();
     detail.innerHTML=`
-      <div class="department-detail-head"><button class="btn btn-secondary btn-sm" type="button" onclick="cancelDepartmentCreation()">‹ Departments</button><div><h3>Create Department</h3><p>Define the team and rooms now; inventory can be added after creation.</p></div></div>
+      <div class="department-detail-head"><button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="cancelDepartmentCreation()" aria-label="Back to departments" title="Back to departments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Departments</span></button><div><h3>Create Department</h3><p>Define the team and rooms now; inventory can be added after creation.</p></div></div>
       <div class="settings-group department-create-form">
         <div class="form-group"><label for="settings-department-create-name">Department name</label><input type="text" id="settings-department-create-name" placeholder="e.g. Catering" autofocus></div>
         <div class="form-group"><label for="settings-department-create-manager">Manager</label><select id="settings-department-create-manager"><option value="">No manager yet</option>${profiles.map(profile=>`<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)} · ${escapeHtml(profile.role)}</option>`).join('')}</select></div>
@@ -1386,7 +1386,7 @@ function renderDepartmentSettings(){
   overview.hidden=true;
   detail.hidden=false;
   detail.innerHTML=`
-    <div class="department-detail-head"><button class="btn btn-secondary btn-sm" type="button" onclick="closeDepartmentSettings()">‹ Departments</button><div><h3>${escapeHtml(department.name)}</h3><p>Independent inventory and menu workspace</p></div><button class="btn ${departmentSettingsEditMode?'btn-primary':'btn-secondary'} department-detail-edit" type="button" onclick="setDepartmentSettingsEditMode(${departmentSettingsEditMode?'false':'true'})">${departmentSettingsEditMode?'Done':'Edit'}</button></div>
+    <div class="department-detail-head"><button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="closeDepartmentSettings()" aria-label="Back to departments" title="Back to departments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Departments</span></button><div><h3>${escapeHtml(department.name)}</h3><p>Independent inventory and menu workspace</p></div><button class="btn ${departmentSettingsEditMode?'btn-primary':'btn-secondary'} department-detail-edit" type="button" onclick="setDepartmentSettingsEditMode(${departmentSettingsEditMode?'false':'true'})">${departmentSettingsEditMode?'Done':'Edit'}</button></div>
     <div class="department-detail-stats">
       <div class="department-detail-stat"><span>Inventory items</span><strong>${products.length}</strong></div>
       <div class="department-detail-stat"><span>Menus</span><strong>${menuCount}</strong></div>

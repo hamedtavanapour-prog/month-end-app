@@ -95,6 +95,7 @@ body.sidebar-collapsed .profile-menu{left:58px;bottom:0;}
 .settings-nav-item.active .settings-icon{background:rgba(255,255,255,0.38);}
 .settings-detail{background:var(--bg);padding:28px;overflow:auto;}
 .settings-back{display:none;border:0;background:transparent;color:var(--accent);font-size:0.9rem;font-weight:800;margin-bottom:14px;cursor:pointer;}
+.mobile-back-button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
 .settings-pane{display:none;max-width:840px;margin:0 auto;}
 .settings-pane.active{display:block;}
 .settings-section-head{margin-bottom:16px;padding:2px 0 4px;}
@@ -1321,6 +1322,15 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   .desktop-only{display:none!important;}
   html,body,.app,.main,.page{width:100%;max-width:100%;overflow-x:hidden;}
   .page,.page-header,.card,.settings-app,.settings-sidebar,.settings-detail,.settings-pane,.settings-group,.catalog-layout,.catalog-main{min-width:0;max-width:100%;}
+  .page>.page-header{align-items:center;margin-bottom:10px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
+  .page>.page-header::before{display:none;}
+  .page>.page-header>.page-header-text{display:none;}
+  .page>.page-header>div:not(.page-header-text){width:100%;margin:0;justify-content:flex-start;}
+  #page-settings>.page-header{display:none;}
+  #page-settings>.settings-app{min-height:calc(100dvh - 118px);}
+  .mobile-back-button{display:inline-grid!important;width:42px!important;min-width:42px!important;height:42px!important;min-height:42px!important;place-items:center!important;flex:0 0 42px!important;border-radius:12px!important;padding:0!important;}
+  .mobile-back-button>span{display:none!important;}
+  .settings-back.mobile-back-button{margin:0 0 12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);}
   img,canvas,video{max-width:100%;height:auto;}
   button,input,select,textarea{max-width:100%;}
   .stat-card .label,.stat-card .sub{max-width:100%;white-space:normal;overflow-wrap:anywhere;}
