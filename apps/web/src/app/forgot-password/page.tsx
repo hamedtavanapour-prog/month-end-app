@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Reset password" };
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string }> }) {
   const params = await searchParams;
   return <main className="setup-page"><section className="setup-card activation-card">
-    <span className="brand-mark" aria-hidden="true">🍺</span>
+    <span className="brand-mark" aria-hidden="true">ME</span>
     {params.sent ? <><p className="eyebrow">Email sent</p><h1>Check your inbox.</h1><p>If an account exists for that address, a secure password-reset link is on its way.</p><Link className="secondary-link" href="/login">Back to sign in</Link></> : <>
       <p className="eyebrow">Account recovery</p><h1>Reset your password.</h1><p>Enter the email address you use for Keg Bar Inventory.</p>
       {params.error ? <div className="form-alert">Enter a valid email address.</div> : null}
@@ -17,4 +17,3 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
     </>}
   </section></main>;
 }
-

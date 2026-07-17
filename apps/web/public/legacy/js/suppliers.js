@@ -305,11 +305,11 @@ function renderSuppliers(){
     const activeSuppliers=state.suppliers.filter(supplier=>!supplier.archived);
     let emptyState;
     if(filtersApplied){
-      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🔎</span><strong>No suppliers match these filters</strong><p>Clear the search and status filter to return to active suppliers.</p><button class="btn btn-secondary" type="button" onclick="resetSupplierFilters()">Clear filters</button></div>';
+      emptyState='<div class="table-empty-state"><strong>No suppliers match these filters</strong><p>Clear the search and status filter to return to active suppliers.</p><button class="btn btn-secondary" type="button" onclick="resetSupplierFilters()">Clear filters</button></div>';
     }else if(state.suppliers.length&&!activeSuppliers.length){
-      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>All suppliers are archived</strong><p>Archived suppliers stay saved but are hidden from the active list.</p><button class="btn btn-secondary" type="button" onclick="showArchivedSupplierFilter()">View archived suppliers</button></div>';
+      emptyState='<div class="table-empty-state"><strong>All suppliers are archived</strong><p>Archived suppliers stay saved but are hidden from the active list.</p><button class="btn btn-secondary" type="button" onclick="showArchivedSupplierFilter()">View archived suppliers</button></div>';
     }else{
-      emptyState='<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🏭</span><strong>Add your first supplier</strong><p>Keep contacts, ordering minimums, lead times, and linked products together.</p><button class="btn btn-primary" type="button" onclick="openSupplierModal()">＋ Add Supplier</button></div>';
+      emptyState='<div class="table-empty-state"><strong>Add your first supplier</strong><p>Keep contacts, ordering minimums, lead times, and linked products together.</p><button class="btn btn-primary" type="button" onclick="openSupplierModal()">＋ Add Supplier</button></div>';
     }
     tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;return;
   }

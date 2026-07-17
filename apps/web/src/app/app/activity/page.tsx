@@ -33,8 +33,8 @@ export default async function ActivityPage() {
 
   return <main className="team-shell">
     <aside className="team-sidebar">
-      <Link className="legacy-brand" href="/app"><strong>🍺 Keg Bar</strong><span>Inventory Manager</span></Link>
-      <nav><Link href="/app">← Inventory workspace</Link><Link href="/app/team">👥 Users & access</Link><Link href="/app">🏢 Departments</Link><span className="active">🧾 Activity log</span></nav>
+      <Link className="legacy-brand" href="/app"><strong>ME / Keg Bar</strong><span>Inventory Manager</span></Link>
+      <nav><Link href="/app">← Inventory workspace</Link><Link href="/app/team">Users & access</Link><Link href="/app">Departments</Link><span className="active">Activity log</span></nav>
       <div className="team-current-user"><b>{initials(context.displayName)}</b><span><strong>{context.displayName}</strong><small>{context.role}</small></span></div>
     </aside>
     <section className="team-content">
@@ -49,4 +49,3 @@ export default async function ActivityPage() {
     </section>
   </main>;
 }
-

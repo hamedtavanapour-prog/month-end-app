@@ -46,6 +46,7 @@ export default async function AppHome() {
   return (
     <main className="legacy-host">
       <iframe
+        allow="microphone"
         className="legacy-frame"
         src="/legacy/index.html?v=department-setup-1"
         title={`${organization.name} inventory workspace for ${email}`}

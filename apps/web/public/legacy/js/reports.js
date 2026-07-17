@@ -52,7 +52,7 @@ function renderDashboardOnboarding(){
     const allowed=profileCanAccessPage(currentProfile(),step.page);
     const status=step.complete?'Complete':index===steps.findIndex(item=>!item.complete)?'Next':'Not started';
     return`<button type="button" class="dashboard-onboarding-step ${step.complete?'complete':''}" onclick="openDashboardSetupStep('${step.key}')" ${allowed?'':`disabled title="You do not have access to this area."`}>
-      <span class="dashboard-step-marker" aria-hidden="true">${step.complete?'✓':index+1}</span>
+      <span class="dashboard-step-marker" aria-hidden="true">${step.complete?'Done':index+1}</span>
       <span class="dashboard-step-copy"><strong>${step.label}</strong><small>${step.detail}</small></span>
       <span class="dashboard-step-status">${status}${allowed?' →':''}</span>
     </button>`;

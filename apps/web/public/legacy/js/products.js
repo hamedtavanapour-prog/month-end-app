@@ -308,7 +308,7 @@ function addProductUnitRow(unit={}){
     <input type="text" data-field="sku" placeholder="SKU / code" value="${unit.sku||''}" oninput="rebuildProductUnitSelect()">
     <input type="number" min="0" step="0.01" data-field="cost" placeholder="0.00" value="${unit.cost||''}" oninput="rebuildProductUnitSelect()">
     <input type="number" min="0" step="1" data-field="par" placeholder="0" value="${unit.par||''}" oninput="rebuildProductUnitSelect()">
-    <button class="btn btn-ghost-danger btn-sm" type="button" onclick="removeProductUnitRow(this)">✕</button>
+    <button class="btn btn-ghost-danger btn-sm" type="button" onclick="removeProductUnitRow(this)">Remove</button>
   `;
   el.appendChild(row);
   rebuildProductUnitSelect();
@@ -597,11 +597,11 @@ function renderProducts(){
     const filtersApplied=!!(search||cat||sub||status!=='active');
     let emptyState;
     if(filtersApplied){
-      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🔎</span><strong>No products match these filters</strong><p>Clear the search and filters to return to active ${escapeHtml(title)} products.</p><button class="btn btn-secondary" type="button" onclick="resetProductFilters()">Clear filters</button></div>`;
+      emptyState=`<div class="table-empty-state"><strong>No products match these filters</strong><p>Clear the search and filters to return to active ${escapeHtml(title)} products.</p><button class="btn btn-secondary" type="button" onclick="resetProductFilters()">Clear filters</button></div>`;
     }else if(departmentProducts.length&&!activeDepartmentProducts.length){
-      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>All ${escapeHtml(title)} products are archived</strong><p>Archived products are kept out of active inventory and counts.</p><button class="btn btn-secondary" type="button" onclick="showArchivedProductFilter()">View archived products</button></div>`;
+      emptyState=`<div class="table-empty-state"><strong>All ${escapeHtml(title)} products are archived</strong><p>Archived products are kept out of active inventory and counts.</p><button class="btn btn-secondary" type="button" onclick="showArchivedProductFilter()">View archived products</button></div>`;
     }else{
-      emptyState=`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">📦</span><strong>Add your first ${escapeHtml(title)} product</strong><p>Products hold the names, packaging, cost, and supplier details used across inventory.</p><button class="btn btn-primary" type="button" onclick="openProductModal()">＋ Add ${escapeHtml(title)} product</button></div>`;
+      emptyState=`<div class="table-empty-state"><strong>Add your first ${escapeHtml(title)} product</strong><p>Products hold the names, packaging, cost, and supplier details used across inventory.</p><button class="btn btn-primary" type="button" onclick="openProductModal()">＋ Add ${escapeHtml(title)} product</button></div>`;
     }
     tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;syncHeaderCb();return;
   }
@@ -611,7 +611,7 @@ function renderProducts(){
     const menuId=`prod-actions-${p.id}`;
     return`<tr data-id="${p.id}" class="product-row ${sel?'row-selected':''} ${p.archived?'archived-row':''}" onclick="openProductView('${p.id}')">${visCols.map(c=>{switch(c.key){
       case 'sel':return`<td style="text-align:center;padding:9px 8px;"><input type="checkbox" ${sel?'checked':''} onchange="event.stopPropagation();prodRowCheck('${p.id}',this)" onclick="event.stopPropagation()" style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;"></td>`;
-      case 'name':return`<td><strong>${p.name}</strong>${p.archived?' <span class="sub-badge">Archived</span>':''}${low?` <span style="color:var(--warning);font-size:0.74rem;">⚠</span>`:''}${p.notes?`<div style="font-size:0.71rem;color:var(--text-muted);">${p.notes}</div>`:''}</td>`;
+      case 'name':return`<td><strong>${p.name}</strong>${p.archived?' <span class="sub-badge">Archived</span>':''}${low?` <span class="missing-pill">Low</span>`:''}${p.notes?`<div style="font-size:0.71rem;color:var(--text-muted);">${p.notes}</div>`:''}</td>`;
       case 'inventoryName':return`<td>${escapeHtml(p.inventoryName||p.name||'—')}</td>`;
       case 'aliases':return`<td>${aliasBadges(p.aliases)}</td>`;
       case 'category':return`<td>${catBadge(p.category)}</td>`;

@@ -651,7 +651,7 @@ function renderInventoryTemplatePreview(){
       <strong class="inventory-template-position">${index+1}</strong>
       <span class="inventory-template-product"><strong>${escapeHtml(item.productName)}</strong>${item.reportProductName&&item.reportProductName!==item.productName?`<small>Matched from ${escapeHtml(item.reportProductName)}</small>`:''}</span>
       <span class="inventory-template-row-actions">
-        <button type="button" class="remove" aria-label="Remove ${escapeHtml(item.productName)}" title="Remove" onclick="removeInventoryTemplateItem(${index})">✕</button>
+        <button type="button" class="remove" aria-label="Remove ${escapeHtml(item.productName)}" title="Remove" onclick="removeInventoryTemplateItem(${index})">Remove</button>
       </span>
     </div>`;
   }).join('')||'<div class="inventory-template-empty">No items match your search.</div>';
@@ -1873,10 +1873,10 @@ function renderInsights(){
       const sups=state.suppliers.filter(s=>s.products&&s.products.includes(p.id));
       const maxLead=sups.length>0?Math.max(...sups.map(s=>s.leadDays||0)):0;
       const urg=maxLead+1;
-      if(dL<=urg)alerts.push({type:'danger',icon:'🚨',name:p.name,msg:`Runout in ~<strong>${dL} day${dL!==1?'s':''}</strong>. Stock: ${stock}. Avg weekly: ${avgW.toFixed(2)}.${maxLead?` Lead: ${maxLead}d.`:''}`});
-      else if(dL<=urg*3)alerts.push({type:'warning',icon:'⚠️',name:p.name,msg:`Running low — ~<strong>${dL} days</strong> remaining.`});
+      if(dL<=urg)alerts.push({type:'danger',name:p.name,msg:`Runout in ~<strong>${dL} day${dL!==1?'s':''}</strong>. Stock: ${stock}. Avg weekly: ${avgW.toFixed(2)}.${maxLead?` Lead: ${maxLead}d.`:''}`});
+      else if(dL<=urg*3)alerts.push({type:'warning',name:p.name,msg:`Running low — ~<strong>${dL} days</strong> remaining.`});
     }
-    if(stock!==null&&p.par>0&&stock<=p.par&&!alerts.some(a=>a.name===p.name))alerts.push({type:'warning',icon:'📦',name:p.name,msg:`At or below par (stock: ${stock}, par: ${p.par}).`});
+    if(stock!==null&&p.par>0&&stock<=p.par&&!alerts.some(a=>a.name===p.name))alerts.push({type:'warning',name:p.name,msg:`At or below par (stock: ${stock}, par: ${p.par}).`});
     if(avgW&&avgW>0){
       const sups=state.suppliers.filter(s=>s.products&&s.products.includes(p.id));
       const lead=sups.length>0?Math.max(...sups.map(s=>s.leadDays||0)):3;
@@ -1885,7 +1885,7 @@ function renderInsights(){
       if(Math.abs(diff)>=1)suggestions.push({p,currentPar:p.par||0,suggested,avgW,reason:diff>0?`Usage exceeds par buffer (+${diff})`:`Par may be too high (−${Math.abs(diff)})`});
     }
   });
-  document.getElementById('insights-alerts').innerHTML=alerts.length?alerts.map(a=>`<div class="alert-card ${a.type}"><div class="alert-icon">${a.icon}</div><div class="alert-body"><strong>${productNameLink(state.products.find(p=>p.name===a.name),a.name)}</strong><p>${a.msg}</p></div></div>`).join(''):`<div class="card" style="margin-bottom:18px;"><p style="color:var(--success);font-weight:600;">✅ No critical alerts.</p></div>`;
+  document.getElementById('insights-alerts').innerHTML=alerts.length?alerts.map(a=>`<div class="alert-card ${a.type}"><div class="alert-body"><strong>${productNameLink(state.products.find(p=>p.name===a.name),a.name)}</strong><p>${a.msg}</p></div></div>`).join(''):`<div class="card" style="margin-bottom:18px;"><p style="color:var(--success);font-weight:600;">No critical alerts.</p></div>`;
   document.getElementById('insights-tbody').innerHTML=suggestions.length?suggestions.map(({p,currentPar,suggested,avgW,reason})=>`<tr><td><strong>${productNameLink(p)}</strong></td><td>${catBadge(p.category)}</td><td>${currentPar}</td><td>${avgW.toFixed(2)} / wk</td><td><strong style="color:${suggested>currentPar?'var(--warning)':'var(--success)'}">${suggested}</strong></td><td style="font-size:0.78rem;color:var(--text-muted);">${reason}</td><td><button class="btn btn-primary btn-sm" onclick="applyPar('${p.id}',${suggested})">Apply ${suggested}</button></td></tr>`).join(''):`<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No adjustments suggested.</td></tr>`;
 }
 

@@ -280,9 +280,9 @@ function renderOrderCell(order,col){
     case 'notes':
       return`<td class="order-notes">${order.notes?escapeHtml(order.notes):'—'}</td>`;
     case 'scan':
-      return`<td>${order.scanData?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();viewScan('${order.id}')">🖼</button>`:'—'}</td>`;
+      return`<td>${order.scanData?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();viewScan('${order.id}')">View file</button>`:'—'}</td>`;
     case 'actions':
-      return`<td><div class="order-actions"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openOrderModal('${order.id}')">Edit</button><button class="btn btn-ghost-danger btn-sm" onclick="event.stopPropagation();deleteOrder('${order.id}')">✕</button></div></td>`;
+      return`<td><div class="order-actions"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openOrderModal('${order.id}')">Edit</button><button class="btn btn-ghost-danger btn-sm" onclick="event.stopPropagation();deleteOrder('${order.id}')">Delete</button></div></td>`;
     default:
       return'<td>—</td>';
   }
@@ -295,7 +295,7 @@ function renderOrders(){
   const tbody=document.getElementById('ord-tbody');
   const rows=orderTableRows();
   if(!rows.length){
-    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}"><div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🛒</span><strong>Create your first order</strong><p>Record a supplier invoice, its products, quantities, and total to start tracking purchases.</p><button class="btn btn-primary" type="button" onclick="openOrderModal()">＋ Create first order</button></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="${visibleCols.length}"><div class="table-empty-state"><strong>Create your first order</strong><p>Record a supplier invoice, its products, quantities, and total to start tracking purchases.</p><button class="btn btn-primary" type="button" onclick="openOrderModal()">＋ Create first order</button></div></td></tr>`;
     return;
   }
 
@@ -404,7 +404,7 @@ function addOrderLine(existingLine=null){
     <input type="number" min="0" step="0.01" data-field="unitPrice" aria-label="Unit price" placeholder="Unit $" value="${escapeHtml(line.unitPrice)}" oninput="updateOrderTotal()">
     <input type="number" min="0" step="0.01" data-field="deposit" aria-label="Deposit" placeholder="Deposit" value="${escapeHtml(line.deposit)}">
     <div class="order-line-total">$0.00</div>
-    <button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove invoice item" onclick="removeLine('ol-${lineId}')">✕</button>
+    <button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove invoice item" onclick="removeLine('ol-${lineId}')">Remove</button>
   `;
   container.appendChild(row);
   updateOrderTotal();
@@ -641,7 +641,7 @@ function renderScanPreview(file){
   if(file.type.startsWith('image/')){
     preview.innerHTML=`<div class="scan-preview-img"><img src="${scanFileData}" alt="scan"></div>`;
   }else{
-    preview.innerHTML=`<div class="scan-file-preview">📄 ${escapeHtml(file.name)}</div>`;
+    preview.innerHTML=`<div class="scan-file-preview">${escapeHtml(file.name)}</div>`;
   }
 }
 
@@ -659,7 +659,7 @@ async function processScanFile(file){
 
   scanFileName=file.name;
   scanExtractedInvoice=null;
-  document.getElementById('scan-fname').textContent=`📎 ${file.name}`;
+  document.getElementById('scan-fname').textContent=file.name;
   document.getElementById('scan-create-btn').disabled=true;
 
   const reader=new FileReader();
@@ -1168,7 +1168,7 @@ function viewScan(id){
   if(order.scanData.startsWith('data:image/')){
     body.innerHTML=`<img src="${order.scanData}" class="scan-view-img" alt="Order scan">`;
   }else{
-    body.innerHTML=`<a href="${order.scanData}" download="${escapeHtml(order.scanName||'order.pdf')}" class="btn btn-primary">⬇ Download PDF</a>`;
+    body.innerHTML=`<a href="${order.scanData}" download="${escapeHtml(order.scanName||'order.pdf')}" class="btn btn-primary">Download PDF</a>`;
   }
   openModal('modal-view-scan');
 }

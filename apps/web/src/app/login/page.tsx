@@ -31,7 +31,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="login-page">
       <section className="login-story" aria-label="Keg Bar introduction">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">🍺</span>
+          <span className="brand-mark" aria-hidden="true">ME</span>
           <span>Keg Bar</span>
         </div>
         <div className="story-copy">

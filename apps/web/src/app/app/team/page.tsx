@@ -77,12 +77,12 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
   return (
     <main className="team-shell">
       <aside className="team-sidebar">
-        <Link className="legacy-brand" href="/app"><strong>🍺 Keg Bar</strong><span>Inventory Manager</span></Link>
+        <Link className="legacy-brand" href="/app"><strong>ME / Keg Bar</strong><span>Inventory Manager</span></Link>
         <nav>
           <Link href="/app">← Inventory workspace</Link>
-          <span className="active">👥 Users & access</span>
-          <Link href="/app">🏢 Departments</Link>
-          <Link href="/app/activity">🧾 Activity log</Link>
+          <span className="active">Users & access</span>
+          <Link href="/app">Departments</Link>
+          <Link href="/app/activity">Activity log</Link>
         </nav>
         <div className="team-current-user">
           <b>{initials(context.displayName)}</b>

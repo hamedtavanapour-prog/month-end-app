@@ -92,6 +92,14 @@ function currentRoomProducts(){
   const floorRoom=room?.roomId?floorPlanRoomById(room.roomId):null;
   return roomProducts(floorRoom);
 }
+function currentCountProducts(){
+  if(currentInvMergedView&&currentInvEdit){
+    const inv=state.inventories.find(item=>item.id===currentInvEdit);
+    const expected=expectedInventoryProductIds(inv);
+    return state.products.filter(product=>!product.archived&&expected.has(product.id));
+  }
+  return currentRoomProducts();
+}
 function roomProductSummary(room){
   const activeCount=state.products.filter(product=>!product.archived).length;
   if(!Array.isArray(room.productIds))return`All ${activeCount} active items`;
@@ -335,6 +343,7 @@ function inventoryRoomItemsEqual(a={},b={}){
   });
 }
 function captureCurrentRoomCounts(){
+  if(currentInvMergedView)return;
   const room=currentInventoryRoom();
   if(!room)return;
   const allowedProducts=currentRoomProducts();
@@ -362,12 +371,21 @@ function renderInventoryRooms(){
   }).join('');
   const select=document.getElementById('inv-room-select');
   if(select){
-    select.innerHTML=rooms.map(room=>`<option value="${room.id}" ${room.id===currentInvRoomId?'selected':''}>${escapeHtml(room.name)} · ${Object.keys(room.items||{}).length} counted</option>`).join('');
-    select.value=currentInvRoomId||rooms[0]?.id||'';
+    const mergedOption=currentInvEdit?`<option value="all" ${currentInvMergedView?'selected':''}>Merged Total</option>`:'';
+    select.innerHTML=mergedOption+rooms.map(room=>`<option value="${room.id}" ${!currentInvMergedView&&room.id===currentInvRoomId?'selected':''}>${escapeHtml(room.name)}</option>`).join('');
+    select.value=currentInvMergedView?'all':(currentInvRoomId||rooms[0]?.id||'');
   }
 }
 function switchInventoryRoom(roomId){
+  if(roomId==='all'&&currentInvEdit){
+    captureCurrentRoomCounts();
+    const inv=state.inventories.find(item=>item.id===currentInvEdit);if(!inv)return;
+    currentInvMergedView=true;
+    liveInvCounts={...inv.items};
+    renderInventoryRooms();renderInvRows(true);return;
+  }
   captureCurrentRoomCounts();
+  currentInvMergedView=false;
   currentInvRoomId=roomId;
   const room=currentInventoryRoom();
   liveInvCounts={};
@@ -714,18 +732,40 @@ function initLiveCounts(ex){
   currentInvRoomId=currentInvRooms[0].id;
   currentRoomProducts().forEach(p=>{liveInvCounts[p.id]='';});
 }
-function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);hideInventoryFinishMessage();const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');const section=row.closest('.inv-count-section');if(section){const inputs=[...section.querySelectorAll('input[data-count-input="true"]')];const filled=inputs.filter(input=>input.value!=='').length;const count=section.querySelector('.inv-section-summary-count');if(count)count.textContent=`${filled}/${inputs.length}`;}updateInvProgress();}
-function invQtyInputs(){return[...document.querySelectorAll('#inv-rows input[data-count-input="true"]')].filter(input=>!input.closest('[hidden]'));}
+function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);hideInventoryFinishMessage();const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');const section=row.closest('.inv-count-section');if(section){const inputs=[...section.querySelectorAll('input[data-count-input="true"]')];const filled=inputs.filter(input=>input.value!=='').length;const count=section.querySelector('.inv-section-summary-count');if(count)count.textContent=`${filled}/${inputs.length}`;}prepareFollowingInventorySection(el);updateInvProgress();}
+function invQtyInputs(){return[...document.querySelectorAll('#inv-rows input[data-count-input="true"]')];}
+function expandInventorySectionElement(section){
+  if(!section||!section.classList.contains('collapsed'))return;
+  section.classList.remove('collapsed');
+  section.querySelector('.inv-section-header')?.setAttribute('aria-expanded','true');
+  const items=section.querySelector('.inv-section-items');
+  if(items)items.hidden=false;
+  if(section.dataset.sectionToken)expandedInventorySections.add(section.dataset.sectionToken);
+}
+function prepareFollowingInventorySection(input){
+  const section=input?.closest('.inv-count-section');
+  if(!section)return;
+  const sectionInputs=[...section.querySelectorAll('input[data-count-input="true"]')];
+  if(sectionInputs.at(-1)!==input)return;
+  expandInventorySectionElement(section.nextElementSibling?.matches('.inv-count-section')?section.nextElementSibling:null);
+}
+function scrollInventoryInputIntoView(input){
+  requestAnimationFrame(()=>input.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'}));
+}
 function focusInvQtyInput(current,step=1){
   const inputs=invQtyInputs();
   const index=inputs.indexOf(current);
   const next=inputs[index+step];
   if(next){
+    expandInventorySectionElement(next.closest('.inv-count-section'));
     next.focus();
     next.select();
+    scrollInventoryInputIntoView(next);
+  }else if(step>0){
+    current.blur();
   }
 }
-function onInvQtyFocus(input){setTimeout(()=>input.select(),0);}
+function onInvQtyFocus(input){setTimeout(()=>{input.select();prepareFollowingInventorySection(input);scrollInventoryInputIntoView(input);},0);}
 function onInvQtyKey(event,input){
   if(event.key!=='Enter'&&event.key!=='Tab')return;
   event.preventDefault();
@@ -873,7 +913,10 @@ function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate=
   currentInvEdit=existingId;const ex=existingId?state.inventories.find(i=>i.id===existingId):null;
   if(ex)ensureInventoryHasFloorPlanRooms(ex);
   document.getElementById('inv-date').value=ex?ex.date:(presetDate||today());document.getElementById('inv-label').value=ex?ex.label||'':presetLabel;
-  initLiveCounts(ex);document.getElementById('inv-search').value='';document.getElementById('inv-cat-f').value='';
+  initLiveCounts(ex);
+  currentInvMergedView=!!ex&&window.innerWidth<=820;
+  if(currentInvMergedView)liveInvCounts={...ex.items};
+  document.getElementById('inv-search').value='';document.getElementById('inv-cat-f').value='';
   if(!ex&&selectedFloorRoomId){
     const selected=currentInvRooms.find(room=>room.roomId===selectedFloorRoomId);
     if(selected){
@@ -901,7 +944,7 @@ function updateInventoryFilterSummary(){
   summary.textContent=active?`${active} active`:'Default';
 }
 function updateInvProgress(){
-  const products=currentRoomProducts();
+  const products=currentCountProducts();
   const total=products.length;const filled=products.filter(product=>{const v=liveInvCounts[product.id];return v!==''&&v!==null&&v!==undefined;}).length;const pct=total>0&&filled>0?Math.max(1,Math.round(filled/total*100)):0;
   document.getElementById('inv-prog-bar').style.width=pct+'%';document.getElementById('inv-prog-label').textContent=`${filled} of ${total} (${pct}%)`;
   document.getElementById('inv-prog-pills').innerHTML=`<span class="filled-pill"><span class="filled-dot"></span>${filled}</span><span class="missing-pill"><span class="missing-dot"></span>${total-filled} missing</span>`;
@@ -941,7 +984,7 @@ function setInventoryFinishSaving(saving){
   if(mobileLabel)mobileLabel.textContent=saving?'Saving…':'Finish & View Report';
 }
 function renderInvRows(skipCapture=false){
-  const roomScopedProducts=currentRoomProducts();
+  const roomScopedProducts=currentCountProducts();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
   const search=document.getElementById('inv-search').value.toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
   updateInventoryFilterSummary();
@@ -952,12 +995,12 @@ function renderInvRows(skipCapture=false){
   const groups={};prods.forEach(p=>{const k=p.category+'|||'+(p.subcategory||'Other');if(!groups[k])groups[k]={cat:p.category,sub:p.subcategory||'Other',items:[]};groups[k].items.push(p);});
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!expandedInventorySections.has(sectionToken);
     const filledCount=g.items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
-    html+=`<section class="inv-count-section ${collapsed?'collapsed':''}">
+    html+=`<section class="inv-count-section ${collapsed?'collapsed':''}" data-section-token="${sectionToken}">
       <button class="inv-section-header" type="button" aria-expanded="${!collapsed}" onclick="toggleInventorySection('${sectionToken}')">
         <span class="inv-section-title">${catBadge(g.cat)} <span>${escapeHtml(g.sub)}</span></span>
         <span class="inv-section-summary"><span class="inv-section-summary-count">${filledCount}/${g.items.length}</span><span class="inv-section-chevron" aria-hidden="true">⌄</span></span>
@@ -966,7 +1009,11 @@ function renderInvRows(skipCapture=false){
     </section>`;
   });
   else html=prods.map(renderProduct).join('');
-  document.getElementById('inv-rows').innerHTML=html;updateInvProgress();
+  document.getElementById('inv-rows').innerHTML=html;
+  const renderedInputs=invQtyInputs();
+  renderedInputs.forEach(input=>input.setAttribute('enterkeyhint','next'));
+  renderedInputs.at(-1)?.setAttribute('enterkeyhint','done');
+  updateInvProgress();
 }
 function toggleInventorySection(sectionToken){
   if(expandedInventorySections.has(sectionToken))expandedInventorySections.delete(sectionToken);
@@ -1068,12 +1115,12 @@ function renderInventoryTable(){
   const tbody=document.getElementById('inv-tbody');
   if(!rows.length){
     const emptyState=showArchivedInventories
-      ?`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">🗄️</span><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
-      :`<div class="table-empty-state"><span class="table-empty-icon" aria-hidden="true">📋</span><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
+      ?`<div class="table-empty-state"><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
+      :`<div class="table-empty-state"><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
     tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;
     return;
   }
-  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span style="color:var(--success)">✓</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="viewInventory('${inv.id}')">View</button>${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
+  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.draft?'<div style="margin-top:4px;"><span class="missing-pill">Draft</span></div>':''}${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="viewInventory('${inv.id}')">View</button>${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
 }
 function inventoryMenuHtml(inv,menuId){
   return`<div class="drop-wrap inventory-actions">
@@ -1093,32 +1140,72 @@ function archiveInventory(id,archived=true){
   inv.archived=archived;save();renderInventoryTable();refreshLiveInventoryIfVisible();toast(archived?'Count archived.':'Count restored.');
 }
 function viewInventory(id){
-  viewInvId=id;viewInvTab='all';const inv=state.inventories.find(i=>i.id===id);normalizeInventoryRooms(inv);
+  viewInvId=id;viewInvTab='all';viewInvExpandedProductId=null;const inv=state.inventories.find(i=>i.id===id);normalizeInventoryRooms(inv);
   document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
+  document.getElementById('view-inv-search').value='';
   renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
 }
-function editViewedInventory(){const id=viewInvId;if(!id)return;closeModal('modal-view-inv');openInventoryModal(id);}
+function editViewedInventory(){const id=viewInvId;if(!id)return;const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openInventoryModal(id);if(selectedRoom)switchInventoryRoom(selectedRoom);}
 function renderViewInvTabs(inv){
-  const tabs=document.getElementById('view-inv-tabs');
-  const tabButton=(id,label)=>`<button type="button" class="tab ${viewInvTab===id?'active':''}" onclick="switchViewInvTab('${id}')" aria-pressed="${viewInvTab===id?'true':'false'}">${label}</button>`;
-  tabs.innerHTML=tabButton('all','Merged Total')+tabButton('missing','Not Counted')+
-    inv.rooms.map(room=>tabButton(room.id,escapeHtml(room.name))).join('');
+  const select=document.getElementById('view-inv-select');
+  select.innerHTML=`<option value="all">Merged Total</option><option value="missing">Not Counted</option>${inv.rooms.map(room=>`<option value="${room.id}">${escapeHtml(room.name)}</option>`).join('')}`;
+  select.value=viewInvTab;
 }
-function switchViewInvTab(tab){viewInvTab=tab;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
+function switchViewInvTab(tab){viewInvTab=tab;viewInvExpandedProductId=null;const inv=state.inventories.find(i=>i.id===viewInvId);if(inv)renderViewInvTabs(inv);renderViewInvTable();}
 function roomQtyBreakdown(inv,productId){
   return inv.rooms.map(room=>({name:room.name,qty:room.items?.[productId]}))
     .filter(item=>item.qty!==undefined&&item.qty!==null&&item.qty!=='')
     .map(item=>`${escapeHtml(item.name)} ${liveQty(item.qty)}`)
     .join(' · ');
 }
+function toggleViewInvProduct(productId){
+  viewInvExpandedProductId=viewInvExpandedProductId===productId?null:productId;
+  renderViewInvTable();
+}
+function viewInvItemDetailHtml(inv,product){
+  const roomFields=inv.rooms.map(room=>{
+    const value=room.items?.[product.id];
+    return`<label class="view-inv-room-field"><span>${escapeHtml(room.name)}</span><input type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" autocomplete="off" data-view-room-id="${room.id}" value="${value===undefined||value===null?'':value}" placeholder="Not counted"></label>`;
+  }).join('');
+  return`<div class="view-inv-item-detail" data-view-product-id="${product.id}" onclick="event.stopPropagation()"><div class="view-inv-room-grid">${roomFields}</div><button class="btn btn-primary" type="button" onclick="saveViewedInventoryItem('${product.id}',this)">Save Item</button></div>`;
+}
+function saveViewedInventoryItem(productId,button){
+  const inv=state.inventories.find(item=>item.id===viewInvId);if(!inv)return;
+  const detail=button?.closest('.view-inv-item-detail');if(!detail)return;
+  detail.querySelectorAll('[data-view-room-id]').forEach(input=>{
+    const room=inv.rooms.find(item=>item.id===input.dataset.viewRoomId);if(!room)return;
+    const value=input.value.trim();
+    if(value==='')delete room.items[productId];
+    else{const quantity=parseFloat(value);if(!isNaN(quantity)&&quantity>=0)room.items[productId]=quantity;}
+  });
+  inv.items=mergeInventoryRoomItems(inv.rooms);
+  inv.draft=!Object.keys(inv.items).length;
+  save();renderInventoryTable();refreshLiveInventoryIfVisible();renderViewInvTable();toast('Item count updated.');
+}
 function renderViewInvTable(){
   const inv=state.inventories.find(i=>i.id===viewInvId);if(!inv)return;normalizeInventoryRooms(inv);
   const selectedRoom=inv.rooms.find(r=>r.id===viewInvTab)||null;
   const source=viewInvTab==='all'||viewInvTab==='missing'?inv.items:(selectedRoom?.items||{});
-  let total=0,rows='';
-  if(viewInvTab==='missing'){const expected=expectedInventoryProductIds(inv);const mp=state.products.filter(p=>expected.has(p.id)&&source[p.id]===undefined);rows=mp.map(p=>`<tr style="color:var(--danger)"><td>${productNameLink(p)}</td><td>${catBadge(p.category)}</td><td>${subBadge(p.subcategory)}</td><td>—</td><td>${p.unit}</td><td>${p.par||'—'}</td><td>—</td><td>—</td></tr>`).join('')||`<tr><td colspan="8" style="color:var(--text-muted);text-align:center">All counted!</td></tr>`;}
-  else{rows=Object.entries(source).map(([pid,qty])=>{const p=getProduct(pid);if(!p)return'';const val=p.cost*qty;total+=val;const breakdown=viewInvTab==='all'?roomQtyBreakdown(inv,pid):'';return`<tr><td>${productNameLink(p)}</td><td>${catBadge(p.category)}</td><td>${subBadge(p.subcategory)}</td><td><strong>${liveQty(qty)}</strong>${breakdown?`<div style="color:var(--text-muted);font-size:0.7rem;margin-top:3px;">${breakdown}</div>`:''}</td><td>${p.unit}</td><td>${p.par||'—'}</td><td>${p.cost>0?fmt(p.cost):'—'}</td><td><strong>${fmt(val)}</strong></td></tr>`;}).join('');}
-  document.getElementById('view-inv-tbody').innerHTML=rows||`<tr><td colspan="8" style="color:var(--text-muted)">No items.</td></tr>`;
+  const search=(document.getElementById('view-inv-search')?.value||'').trim().toLowerCase();
+  let products;
+  if(viewInvTab==='missing'){
+    const expected=expectedInventoryProductIds(inv);
+    products=state.products.filter(product=>expected.has(product.id)&&source[product.id]===undefined);
+  }else products=Object.keys(source).map(getProduct).filter(Boolean);
+  products=products.filter(product=>!search||[product.name,product.category,product.subcategory,product.aliases].some(value=>String(value||'').toLowerCase().includes(search))).sort((a,b)=>a.name.localeCompare(b.name));
+  let total=0;
+  const desktopRows=products.map(product=>{
+    const qty=source[product.id];const counted=qty!==undefined&&qty!==null&&qty!=='';const val=counted?product.cost*qty:0;total+=val;
+    const expanded=viewInvExpandedProductId===product.id;
+    return`<tr class="view-inv-item-row" onclick="toggleViewInvProduct('${product.id}')"><td>${productNameLink(product)}</td><td>${catBadge(product.category)}</td><td>${subBadge(product.subcategory)}</td><td><strong>${counted?liveQty(qty):'—'}</strong></td><td>${product.unit}</td><td>${product.par||'—'}</td><td>${counted&&product.cost>0?fmt(product.cost):'—'}</td><td><strong>${counted?fmt(val):'—'}</strong></td></tr>${expanded?`<tr class="view-inv-detail-row"><td colspan="8">${viewInvItemDetailHtml(inv,product)}</td></tr>`:''}`;
+  }).join('');
+  const mobileCards=products.map(product=>{
+    const qty=source[product.id];const counted=qty!==undefined&&qty!==null&&qty!=='';const expanded=viewInvExpandedProductId===product.id;
+    return`<article class="view-inv-item-card ${expanded?'expanded':''}"><button type="button" onclick="toggleViewInvProduct('${product.id}')" aria-expanded="${expanded}"><span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.category)}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''} · ${escapeHtml(product.unit)}</small></span><span class="view-inv-item-qty"><strong>${counted?liveQty(qty):'—'}</strong><small>${viewInvTab==='all'?'total':'counted'}</small></span></button>${expanded?viewInvItemDetailHtml(inv,product):''}</article>`;
+  }).join('');
+  const emptyText=viewInvTab==='missing'&&!search?'All items were counted.':search?'No matching items.':'No items.';
+  document.getElementById('view-inv-tbody').innerHTML=desktopRows||`<tr><td colspan="8" style="color:var(--text-muted);text-align:center">${emptyText}</td></tr>`;
+  document.getElementById('view-inv-list').innerHTML=mobileCards||`<p class="empty-cell">${emptyText}</p>`;
   document.getElementById('view-inv-total').textContent=viewInvTab!=='missing'?`Total: ${fmt(total)}`:'';
 }
 function deleteInventory(id){closeAllMenus();if(!confirm('Delete?'))return;state.inventories=state.inventories.filter(i=>i.id!==id);save();closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}

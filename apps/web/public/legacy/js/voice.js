@@ -71,6 +71,29 @@ function preferredAudioMime(){
   return options.find(type=>window.MediaRecorder&&MediaRecorder.isTypeSupported(type))||'';
 }
 
+function browserSpeechRecognition(){
+  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
+}
+
+function reviewVoiceTranscript(transcript){
+  const cleaned=String(transcript||'').trim();
+  if(!cleaned){
+    resetVoiceState();
+    toast('Nothing heard.',true);
+    return;
+  }
+  voiceFinal=cleaned;
+  voicePendingTranscript=cleaned;
+  voiceReviewPending=true;
+  recognition=null;
+  voiceRecorder=null;
+  setVoiceButtons(null);
+  setVoiceModal(cleaned);
+  document.getElementById('voice-ctx-label').textContent='Review Transcription';
+  document.getElementById('voice-hint').textContent='Check the text, then apply it or cancel.';
+  setVoiceActionState('review');
+}
+
 async function toggleVoice(ctx){
   if(voiceActive){
     stopVoice();
@@ -86,6 +109,46 @@ async function toggleVoice(ctx){
 }
 
 async function startVoice(){
+  const Recognition=browserSpeechRecognition();
+  if(Recognition){
+    try{
+      recognition=new Recognition();
+      recognition.continuous=true;
+      recognition.interimResults=true;
+      recognition.lang='en-CA';
+      recognition.onresult=event=>{
+        let interim='';
+        for(let index=event.resultIndex;index<event.results.length;index++){
+          const phrase=event.results[index][0]?.transcript||'';
+          if(event.results[index].isFinal)voiceFinal+=(voiceFinal?' ':'')+phrase.trim();
+          else interim+=phrase;
+        }
+        voiceInterim=interim.trim();
+        setVoiceModal([voiceFinal,voiceInterim].filter(Boolean).join(' ')||'Listening...');
+      };
+      recognition.onerror=event=>{
+        const permissionError=event.error==='not-allowed'||event.error==='service-not-allowed';
+        const message=permissionError?'Microphone permission is required for voice.':'Voice recognition stopped. Try again.';
+        resetVoiceState();
+        toast(message,true);
+      };
+      recognition.onend=()=>{
+        const transcript=[voiceFinal,voiceInterim].filter(Boolean).join(' ').trim();
+        recognition=null;
+        voiceActive=false;
+        reviewVoiceTranscript(transcript);
+      };
+      voiceStartedAt=Date.now();
+      voiceActive=true;
+      setVoiceButtons(voiceContext);
+      setVoiceModal('Listening... Click Stop & Review when finished.');
+      setVoiceActionState('recording');
+      recognition.start();
+      return;
+    }catch(error){
+      recognition=null;
+    }
+  }
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
     toast('Voice recording needs a browser with microphone recording support.',true);
     return;
@@ -125,6 +188,14 @@ function stopVoice(){
   setVoiceButtons(null);
   setVoiceModal('Transcribing...');
   setVoiceActionState('transcribing');
+  if(recognition){
+    try{recognition.stop();}catch(error){
+      const transcript=[voiceFinal,voiceInterim].filter(Boolean).join(' ').trim();
+      recognition=null;
+      reviewVoiceTranscript(transcript);
+    }
+    return;
+  }
   if(voiceRecorder&&voiceRecorder.state!=='inactive'){
     voiceRecorder.stop();
   }else{
@@ -187,14 +258,7 @@ async function transcribeVoiceRecording(){
       toast('No speech detected.',true);
       return;
     }
-    voicePendingTranscript=transcript;
-    voiceReviewPending=true;
-    voiceRecorder=null;
-    setVoiceButtons(null);
-    setVoiceModal(transcript);
-    document.getElementById('voice-ctx-label').textContent='Review Transcription';
-    document.getElementById('voice-hint').textContent='Check the text, then apply it or cancel.';
-    setVoiceActionState('review');
+    reviewVoiceTranscript(transcript);
   }catch(error){
     resetVoiceState();
     toast(error.message||'Voice transcription failed.',true);
@@ -306,5 +370,5 @@ function voiceProductMatch(query,products){
 }
 function fuzzyMatch(query,products){const q=normStr(query);if(!q)return null;for(const p of products){const aliases=(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean);if(aliases.includes(q))return{product:p,score:1};}for(const p of products){if(normStr(p.name)===q)return{product:p,score:1};}let best=null,bestScore=0;for(const p of products){const allNames=[normStr(p.name),...(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean)];for(const name of allNames){if(name.includes(q)||q.includes(name)){const score=Math.min(q.length,name.length)/Math.max(q.length,name.length);if(score>bestScore){bestScore=score;best=p;}}const qw=q.split(' ').filter(w=>w.length>1),nw=name.split(' ').filter(w=>w.length>1);let ov=0;for(const w of qw){if(nw.some(n=>n===w||n.startsWith(w)||w.startsWith(n)))ov++;}if(qw.length>0){const s2=ov/Math.max(qw.length,nw.length);if(s2>bestScore){bestScore=s2;best=p;}}}}return bestScore>=0.25?{product:best,score:bestScore}:null;}
 function applyVoiceProducts(parsed){let m=0;const updated=new Set(),um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r){r.product.par=qty;updated.add(r.product.id);m++;}else um.push(nameStr);});if(m){save();renderProducts();document.querySelectorAll('#prod-tbody tr[data-id]').forEach(row=>{if(updated.has(row.dataset.id)){row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});toast(`Voice: ${m} par level${m>1?'s':''} updated.`);}if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
-function applyVoiceInventory(parsed){let m=0;const um=[],amb=[];parsed.forEach(({nameStr,qty})=>{const r=voiceProductMatch(nameStr,state.products);if(r&&!r.ambiguous){liveInvCounts[r.product.id]=qty;const el=document.getElementById('invq-'+r.product.id);if(el){el.value=qty;const row=document.getElementById('row-'+r.product.id);if(row){const dot=row.querySelector('.missing-dot,.filled-dot');if(dot)dot.className='filled-dot';row.className='inv-count-row filled-row';row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');row.scrollIntoView({behavior:'smooth',block:'center'});}}m++;}else if(r?.ambiguous)amb.push(`${nameStr} (${r.candidates.map(candidate=>candidate.product.name).join(' / ')})`);else um.push(nameStr);});updateInvProgress();if(m)toast(`Voice: ${m} count${m>1?'s':''} filled.`);if(amb.length)setTimeout(()=>toast('Ambiguous: '+amb.join(', '),true),700);else if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
+function applyVoiceInventory(parsed){let m=0;const um=[],amb=[],updated=[];const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;parsed.forEach(({nameStr,qty})=>{const r=voiceProductMatch(nameStr,products);if(r&&!r.ambiguous){liveInvCounts[r.product.id]=qty;updated.push(r.product.id);m++;}else if(r?.ambiguous)amb.push(`${nameStr} (${r.candidates.map(candidate=>candidate.product.name).join(' / ')})`);else um.push(nameStr);});if(m){renderInvRows(true);updated.forEach(productId=>{const row=document.getElementById('row-'+productId);if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});toast(`Voice: ${m} count${m>1?'s':''} filled.`);}else updateInvProgress();if(amb.length)setTimeout(()=>toast('Ambiguous: '+amb.join(', '),true),700);else if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
 function applyVoiceOrders(parsed){const lines=[];const um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r)lines.push({productId:r.product.id,productName:r.product.name,productNumber:r.product.sku||r.product.id,sku:r.product.sku||'',qty,unit:r.product.unit||'',unitSize:'',unitPrice:r.product.cost||0,deposit:0});else um.push(nameStr);});if(!lines.length){toast('No products matched.',true);return;}resetOrderModal();editingOrderId=null;document.getElementById('ord-modal-title').textContent='New Voice Invoice';document.getElementById('om-date').value=today();document.getElementById('om-invoice').value='Voice Invoice - '+new Date().toLocaleDateString('en-CA');document.getElementById('om-status').value='Draft';document.getElementById('om-notes').value=um.length?'Unmatched: '+um.join(', '):'';document.getElementById('order-lines').innerHTML='';lines.forEach(l=>addOrderLine(l));updateOrderTotal();openModal('modal-order');toast(`Voice: ${lines.length} line${lines.length>1?'s':''} added.`);if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),800);}

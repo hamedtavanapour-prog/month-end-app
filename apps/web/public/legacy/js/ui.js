@@ -1,7 +1,8 @@
 // ui.js — generic UI: dropdown menus, column pickers, page navigation, modals.
 // (Classic script sharing global scope; load order defined in index.html.)
 
-const THEME_STORAGE_KEY='keg_bar_theme';
+const THEME_STORAGE_KEY='keg_bar_theme_v2';
+const APP_THEMES=['slate','graphite','paper','hospitality','hospitality-light'];
 const SIDEBAR_STORAGE_KEY='keg_bar_sidebar_collapsed';
 const PROFILE_STORAGE_KEY='keg_bar_current_profile';
 const APP_ACCESS_OPTIONS=[
@@ -18,27 +19,38 @@ const APP_ACCESS_OPTIONS=[
 ];
 const MANAGER_DEFAULT_ACCESS=['dashboard','live-inventory','inventory','orders','usage','reports'];
 
+// Number fields are text-entry controls. Scrolling or arrow keys must not adjust values.
+document.addEventListener('wheel',event=>{
+  const input=event.target?.closest?.('input[type="number"]');
+  if(input&&document.activeElement===input)input.blur();
+},{capture:true,passive:true});
+document.addEventListener('keydown',event=>{
+  if((event.key==='ArrowUp'||event.key==='ArrowDown')&&event.target?.matches?.('input[type="number"]'))event.preventDefault();
+},true);
+
 function setTheme(theme){
-  const nextTheme=theme==='light'?'light':'dark';
+  const nextTheme=APP_THEMES.includes(theme)?theme:'slate';
   document.documentElement.dataset.theme=nextTheme;
   try{localStorage.setItem(THEME_STORAGE_KEY,nextTheme);}catch(e){}
   updateThemeToggle(nextTheme);
 }
 
-function updateThemeToggle(theme=document.documentElement.dataset.theme||'dark'){
-  const isLight=theme==='light';
-  document.getElementById('theme-dark-btn')?.classList.toggle('active',!isLight);
-  document.getElementById('theme-light-btn')?.classList.toggle('active',isLight);
+function updateThemeToggle(theme=document.documentElement.dataset.theme||'slate'){
+  document.querySelectorAll('[data-theme-choice]').forEach(card=>{
+    const active=card.dataset.themeChoice===theme;
+    card.classList.toggle('active',active);
+    card.setAttribute('aria-pressed',String(active));
+  });
 }
 
 function toggleTheme(){
-  const current=document.documentElement.dataset.theme||'dark';
-  setTheme(current==='light'?'dark':'light');
+  const current=document.documentElement.dataset.theme||'slate';
+  setTheme(current==='graphite'?'slate':'graphite');
 }
 
 function initTheme(){
-  let saved='dark';
-  try{saved=localStorage.getItem(THEME_STORAGE_KEY)||'dark';}catch(e){}
+  let saved='slate';
+  try{saved=localStorage.getItem(THEME_STORAGE_KEY)||'slate';}catch(e){}
   setTheme(saved);
 }
 
@@ -421,12 +433,37 @@ function renderSettings(){
   if(typeof renderDepartmentSettings==='function')renderDepartmentSettings();
   if(typeof renderProductMenuSettings==='function')renderProductMenuSettings();
   renderProfileSettings();
+  renderGeneralSettings();
   updateThemeToggle();
   const profile=currentProfile();
   const avatar=document.getElementById('settings-profile-avatar');
   if(avatar)avatar.textContent=profileInitials(profile);
   const title=document.getElementById('settings-profile-title');
   if(title)title.textContent=profile?.name||'Manager';
+}
+
+function renderGeneralSettings(){
+  const setText=(id,value)=>{const element=document.getElementById(id);if(element)element.textContent=String(value);};
+  const profile=currentProfile();
+  const organization=window.serverAccessContext?.organization;
+  const activeUsers=(state.profiles||[]).filter(item=>!item.archived).length;
+  const departments=typeof activeDepartments==='function'?activeDepartments().length:(state.departments||[]).filter(item=>!item.archived).length;
+  const rooms=typeof activeFloorPlanRooms==='function'?activeFloorPlanRooms().length:(state.rooms||[]).filter(item=>!item.archived).length;
+  const products=(state.products||[]).filter(item=>!item.archived).length;
+  const counts=(state.inventories||[]).filter(item=>!item.archived).length;
+  const version=document.querySelector('meta[name="app-version"]')?.content||'1.0.0';
+  setText('general-organization-name',organization?.name||'Month\'s End');
+  setText('general-workspace-summary',`${departments} department${departments===1?'':'s'} · ${rooms} counting room${rooms===1?'':'s'}`);
+  setText('general-user-count',activeUsers||1);
+  setText('general-department-count',departments);
+  setText('general-room-count',rooms);
+  setText('general-product-count',products);
+  setText('general-current-user',profile?.name||'Workspace member');
+  setText('general-current-role',profile?.role||'Workspace member');
+  setText('general-count-total',counts);
+  setText('general-app-version',version);
+  const status=document.getElementById('general-sync-status');
+  if(status)status.lastChild.textContent=cloudReady?'Cloud connected':'Local fallback';
 }
 
 function renderAccessControlledNav(){
@@ -502,8 +539,27 @@ function mobileNavGroupForPage(page){
   return'home';
 }
 
+function resetMobileNavTrigger(group){
+  const trigger=document.getElementById(`mobile-nav-${group}`);if(!trigger)return;
+  if(!trigger.dataset.defaultIcon)trigger.dataset.defaultIcon=trigger.querySelector('.mobile-nav-icon')?.innerHTML||'';
+  const defaults={actions:'Actions',more:'More'};
+  const icon=trigger.querySelector('.mobile-nav-icon');const label=trigger.querySelector(':scope > span:last-child');
+  if(icon)icon.innerHTML=trigger.dataset.defaultIcon;
+  if(label)label.textContent=defaults[group];
+}
+function setMobileNavTriggerPage(group,page){
+  const trigger=document.getElementById(`mobile-nav-${group}`);
+  const source=document.querySelector(`#mobile-${group}-menu [data-mobile-page="${page}"]`);
+  if(!trigger||!source)return;
+  const icon=trigger.querySelector('.mobile-nav-icon');const label=trigger.querySelector(':scope > span:last-child');
+  if(icon)icon.innerHTML=source.querySelector(':scope > span:first-child')?.innerHTML||icon.innerHTML;
+  if(label)label.textContent=source.querySelector('strong')?.textContent||label.textContent;
+}
+
 function updateMobileNavigation(page){
   const group=mobileNavGroupForPage(page);
+  resetMobileNavTrigger('actions');resetMobileNavTrigger('more');
+  if(group==='actions'||group==='more')setMobileNavTriggerPage(group,page);
   document.querySelectorAll('.mobile-nav-item').forEach(item=>{
     const active=item.id===`mobile-nav-${group}`;
     item.classList.toggle('active',active);

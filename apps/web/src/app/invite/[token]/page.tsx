@@ -40,7 +40,7 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
     <main className="login-page invite-page">
       <InviteSessionBridge />
       <section className="login-story" aria-label="Keg Bar invitation">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">🍺</span><span>Keg Bar</span></div>
+        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">ME</span><span>Keg Bar</span></div>
         <div className="story-copy"><p className="eyebrow">Team invitation</p><h1>You’re joining one shared operation.</h1><p>Your work will be saved under your own account, with access limited to the departments and actions assigned to you.</p></div>
         <p className="story-footnote">Individual login · Department access · Activity history</p>
       </section>
