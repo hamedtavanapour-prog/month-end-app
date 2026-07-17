@@ -2,6 +2,7 @@
 
 let productUnitEditorSnapshot=null;
 let productUnitEditorSaving=false;
+let mobileExpandedProductId=null;
 
 const PRODUCT_MENU_DEFINITIONS={
   products:{label:'Inventory Products',description:'Items assigned to this department'},
@@ -118,9 +119,11 @@ function ensureCurrentDepartmentView(){
 
 function renderProductDepartmentTabs(){
   const tabs=document.getElementById('product-department-tabs');
-  if(!tabs)return;
   ensureCurrentDepartmentView();
-  tabs.innerHTML=activeDepartments().map(department=>`<button type="button" class="${department.id===productDepartmentView?'active':''}" data-product-department="${department.id}" onclick="setProductDepartmentView('${department.id}')">${escapeHtml(department.name)}</button>`).join('');
+  const departments=activeDepartments();
+  if(tabs)tabs.innerHTML=departments.map(department=>`<button type="button" class="${department.id===productDepartmentView?'active':''}" data-product-department="${department.id}" onclick="setProductDepartmentView('${department.id}')">${escapeHtml(department.name)}</button>`).join('');
+  const select=document.getElementById('product-department-select');
+  if(select){select.innerHTML=departments.map(department=>`<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join('');select.value=productDepartmentView;}
 }
 
 function renderProductCatalogMenu(){
@@ -142,6 +145,11 @@ function renderProductCatalogMenu(){
     </div>
     <button class="catalog-nav ${productCatalogView==='import-backlog'?'active':''}" data-catalog-view="import-backlog" type="button" onclick="setProductCatalogView('import-backlog')"><span>Import Backlog</span><strong id="catalog-count-import-backlog">0</strong></button>
     <button class="catalog-nav ${productCatalogView==='archived'?'active':''}" data-catalog-view="archived" type="button" onclick="setProductCatalogView('archived')"><span>Archived</span><strong id="catalog-count-archived">0</strong></button>`;
+  const select=document.getElementById('product-catalog-select');
+  if(select){
+    select.innerHTML=`<option value="products">Inventory</option><optgroup label="Menus">${activeMenus.map(menu=>`<option value="menu:${escapeHtml(menu.id)}">${escapeHtml(menu.name)}</option>`).join('')}</optgroup><option value="import-backlog">Import Backlog</option><option value="archived">Archived</option>`;
+    select.value=productCatalogView;
+  }
 }
 
 function toggleProductCatalogMenu(){
@@ -161,6 +169,7 @@ function setProductDepartmentView(department){
   if(!getDepartment(department)||getDepartment(department).archived)return;
   productDepartmentView=department;
   productCatalogView='products';
+  mobileExpandedProductId=null;
   selectedProds.clear();
   const categoryFilter=document.getElementById('prod-cat-f');
   if(categoryFilter)categoryFilter.value='';
@@ -179,11 +188,26 @@ function setProductDepartmentView(department){
 
 function setProductCatalogView(view){
   productCatalogView=view;
+  mobileExpandedProductId=null;
   if(view.startsWith('menu:'))productCatalogMenuExpanded=true;
   selectedProds.clear();
   document.querySelectorAll('.catalog-nav[data-catalog-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===view));
   document.getElementById('prod-sel-bar')?.classList.remove('show');
   renderProducts();
+}
+
+function openProductFilterSheet(){document.getElementById('product-filter-sheet')?.classList.add('open');}
+function closeProductFilterSheet(){document.getElementById('product-filter-sheet')?.classList.remove('open');}
+function setProductSort(value){const[col='name',dir='asc']=String(value||'name:asc').split(':');sortState.products={col,dir};renderProducts();}
+function updateProductFilterSummary(){
+  const summary=document.getElementById('product-filter-summary');if(!summary)return;
+  const cat=document.getElementById('prod-cat-f')?.value||'';
+  const sub=document.getElementById('prod-sub-f')?.value||'';
+  const status=document.getElementById('prod-status-f')?.value||'active';
+  const sortValue=`${sortState.products.col}:${sortState.products.dir}`;
+  const sort=document.getElementById('prod-sort-f');if(sort)sort.value=sortValue;
+  const active=[cat,sub,status!=='active'?status:'',sortValue!=='name:asc'?sortValue:''].filter(Boolean).length;
+  summary.textContent=active?`${active} active`:'Default';
 }
 
 function updateCatalogCounts(){
@@ -553,6 +577,34 @@ function openProductView(id){
   openModal('modal-product-view');
 }
 
+function toggleMobileProductDetails(id){
+  mobileExpandedProductId=mobileExpandedProductId===id?null:id;
+  closeAllMenus();
+  renderProducts();
+}
+function mobileProductCardHtml(product){
+  const expanded=mobileExpandedProductId===product.id;
+  const suppliers=productSuppliersHtml(product)||'—';
+  const lastCount=product.lastCount!==null&&product.lastCount!==undefined?product.lastCount:'—';
+  return`<article class="product-mobile-card ${expanded?'expanded':''} ${product.archived?'archived-row':''}">
+    <button class="product-mobile-card-head" type="button" aria-expanded="${expanded}" onclick="toggleMobileProductDetails('${product.id}')"><strong>${escapeHtml(product.name)}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+    ${expanded?`<div class="product-mobile-details">
+      <div><span>Inventory name</span><strong>${escapeHtml(product.inventoryName||product.name||'—')}</strong></div>
+      <div><span>Category</span><strong>${escapeHtml(product.category||'—')}</strong></div>
+      <div><span>Subcategory</span><strong>${escapeHtml(product.subcategory||'—')}</strong></div>
+      <div><span>Packaging</span><strong>${escapeHtml(product.unit||'—')}</strong></div>
+      <div><span>Packaging cost</span><strong>${product.cost>0?fmt(product.cost):'—'}</strong></div>
+      <div><span>Par</span><strong>${product.par||'—'}</strong></div>
+      <div><span>Last count</span><strong>${lastCount}</strong></div>
+      <div><span>SKU / code</span><strong>${escapeHtml(product.sku||'—')}</strong></div>
+      <div class="product-mobile-wide"><span>Alternate names</span><strong>${escapeHtml(product.aliases||'—')}</strong></div>
+      <div class="product-mobile-wide"><span>Suppliers</span><strong>${suppliers}</strong></div>
+      <div class="product-mobile-wide"><span>Notes</span><strong>${escapeHtml(product.notes||'—')}</strong></div>
+      <div class="product-mobile-actions" onclick="event.stopPropagation()">${productMenuHtml(product,`product-mobile-actions-${product.id}`)}</div>
+    </div>`:''}
+  </article>`;
+}
+
 function renderProducts(){
   ensureCurrentDepartmentView();
   renderProductDepartmentTabs();
@@ -563,6 +615,12 @@ function renderProducts(){
   if(help)help.textContent=`Items assigned to ${title}. Shared items may also appear in other departments.`;
   renderProductCatalogMenu();
   updateCatalogCounts();
+  updateProductFilterSummary();
+  const catalogCard=document.querySelector('#page-products .catalog-card');
+  const mobileList=document.getElementById('product-mobile-list');
+  const mobileCardMode=productCatalogView==='products';
+  catalogCard?.classList.toggle('product-mobile-card-mode',mobileCardMode);
+  if(mobileList)mobileList.innerHTML='';
   document.querySelectorAll('.catalog-nav[data-catalog-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===productCatalogView));
   document.querySelectorAll('[data-product-department]').forEach(button=>button.classList.toggle('active',button.dataset.productDepartment===productDepartmentView));
   if(productCatalogView==='import-backlog')return renderImportBacklogCatalog();
@@ -603,7 +661,9 @@ function renderProducts(){
     }else{
       emptyState=`<div class="table-empty-state"><strong>Add your first ${escapeHtml(title)} product</strong><p>Products hold the names, packaging, cost, and supplier details used across inventory.</p><button class="btn btn-primary" type="button" onclick="openProductModal()">＋ Add ${escapeHtml(title)} product</button></div>`;
     }
-    tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;syncHeaderCb();return;
+    tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;
+    if(mobileList)mobileList.innerHTML=emptyState;
+    syncHeaderCb();return;
   }
   tbody.innerHTML=list.map(p=>{
     const low=p.par>0&&p.lastCount!==null&&p.lastCount<=p.par;
@@ -627,6 +687,7 @@ function renderProducts(){
       default:return`<td>—</td>`;
     }}).join('')}</tr>`;
   }).join('');
+  if(mobileList)mobileList.innerHTML=list.map(mobileProductCardHtml).join('');
   syncHeaderCb();
 }
 
@@ -656,6 +717,7 @@ function resetProductFilters(shouldRender=true){
   document.getElementById('prod-cat-f').value='';
   document.getElementById('prod-sub-f').innerHTML='<option value="">All</option>';
   document.getElementById('prod-status-f').value='active';
+  sortState.products={col:'name',dir:'asc'};
   if(shouldRender)renderProducts();
 }
 function showArchivedProductFilter(){

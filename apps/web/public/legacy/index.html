@@ -130,6 +130,7 @@
       <span id="product-department-help">Products, packaging, and suppliers by department</span>
     </div>
     <div class="segmented-control product-department-tabs" id="product-department-tabs" aria-label="Choose product department"></div>
+    <label class="product-department-mobile" for="product-department-select"><select id="product-department-select" aria-label="Department" onchange="setProductDepartmentView(this.value)"></select></label>
   </div>
   <div class="sel-bar" id="prod-sel-bar">
     <span class="sel-count" id="prod-sel-count">0 selected</span>
@@ -137,21 +138,30 @@
     <button class="btn btn-secondary btn-sm" onclick="prodClearSel()">Clear</button>
     <button class="btn btn-danger btn-sm" onclick="prodDeleteSelected()"> Delete Selected</button>
   </div>
-  <div class="card" style="margin-bottom:14px;">
-    <div class="form-row">
-      <div class="form-group" style="flex:2;min-width:130px;"><label>Search</label><input type="text" id="prod-search" placeholder="System, inventory, alternate, or supplier…" oninput="renderProducts()"></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Category</label>
-        <select id="prod-cat-f" onchange="updateSubcatFilter('prod-sub-f','prod-cat-f');renderProducts()">
-          <option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option>
-        </select>
+  <div class="card product-filter-card" style="margin-bottom:14px;">
+    <div class="form-row product-filter-row">
+      <div class="form-group product-search-field" style="flex:2;min-width:130px;"><label for="prod-search">Search</label><input type="search" id="prod-search" placeholder="Search products…" oninput="renderProducts()"></div>
+      <button class="btn btn-secondary product-filter-trigger mobile-only" type="button" onclick="openProductFilterSheet()"><span>Sort &amp; Filter</span><small id="product-filter-summary">Default</small></button>
+      <div class="product-filter-sheet" id="product-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="product-filter-title">
+        <div class="product-filter-sheet-head mobile-only"><div><span>Product options</span><h4 id="product-filter-title">Sort &amp; Filter</h4></div><button type="button" aria-label="Close product filters" onclick="closeProductFilterSheet()">&times;</button></div>
+        <div class="product-filter-fields">
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-cat-f">Category</label>
+            <select id="prod-cat-f" onchange="updateSubcatFilter('prod-sub-f','prod-cat-f');renderProducts()">
+              <option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-sub-f">Subcategory</label><select id="prod-sub-f" onchange="renderProducts()"><option value="">All</option></select></div>
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-status-f">Status</label><select id="prod-status-f" onchange="renderProducts()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div>
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-sort-f">Sort</label><select id="prod-sort-f" onchange="setProductSort(this.value)"><option value="name:asc">Name A–Z</option><option value="name:desc">Name Z–A</option><option value="category:asc">Category</option><option value="cost:asc">Cost low to high</option><option value="cost:desc">Cost high to low</option><option value="par:desc">Highest par</option><option value="lastCount:desc">Latest count quantity</option></select></div>
+        </div>
+        <button class="btn btn-primary product-filter-done mobile-only" type="button" onclick="closeProductFilterSheet()">Done</button>
       </div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Subcategory</label><select id="prod-sub-f" onchange="renderProducts()"><option value="">All</option></select></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Status</label><select id="prod-status-f" onchange="renderProducts()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div>
     </div>
   </div>
   <div class="catalog-layout">
+    <label class="product-catalog-mobile" for="product-catalog-select"><select id="product-catalog-select" aria-label="Product view" onchange="setProductCatalogView(this.value)"></select></label>
     <aside class="catalog-sidebar" id="product-catalog-sidebar"></aside>
-    <div class="card catalog-card"><div class="table-wrap"><table><thead id="prod-thead"><tr></tr></thead><tbody id="prod-tbody"></tbody></table></div></div>
+    <div class="card catalog-card"><div class="table-wrap product-table-wrap"><table><thead id="prod-thead"><tr></tr></thead><tbody id="prod-tbody"></tbody></table></div><div class="product-mobile-list" id="product-mobile-list"></div></div>
   </div>
 </div>
 

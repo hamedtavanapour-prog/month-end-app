@@ -1132,18 +1132,18 @@ function renderInventoryTable(){
 function mobileInventoryCardHtml(inv,index){
   const expanded=mobileExpandedInventoryId===inv.id;
   const label=inv.label||'Inventory Count';
-  return`<article class="inventory-mobile-card ${expanded?'expanded':''} ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')" role="button" tabindex="0" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();viewInventory('${inv.id}')}" aria-label="View ${escapeHtml(label)} from ${fmtDate(inv.date)}">
+  return`<article class="inventory-mobile-card ${expanded?'expanded':''} ${inv.archived?'archived-row':''}" onclick="toggleMobileInventoryDetails('${inv.id}')" role="button" tabindex="0" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();toggleMobileInventoryDetails('${inv.id}')}" aria-label="${expanded?'Hide':'Show'} details for ${escapeHtml(label)} from ${fmtDate(inv.date)}" aria-expanded="${expanded}">
     <div class="inventory-mobile-card-head">
       <div class="inventory-mobile-card-title"><strong>${escapeHtml(label)}</strong><time datetime="${inv.date}">${fmtDate(inv.date)}</time></div>
-      <button class="inventory-mobile-expand" type="button" aria-label="${expanded?'Hide':'Show'} count details" aria-expanded="${expanded}" onclick="event.stopPropagation();toggleMobileInventoryDetails('${inv.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+      <span class="inventory-mobile-expand" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
     </div>
     ${expanded?`<div class="inventory-mobile-details">
-      <div><span>Rooms counted</span><strong>${inv.roomsCount}</strong></div>
-      <div><span>Items counted</span><strong>${inv.counted}</strong></div>
-      <div><span>Items missing</span><strong class="${inv.missing?'danger-text':''}">${inv.missing}</strong></div>
-      <div><span>Total value</span><strong>${fmt(inv.value)}</strong></div>
+      <div class="inventory-mobile-detail-row"><span>Rooms counted</span><strong>${inv.roomsCount}</strong></div>
+      <div class="inventory-mobile-detail-row"><span>Items counted</span><strong>${inv.counted}</strong></div>
+      <div class="inventory-mobile-detail-row"><span>Items missing</span><strong class="${inv.missing?'danger-text':''}">${inv.missing}</strong></div>
+      <div class="inventory-mobile-detail-row"><span>Total value</span><strong>${fmt(inv.value)}</strong></div>
       ${inv.draft?'<span class="inventory-mobile-status">Draft</span>':''}${inv.archived?'<span class="inventory-mobile-status">Archived</span>':''}
-      <div class="inventory-mobile-card-actions" onclick="event.stopPropagation()">${inventoryMenuHtml(inv,`inventory-mobile-menu-${index}`)}</div>
+      <div class="inventory-mobile-card-actions" onclick="event.stopPropagation()"><button class="btn btn-secondary inventory-mobile-view-more" type="button" onclick="event.stopPropagation();viewInventory('${inv.id}')">View More</button>${inventoryMenuHtml(inv,`inventory-mobile-menu-${index}`)}</div>
     </div>`:''}
   </article>`;
 }
