@@ -36,7 +36,7 @@
     window.currentProfile=()=>profile;
     window.profileCanAccessPage=(_profile,page)=>allowedPage(page);
     window.profileCanManageProfiles=()=>Boolean(access.canManageUsers);
-    window.openCurrentProfileSettings=()=>{if(access.canManageUsers&&typeof setSettingsSection==='function'){showPage('settings');setSettingsSection('profiles');}};
+    window.openCurrentProfileSettings=()=>{if(access.canManageUsers&&typeof setSettingsSection==='function'){closeAllMenus();if(typeof dismissSidebarHoverMenu==='function')dismissSidebarHoverMenu(document.querySelector('.profile-menu-wrap'));showPage('settings');setSettingsSection('profiles');}};
     window.logoutProfile=async()=>{
       try{await fetch('/api/sign-out',{method:'POST',credentials:'include'});}catch(e){}
       window.top.location.href='/login';

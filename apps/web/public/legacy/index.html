@@ -477,7 +477,12 @@
   <button class="modal-close" type="button" aria-label="Close category editor" onclick="closeModal('modal-category-editor')">&times;</button>
   <h3 id="category-editor-title">Edit Category</h3>
   <div class="form-group"><label for="category-editor-name">Category name</label><input type="text" id="category-editor-name" maxlength="60"></div>
-  <div class="form-group"><label for="category-editor-subcategories">Subcategories</label><textarea id="category-editor-subcategories" rows="9" placeholder="One subcategory per line"></textarea><small class="field-help">Enter one per line. These appear when editing a product.</small></div>
+  <div class="form-group category-subcategory-editor">
+    <label for="category-editor-subcategory-input">Subcategories</label>
+    <div class="category-subcategory-entry"><input type="text" id="category-editor-subcategory-input" maxlength="80" placeholder="e.g. Vodka" onkeydown="if(event.key==='Enter'){event.preventDefault();addInventoryCategorySubcategory()}"><button class="btn btn-secondary" type="button" onclick="addInventoryCategorySubcategory()">＋ Add</button></div>
+    <div class="category-subcategory-list" id="category-editor-subcategory-list" aria-live="polite"></div>
+    <small class="field-help">Add one at a time, or paste several separated by commas. Select × to remove an entry.</small>
+  </div>
   <div class="modal-actions category-editor-actions"><button class="btn btn-ghost-danger" id="category-editor-delete" type="button" onclick="deleteInventoryCategory()">Delete Category</button><span></span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-category-editor')">Cancel</button><button class="btn btn-primary" type="button" onclick="saveInventoryCategory()">Save Category</button></div>
 </div>
 </div>

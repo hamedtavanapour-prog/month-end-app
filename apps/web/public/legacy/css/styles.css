@@ -51,7 +51,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .profile-summary strong{font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .profile-summary small,.profile-menu small,.profile-row-main small{color:var(--text-muted);font-size:0.7rem;}
 .profile-menu{display:none;position:absolute;left:0;bottom:calc(100% + 8px);width:210px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px var(--shadow);overflow:hidden;z-index:800;}
-.profile-menu.open,.profile-menu-wrap:hover .profile-menu,.profile-menu-wrap:focus-within .profile-menu{display:block;}
+.profile-menu.open,.profile-menu-wrap:not(.flyout-dismissed):hover .profile-menu,.profile-menu-wrap:not(.flyout-dismissed):focus-within .profile-menu{display:block;}
 .profile-menu-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;}
 .profile-menu button{display:block;width:100%;padding:10px 14px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer;font-size:0.84rem;}
 .profile-menu button:hover{background:var(--surface2);color:var(--accent);}
@@ -150,7 +150,14 @@ body.sidebar-collapsed .profile-menu{left:58px;bottom:0;}
 .room-product-search-result small{color:var(--text-muted);font-size:.67rem;}
 .room-product-search-result em{font-style:normal;color:var(--accent);font-size:.7rem;font-weight:800;}
 .room-editor-actions,.category-editor-actions{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;}
-.category-editor-modal textarea{width:100%;resize:vertical;}
+.category-subcategory-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;}
+.category-subcategory-entry>.btn{min-width:86px;justify-content:center;}
+.category-subcategory-list{display:flex;min-height:50px;align-content:flex-start;align-items:flex-start;gap:7px;flex-wrap:wrap;border:1px solid var(--border);border-radius:11px;background:var(--surface2);padding:9px;}
+.category-subcategory-list:empty::before{content:'No subcategories yet';align-self:center;color:var(--text-muted);font-size:.75rem;}
+.category-subcategory-chip{display:inline-flex;align-items:center;gap:7px;max-width:100%;border:1px solid rgba(var(--accent-rgb),.24);border-radius:999px;background:rgba(var(--accent-rgb),.1);color:var(--text);padding:6px 7px 6px 10px;font-size:.75rem;font-weight:700;}
+.category-subcategory-chip>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.category-subcategory-chip>button{display:grid;width:22px;height:22px;flex:0 0 22px;place-items:center;border:0;border-radius:50%;background:rgba(var(--accent-rgb),.14);color:var(--text-muted);cursor:pointer;font:inherit;line-height:1;}
+.category-subcategory-chip>button:hover,.category-subcategory-chip>button:focus-visible{outline:none;background:rgba(var(--accent-rgb),.24);color:var(--text);}
 @media(max-width:600px){
   .settings-section-head-row{flex-direction:column;}
   .settings-section-head-row>.btn{width:100%;justify-content:center;}
@@ -162,6 +169,8 @@ body.sidebar-collapsed .profile-menu{left:58px;bottom:0;}
   .room-editor-actions>span,.category-editor-actions>span{display:none;}
   .room-editor-actions>.btn,.category-editor-actions>.btn{width:100%;justify-content:center;}
   .room-editor-actions>.btn-ghost-danger,.category-editor-actions>.btn-ghost-danger{grid-column:1/-1;grid-row:2;}
+  .category-subcategory-entry{grid-template-columns:1fr;}
+  .category-subcategory-entry>.btn{width:100%;}
   .category-settings-row{align-items:flex-start;}
   .category-settings-row em{white-space:normal;text-align:right;}
 }
@@ -1202,8 +1211,8 @@ body.sidebar-collapsed .profile-avatar{width:34px;height:34px;}
     transform-origin:left bottom;
     transition:opacity .16s ease,transform .2s cubic-bezier(.2,.8,.2,1),visibility 0s linear .2s;
   }
-  body.sidebar-collapsed .sidebar-settings-wrap:hover .sidebar-settings-flyout,
-  body.sidebar-collapsed .sidebar-settings-wrap:focus-within .sidebar-settings-flyout{
+  body.sidebar-collapsed .sidebar-settings-wrap:not(.flyout-dismissed):hover .sidebar-settings-flyout,
+  body.sidebar-collapsed .sidebar-settings-wrap:not(.flyout-dismissed):focus-within .sidebar-settings-flyout{
     opacity:1;
     visibility:visible;
     pointer-events:auto;

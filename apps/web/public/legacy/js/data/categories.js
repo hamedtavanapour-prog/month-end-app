@@ -14,6 +14,7 @@ const DEFAULT_INVENTORY_CATEGORIES={
 };
 
 let SUBCATS=JSON.parse(JSON.stringify(DEFAULT_INVENTORY_CATEGORIES));
+let categoryEditorSubcategories=[];
 
 function wineCategoryForSubcategory(subcategory=''){
   const value=String(subcategory||'').trim();
@@ -28,7 +29,8 @@ function normalizeInventoryCategories(){
     state.inventoryCategories=JSON.parse(JSON.stringify(DEFAULT_INVENTORY_CATEGORIES));
     changed=true;
   }
-  if(state.inventoryCategories.Wine){delete state.inventoryCategories.Wine;changed=true;}
+  const hadLegacyWineCategory=Object.prototype.hasOwnProperty.call(state.inventoryCategories,'Wine');
+  if(hadLegacyWineCategory){delete state.inventoryCategories.Wine;changed=true;}
   Object.entries(state.inventoryCategories).forEach(([name,subcategories])=>{
     const cleanName=String(name||'').trim();
     const cleanSubs=[...new Set((Array.isArray(subcategories)?subcategories:[]).map(item=>String(item||'').trim()).filter(Boolean))];
@@ -36,9 +38,11 @@ function normalizeInventoryCategories(){
     if(cleanName!==name){delete state.inventoryCategories[name];state.inventoryCategories[cleanName]=cleanSubs;changed=true;return;}
     if(JSON.stringify(cleanSubs)!==JSON.stringify(subcategories)){state.inventoryCategories[name]=cleanSubs;changed=true;}
   });
-  ['Reds','Whites','Rosé & Bubbles'].forEach(name=>{
-    if(!state.inventoryCategories[name]){state.inventoryCategories[name]=[...DEFAULT_INVENTORY_CATEGORIES[name]];changed=true;}
-  });
+  if(hadLegacyWineCategory){
+    ['Reds','Whites','Rosé & Bubbles'].forEach(name=>{
+      if(!state.inventoryCategories[name]){state.inventoryCategories[name]=[...DEFAULT_INVENTORY_CATEGORIES[name]];changed=true;}
+    });
+  }
   (state.products||[]).forEach(product=>{
     if(product.category!=='Wine')return;
     product.category=wineCategoryForSubcategory(product.subcategory);
@@ -96,18 +100,45 @@ function renderInventoryCategorySettings(){
 
 function openInventoryCategoryEditor(name=''){
   editingInventoryCategoryName=name;
+  categoryEditorSubcategories=[...(SUBCATS[name]||[])];
   document.getElementById('category-editor-title').textContent=name?'Edit Category':'Add Category';
   document.getElementById('category-editor-name').value=name;
-  document.getElementById('category-editor-subcategories').value=(SUBCATS[name]||[]).join('\n');
+  const subcategoryInput=document.getElementById('category-editor-subcategory-input');
+  if(subcategoryInput)subcategoryInput.value='';
+  renderInventoryCategorySubcategoryEditor();
   const remove=document.getElementById('category-editor-delete');
   if(remove)remove.hidden=!name;
   openModal('modal-category-editor');
   setTimeout(()=>document.getElementById('category-editor-name')?.focus(),30);
 }
 
+function renderInventoryCategorySubcategoryEditor(){
+  const list=document.getElementById('category-editor-subcategory-list');if(!list)return;
+  list.innerHTML=categoryEditorSubcategories.map((subcategory,index)=>`<span class="category-subcategory-chip"><span>${escapeHtml(subcategory)}</span><button type="button" aria-label="Remove ${escapeHtml(subcategory)}" title="Remove" onclick="removeInventoryCategorySubcategory(${index})">×</button></span>`).join('');
+}
+
+function addInventoryCategorySubcategory(shouldFocus=true){
+  const input=document.getElementById('category-editor-subcategory-input');if(!input)return;
+  const additions=String(input.value||'').split(/[\n,]/).map(item=>item.trim()).filter(Boolean);
+  additions.forEach(addition=>{
+    if(!categoryEditorSubcategories.some(existing=>existing.toLowerCase()===addition.toLowerCase()))categoryEditorSubcategories.push(addition);
+  });
+  input.value='';
+  renderInventoryCategorySubcategoryEditor();
+  if(shouldFocus)input.focus();
+}
+
+function removeInventoryCategorySubcategory(index){
+  if(!Number.isInteger(index)||index<0||index>=categoryEditorSubcategories.length)return;
+  categoryEditorSubcategories.splice(index,1);
+  renderInventoryCategorySubcategoryEditor();
+  document.getElementById('category-editor-subcategory-input')?.focus();
+}
+
 function saveInventoryCategory(){
   const name=(document.getElementById('category-editor-name')?.value||'').trim();
-  const subcategories=[...new Set((document.getElementById('category-editor-subcategories')?.value||'').split(/[\n,]/).map(item=>item.trim()).filter(Boolean))];
+  if((document.getElementById('category-editor-subcategory-input')?.value||'').trim())addInventoryCategorySubcategory(false);
+  const subcategories=[...categoryEditorSubcategories];
   if(!name){toast('Enter a category name.',true);return;}
   const duplicate=inventoryCategoryNames().some(existing=>existing!==editingInventoryCategoryName&&existing.toLowerCase()===name.toLowerCase());
   if(duplicate){toast('That category already exists.',true);return;}

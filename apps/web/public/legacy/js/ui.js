@@ -204,22 +204,38 @@ function toggleMenu(id){
 }
 function toggleProfileMenu(){toggleMenu('profile-menu');}
 let profileMenuCloseTimer=null;
+function dismissSidebarHoverMenu(target){
+  const element=target instanceof Element?target:null;
+  const wrap=element?.matches('.sidebar-settings-wrap,.profile-menu-wrap')?element:element?.closest('.sidebar-settings-wrap,.profile-menu-wrap');
+  if(!wrap)return;
+  wrap.classList.add('flyout-dismissed');
+  wrap.querySelector('.profile-menu')?.classList.remove('open');
+  if(document.activeElement instanceof HTMLElement&&wrap.contains(document.activeElement))document.activeElement.blur();
+}
+function initSidebarSettingsFlyoutDismissal(){
+  const wrap=document.querySelector('.sidebar-settings-wrap');if(!wrap)return;
+  wrap.addEventListener('mouseleave',()=>wrap.classList.remove('flyout-dismissed'));
+  wrap.querySelectorAll('#nav-settings,[data-sidebar-settings-key]').forEach(button=>button.addEventListener('click',()=>dismissSidebarHoverMenu(button)));
+}
 function initProfileMenuHover(){
   const wrap=document.querySelector('.profile-menu-wrap');
   const menu=document.getElementById('profile-menu');
   if(!wrap||!menu)return;
   wrap.addEventListener('mouseenter',()=>{
     clearTimeout(profileMenuCloseTimer);
-    menu.classList.add('open');
+    if(!wrap.classList.contains('flyout-dismissed'))menu.classList.add('open');
   });
   wrap.addEventListener('mouseleave',()=>{
     clearTimeout(profileMenuCloseTimer);
+    wrap.classList.remove('flyout-dismissed');
     profileMenuCloseTimer=setTimeout(()=>menu.classList.remove('open'),250);
   });
 }
+initSidebarSettingsFlyoutDismissal();
 initProfileMenuHover();
 function openCurrentProfileSettings(){
   closeAllMenus();
+  dismissSidebarHoverMenu(document.querySelector('.profile-menu-wrap'));
   showPage('settings',{profileOnly:true});
   setSettingsSection('profiles');
 }
