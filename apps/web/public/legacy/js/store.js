@@ -9,6 +9,7 @@ function compactUsageRow(row){
     unitSize:row.unitSize||'',
     qty:row.qty??'',
     actualUsage:row.actualUsage??'',
+    idealUsage:row.idealUsage??'',
     begin:row.begin??'',
     end:row.end??'',
     purch:row.purch??'',
@@ -91,7 +92,8 @@ function compactStateForStorage(){
     inventoryEntryTemplate:state.inventoryEntryTemplate||null,
     importBacklog:state.importBacklog||[],
     departments:state.departments||[],
-    productMenus:state.productMenus||null
+    productMenus:state.productMenus||null,
+    inventoryCategories:state.inventoryCategories||null
   };
 }
 
@@ -294,6 +296,8 @@ function normalizeLoadedState(){
     if(s.archived===undefined)s.archived=false;
     if(!Array.isArray(s.products))s.products=[];
   });
+  const productsChanged=ensureProductCatalog();
+  const inventoryCategoriesChanged=typeof normalizeInventoryCategories==='function'?normalizeInventoryCategories():false;
   let inventoriesChanged=false;
   state.inventories.forEach(inv=>{
     if(typeof normalizeInventoryRooms==='function'){
@@ -308,13 +312,12 @@ function normalizeLoadedState(){
   let profilesChanged=false;
   if(typeof normalizeProfiles==='function')profilesChanged=normalizeProfiles();
   const departmentAssignmentsChanged=typeof ensureDepartmentAssignments==='function'?ensureDepartmentAssignments():false;
-  const productsChanged=ensureProductCatalog();
   const suppliersChanged=ensureSupplierCatalog();
   const drinksChanged=ensureDrinkCatalog();
   const productMenusChanged=typeof ensureProductMenuSettings==='function'?ensureProductMenuSettings():false;
   const menusChanged=typeof ensureMenuLibrary==='function'?ensureMenuLibrary():false;
   syncAllSupplierProductLinks();
-  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
+  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
 }
 
 function load(){

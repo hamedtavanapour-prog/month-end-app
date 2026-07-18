@@ -60,6 +60,7 @@
       const allowed=allowedPage(page);
       item.classList.toggle('access-disabled',!allowed);
       item.style.display=allowed?'flex':'none';
+      if(page==='settings')item.closest('.sidebar-settings-wrap').hidden=!allowed;
     });
 
     document.querySelectorAll('[data-settings-key="profiles"]').forEach(button=>{

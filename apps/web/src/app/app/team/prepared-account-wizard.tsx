@@ -122,7 +122,7 @@ export function PreparedAccountWizard({
   if (!open) {
     return (
       <section className="access-card invite-access-card prepared-account-card add-user-launch-card">
-        <button className="add-user-launch" type="button" onClick={() => { setTemporaryPassword(randomPassword()); setOpen(true); }}>
+        <button className="add-user-launch" type="button" onClick={() => { setTemporaryPassword(randomPassword()); setOpen(true); window.parent?.postMessage({ type: "month-end-team-focus" }, window.location.origin); }}>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></span>
           <strong>Add a user</strong>
           <small>Create their account and assign access.</small>
@@ -132,9 +132,10 @@ export function PreparedAccountWizard({
   }
 
   return (
-    <section className="access-card invite-access-card prepared-account-card account-wizard-card">
+    <div className="account-wizard-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeWizard(); }}>
+    <section className="access-card invite-access-card prepared-account-card account-wizard-card" role="dialog" aria-modal="true" aria-labelledby="account-wizard-title">
       <div className="account-wizard-heading">
-        <div><p>Step {step} of 2</p><h2>{step === 1 ? "Account details" : "Access and permissions"}</h2></div>
+        <div><p>Step {step} of 2</p><h2 id="account-wizard-title">{step === 1 ? "Account details" : "Access and permissions"}</h2></div>
         <button type="button" onClick={closeWizard} aria-label="Close user setup">×</button>
       </div>
       <div className="account-wizard-progress" aria-hidden="true"><span style={{ width: step === 1 ? "50%" : "100%" }} /></div>
@@ -191,5 +192,6 @@ export function PreparedAccountWizard({
         </div>
       </form>
     </section>
+    </div>
   );
 }

@@ -261,6 +261,7 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
         <h3 id="supplier-view-title">${escapeHtml(supplier.name)}${supplier.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta"><span class="sup-tag">${products.length} products</span>${supplier.leadDays?`<span class="sub-badge">${supplier.leadDays} lead days</span>`:''}${matchedProduct?`<span class="sub-badge">Showing ${escapeHtml(matchedProduct.name)}</span>`:''}</div>
       </div>
+      <div class="detail-heading-actions"><button class="icon-btn" type="button" aria-label="Edit supplier" title="Edit supplier" onclick="openSupplierModal('${supplier.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Supplier actions" title="Supplier actions" onclick="event.stopPropagation();toggleMenu('supplier-view-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="supplier-view-actions-menu"><button onclick="closeAllMenus();archiveSupplier('${supplier.id}',${supplier.archived?'false':'true'})">${supplier.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteSupplier('${supplier.id}')">Delete</button></div></div><button class="detail-close" type="button" aria-label="Close supplier detail" title="Close" onclick="closeModal('modal-supplier-view')">&times;</button></div>
     </div>
     <div class="product-detail-grid">
       <div class="product-detail-field"><div class="label">Contact</div><div class="value">${escapeHtml(supplier.contact||'—')}</div></div>
@@ -273,11 +274,6 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
     <div class="product-view-section"><div class="label">Linked Products</div>
       <div class="form-group supplier-view-search"><label>Search Products</label><input type="text" id="supplier-view-product-search" placeholder="Find a linked product…" oninput="renderSupplierViewProducts()"></div>
       <div class="table-wrap supplier-products-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Unit</th><th>Par</th></tr></thead><tbody id="supplier-view-products-tbody">${supplierViewProductRows(supplier)}</tbody></table></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="openSupplierModal('${supplier.id}')">Edit</button>
-      <button class="btn btn-secondary" onclick="archiveSupplier('${supplier.id}',${supplier.archived?'false':'true'})">${supplier.archived?'Restore':'Archive'}</button>
-      <button class="btn btn-ghost-danger" onclick="deleteSupplier('${supplier.id}')">Delete</button>
     </div>
   `;
   openModal('modal-supplier-view');

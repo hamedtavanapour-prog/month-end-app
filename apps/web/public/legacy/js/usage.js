@@ -3,8 +3,9 @@
 const USAGE_COLUMN_PATTERNS={
   product:[/^product$/,/^productname$/,/^item$/,/^itemname$/,/^description$/,/^desc$/,/^name$/,/product.*description/,/item.*description/],
   sku:[/^sku$/,/^code$/,/^sku.*code$/,/^product.*#$/,/^product.*number$/,/^item.*#$/,/^item.*number$/],
-  size:[/^size$/,/^unit.*size$/,/^bottle.*size$/,/^pkg.*size$/,/^package.*size$/],
+  size:[/^size$/,/^unit$/,/^unit.*size$/,/^bottle.*size$/,/^pkg.*size$/,/^package.*size$/],
   actualUsage:[/^actual.*usage$/,/^usage$/,/^used$/,/^qty.*used$/,/^quantity.*used$/,/^actual$/,/^actual.*used$/],
+  idealUsage:[/^ideal.*usage$/,/^ideal$/,/^ideal.*used$/],
   begin:[/^begin$/,/^beginning$/,/^start.*inventory$/,/^begin.*inventory$/,/^opening$/,/^opening.*inventory$/],
   end:[/^end$/,/^ending$/,/^end.*inventory$/,/^ending.*inventory$/,/^closing$/,/^closing.*inventory$/,/^finish$/,/^finished$/],
   purch:[/^purch$/,/^purchase$/,/^purchases$/,/^purchased$/,/^qty.*purch/,/^quantity.*purch/,/^received$/],
@@ -162,6 +163,23 @@ function usageColumnMap(headers){
   },{});
 }
 
+function labelGroupedUsageHeaders(rows){
+  return rows.map(row=>{
+    const cleaned=row.map(cleanUsageHeader);
+    const usageColumns=cleaned.reduce((indices,header,index)=>{
+      if(header==='usage')indices.push(index);
+      return indices;
+    },[]);
+    const isFoodtrakUsageHeader=cleaned.includes('name')&&cleaned.includes('unit')&&cleaned.includes('begin')&&cleaned.includes('purch')&&cleaned.includes('end')&&usageColumns.length>=3;
+    if(!isFoodtrakUsageHeader)return row;
+    const labelled=[...row];
+    labelled[usageColumns[0]]='Actual Usage';
+    labelled[usageColumns[1]]='Ideal Usage';
+    labelled[usageColumns[2]]='Variance Usage';
+    return labelled;
+  });
+}
+
 function inferUsagePeriod(rows,headerIndex){
   const headerRange=usageReportPeriodFromHeader(rows,headerIndex);
   if(headerRange.start||headerRange.end)return headerRange;
@@ -280,6 +298,7 @@ function parseUsageReportRows(rows,fileName){
     if(!productName&&!sku)return;
 
     const actual=usageNumber(usageCell(row,col.actualUsage));
+    const ideal=usageNumber(usageCell(row,col.idealUsage));
     const begin=usageNumber(usageCell(row,col.begin));
     const end=usageNumber(usageCell(row,col.end));
     const purch=usageNumber(usageCell(row,col.purch));
@@ -300,6 +319,7 @@ function parseUsageReportRows(rows,fileName){
       unitSize:unitSize||match?.unit?.unitSize||match?.unit?.unit||match?.product?.unit||'',
       qty,
       actualUsage:actual,
+      idealUsage:ideal,
       begin,
       end,
       purch,
@@ -333,6 +353,7 @@ function completeUsageRowsForProducts(rows,fileName,periodStart='',periodEnd='')
       unitSize:unit.unitSize||unit.unit||product.unit||'',
       qty:0,
       actualUsage:0,
+      idealUsage:'',
       begin:'',
       end:'',
       purch:'',
@@ -784,6 +805,7 @@ function usageLogPeriod(log){
 
 function createUsageLog(fileName,rows,sourceFile=null){
   const period=usageLogPeriod({rows});
+  const profile=typeof currentProfile==='function'?currentProfile():null;
   const log={
     id:uid(),
     fileName,
@@ -791,6 +813,7 @@ function createUsageLog(fileName,rows,sourceFile=null){
     periodStart:period.start,
     periodEnd:period.end,
     createdAt:new Date().toISOString(),
+    createdBy:profile?{id:profile.id||'',name:profile.name||'',email:profile.email||''}:null,
     archived:false,
     rows
   };
@@ -846,10 +869,11 @@ function inferFoodtrakUsageCategory(row){
   if(group==='Entree'||group==='Not Applicable')return{category:'Food',subcategory:'Other Food'};
   if(group==='Misc'||group==='Supplies Non Inv')return{category:'Supplies',subcategory:subgroup==='Inventoried Supplies'?'Smallwares':'Other Supplies'};
   if(group==='Wine'){
-    if(nameInferred.category==='Wine')return nameInferred;
-    if(/champagne|sparkling/i.test(subgroup))return{category:'Wine',subcategory:'Bubbles'};
-    if(/white|rose/i.test(subgroup))return{category:'Wine',subcategory:'Other Whites'};
-    return{category:'Wine',subcategory:'Other Reds'};
+    if(['Reds','Whites','Rosé & Bubbles'].includes(nameInferred.category))return nameInferred;
+    if(/champagne|sparkling/i.test(subgroup))return{category:'Rosé & Bubbles',subcategory:'Bubbles'};
+    if(/rose|rosé/i.test(subgroup))return{category:'Rosé & Bubbles',subcategory:'Rosé'};
+    if(/white/i.test(subgroup))return{category:'Whites',subcategory:'Other Whites'};
+    return{category:'Reds',subcategory:'Other Reds'};
   }
   if(group==='Beer'){
     if(nameInferred.category==='Cider')return nameInferred;
@@ -1113,10 +1137,12 @@ function parseUsagePdfTextRows(rows,fileName){
     const nums=usageNumbersInText(numericText);
     if(nums.length<1)return;
 
+    const isFoodtrakRow=nums.length>=13;
     const actual=nums[0];
-    const begin=nums.length>1?nums[1]:'';
-    const end=nums.length>2?nums[2]:'';
-    const purch=nums.length>3?nums[3]:'';
+    const ideal=isFoodtrakRow?nums[2]:'';
+    const begin=isFoodtrakRow?nums[7]:(nums.length>1?nums[1]:'');
+    const purch=isFoodtrakRow?nums[8]:(nums.length>3?nums[3]:'');
+    const end=isFoodtrakRow?nums[12]:(nums.length>2?nums[2]:'');
     const periodStart=headerPeriod.start||lineDates[0]||inferredDates[0]||'';
     const periodEnd=headerPeriod.end||lineDates[1]||inferredDates[1]||inferredDates[0]||'';
 
@@ -1128,6 +1154,7 @@ function parseUsagePdfTextRows(rows,fileName){
       unitSize:match.unit?.unitSize||match.unit?.unit||match.product.unit||'',
       qty:actual,
       actualUsage:actual,
+      idealUsage:ideal,
       begin,
       end,
       purch,
@@ -1199,7 +1226,7 @@ async function readUsagePdfRows(arrayBuffer){
     pageRows.forEach(row=>textLines.push(row.join(' ')));
   }
 
-  const normalized=normalizePdfRows(rows);
+  const normalized=labelGroupedUsageHeaders(normalizePdfRows(rows));
   if(normalized.some(row=>usageColumnScore(row)>0))return normalized;
   const fallback=pdfTextFallbackRows(textLines.join('\n'));
   if(fallback.length)return fallback;
@@ -1351,7 +1378,7 @@ function inferInventoryTemplateCategory(name,unit,section){
     else if(/rose|rosé/.test(text))subcategory='Rosé';
     else if(/shiraz|syrah/.test(text))subcategory='Syrah / Shiraz';
     else if(/cabernet|merlot/.test(text))subcategory='Cabernet & Blends';
-    return{category:'Wine',subcategory};
+    return{category:typeof wineCategoryForSubcategory==='function'?wineCategoryForSubcategory(subcategory):'Reds',subcategory};
   }
   return{category:'Other',subcategory:'Misc'};
 }
@@ -1361,7 +1388,7 @@ function inventoryTemplateUnitDescriptor(rawUnit,category='Other'){
   const lower=raw.toLowerCase();
   const direct=/^(can|bottle|keg|each|piece|lb|kg|doz|serv|por|recipe|skewer)$/i.test(raw);
   let unit=direct?lower:'unit';
-  if(!direct&&['Spirits','Liqueurs','Wine'].includes(category))unit='bottle';
+  if(!direct&&['Spirits','Liqueurs','Reds','Whites','Rosé & Bubbles'].includes(category))unit='bottle';
   else if(!direct&&['Beer','Cider'].includes(category))unit=/kg|\bl\b|lt/i.test(lower)?'keg':'bottle';
   else if(!direct&&/^cs\//i.test(lower))unit='case';
   return{unit,unitSize:direct?'':raw,sku:'',cost:0,par:0};
@@ -1564,6 +1591,7 @@ function openUsageLogView(id,edit=false){
   selectedUsageLogId=id;
   usageLogEditMode=!!edit;
   const log=selectedUsageLog();
+  usageLogEditSnapshot=edit&&log?JSON.parse(JSON.stringify(log)):null;
   state.uploadedUsage=log?.rows||[];
   const source=document.getElementById('usage-source');
   if(source)source.value='uploaded';
@@ -1591,13 +1619,15 @@ function renderUsageLogs(){
   const status=document.getElementById('usage-log-status-f')?.value||'active';
   const visibleLogs=logs.filter(log=>status==='all'||(status==='archived'?!!log.archived:!log.archived));
   if(!visibleLogs.length){
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No usage logs yet.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No usage logs yet.</td></tr>';
     return;
   }
   tbody.innerHTML=[...visibleLogs].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map((log,index)=>{
     const period=usageLogPeriod(log);
     const matched=usageLogRows(log).filter(row=>row.matched&&row.productId);
     const total=matched.reduce((sum,row)=>sum+usageRowQty(row),0);
+    const idealValues=matched.map(row=>usageNumber(row.idealUsage)).filter(value=>value!=='');
+    const idealTotal=idealValues.reduce((sum,value)=>sum+value,0);
     const classes=['usage-log-row'];
     const menuId=`usage-log-actions-${index}`;
     if(log.id===selectedUsageLogId)classes.push('row-selected');
@@ -1607,6 +1637,8 @@ function renderUsageLogs(){
       <td>${escapeHtml(log.fileName||'Usage upload')}</td>
       <td>${matched.length}</td>
       <td>${total.toFixed(2)}</td>
+      <td>${idealValues.length?idealTotal.toFixed(2):'—'}</td>
+      <td>${escapeHtml(log.createdBy?.name||'Unknown')}</td>
       <td>${log.createdAt?new Date(log.createdAt).toLocaleString():'—'}</td>
       <td onclick="event.stopPropagation();">
         <div class="drop-wrap">
@@ -1641,6 +1673,10 @@ function renderUploadedUsageDetails(){
   const start=log.periodStart||period.start||'';
   const end=log.periodEnd||period.end||'';
   const totalUsage=rows.reduce((sum,row)=>sum+usageRowQty(row),0);
+  const idealValues=rows.map(row=>usageNumber(row.idealUsage)).filter(value=>value!=='');
+  const totalIdealUsage=idealValues.reduce((sum,value)=>sum+value,0);
+  const creatorName=log.createdBy?.name||'Unknown (older log)';
+  const creatorDetail=log.createdBy?.email?`${creatorName} · ${log.createdBy.email}`:creatorName;
   header.classList.toggle('pinned',usageLogHeaderPinned);
   document.getElementById('usage-detail-title').textContent=log.fileName||'Usage Log';
   periodFields.innerHTML=usageLogEditMode?`
@@ -1649,6 +1685,8 @@ function renderUploadedUsageDetails(){
       <div class="form-group"><label>End Date</label><input type="date" id="usage-log-end" value="${escapeHtml(end)}" onchange="saveUsageLogEdits()"></div>
       <div class="invoice-detail-field"><div class="label">Products</div><div class="value">${rows.length}</div></div>
       <div class="invoice-detail-field"><div class="label">Total Usage</div><div class="value">${totalUsage.toFixed(2)}</div></div>
+      <div class="invoice-detail-field"><div class="label">Total Ideal Usage</div><div class="value">${idealValues.length?totalIdealUsage.toFixed(2):'—'}</div></div>
+      <div class="invoice-detail-field"><div class="label">Created By</div><div class="value">${escapeHtml(creatorDetail)}</div></div>
       <div class="invoice-detail-field"><div class="label">Imported</div><div class="value">${log.createdAt?new Date(log.createdAt).toLocaleString():'—'}</div></div>
     </div>
   `:`
@@ -1657,17 +1695,20 @@ function renderUploadedUsageDetails(){
       <div class="invoice-detail-field"><div class="label">End Date</div><div class="value">${end||'—'}</div></div>
       <div class="invoice-detail-field"><div class="label">Products</div><div class="value">${rows.length}</div></div>
       <div class="invoice-detail-field"><div class="label">Total Usage</div><div class="value">${totalUsage.toFixed(2)}</div></div>
+      <div class="invoice-detail-field"><div class="label">Total Ideal Usage</div><div class="value">${idealValues.length?totalIdealUsage.toFixed(2):'—'}</div></div>
+      <div class="invoice-detail-field"><div class="label">Created By</div><div class="value">${escapeHtml(creatorDetail)}</div></div>
       <div class="invoice-detail-field"><div class="label">Imported</div><div class="value">${log.createdAt?new Date(log.createdAt).toLocaleString():'—'}</div></div>
     </div>
   `;
   thead.innerHTML=usageLogEditMode
-    ?'<tr><th>Product</th><th>Unit / Size</th><th>Actual Usage</th><th>Begin</th><th>End</th><th>Purch</th><th>Match</th><th></th></tr>'
-    :'<tr><th>Product</th><th>Unit / Size</th><th>Actual Usage</th><th>Begin</th><th>End</th><th>Purch</th><th>Match</th></tr>';
+    ?'<tr><th>Product</th><th>Unit / Size</th><th>Actual Usage</th><th>Ideal Usage</th><th>Begin</th><th>End</th><th>Purch</th><th>Match</th><th></th></tr>'
+    :'<tr><th>Product</th><th>Unit / Size</th><th>Actual Usage</th><th>Ideal Usage</th><th>Begin</th><th>End</th><th>Purch</th><th>Match</th></tr>';
   tbody.innerHTML=rows.map((row,index)=>usageLogEditMode?`
     <tr data-usage-search="${escapeHtml(usageLogRowSearchText(row))}">
       <td><select data-usage-index="${index}" data-field="productId" onchange="saveUsageLogEdits()">${usageProductOptions(row.productId)}</select></td>
       <td><input type="text" data-usage-index="${index}" data-field="unitSize" value="${escapeHtml(row.unitSize||'')}" oninput="saveUsageLogEdits()"></td>
       <td><input type="number" step="0.01" data-usage-index="${index}" data-field="actualUsage" value="${row.actualUsage!==''?escapeHtml(row.actualUsage):''}" oninput="saveUsageLogEdits()"></td>
+      <td><input type="number" step="0.01" data-usage-index="${index}" data-field="idealUsage" value="${row.idealUsage!==''&&row.idealUsage!==undefined?escapeHtml(row.idealUsage):''}" oninput="saveUsageLogEdits()"></td>
       <td><input type="number" step="0.01" data-usage-index="${index}" data-field="begin" value="${row.begin!==''?escapeHtml(row.begin):''}" oninput="saveUsageLogEdits()"></td>
       <td><input type="number" step="0.01" data-usage-index="${index}" data-field="end" value="${row.end!==''?escapeHtml(row.end):''}" oninput="saveUsageLogEdits()"></td>
       <td><input type="number" step="0.01" data-usage-index="${index}" data-field="purch" value="${row.purch!==''?escapeHtml(row.purch):''}" oninput="saveUsageLogEdits()"></td>
@@ -1679,25 +1720,22 @@ function renderUploadedUsageDetails(){
       <td><strong>${row.productId?productNameLink(row.productId):escapeHtml(row.matchedName||row.productName||'—')}</strong></td>
       <td>${escapeHtml(row.unitSize||'—')}</td>
       <td>${usageDisplayNumber(row.actualUsage)}</td>
+      <td>${usageDisplayNumber(row.idealUsage)}</td>
       <td>${usageDisplayNumber(row.begin)}</td>
       <td>${usageDisplayNumber(row.end)}</td>
       <td>${usageDisplayNumber(row.purch)}</td>
       <td>${row.matched&&row.productId?'Matched':'Unmatched'}${row.sizeMatched?'':' <span class="sub-badge">size review</span>'}</td>
     </tr>
-  `).join('')+`<tr id="usage-detail-no-results" hidden><td colspan="${usageLogEditMode?8:7}" class="empty-cell">No products match your search.</td></tr>`;
+  `).join('')+`<tr id="usage-detail-no-results" hidden><td colspan="${usageLogEditMode?9:8}" class="empty-cell">No products match your search.</td></tr>`;
   actions.innerHTML=usageLogEditMode?`
-    <button class="btn btn-secondary" onclick="toggleUsageLogHeaderPin()">${usageLogHeaderPinned?'Unpin':'Pin'}</button>
-    <button class="btn btn-secondary" onclick="setUsageLogEditMode(false)">Done</button>
+    <div class="editor-completion-actions"><button class="btn btn-secondary" onclick="cancelUsageLogEdits()">Cancel</button><button class="btn btn-primary" onclick="setUsageLogEditMode(false)">Done</button></div>
     <button class="btn btn-secondary" onclick="addUsageLogRow()">+ Add Row</button>
-    <button class="btn btn-secondary" onclick="downloadUsageLogSource('${log.id}')">Download File</button>
-    <button class="btn btn-secondary" onclick="archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button>
-    <button class="btn btn-ghost-danger" onclick="deleteUsageLog('${log.id}',true)">Delete</button>
+    <div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Usage log actions" title="Usage log actions" onclick="event.stopPropagation();toggleMenu('usage-detail-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="usage-detail-actions-menu"><button onclick="closeAllMenus();downloadUsageLogSource('${log.id}')">Download File</button><button onclick="closeAllMenus();archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteUsageLog('${log.id}',true)">Delete</button></div></div>
+    <button class="detail-close" type="button" aria-label="Close usage log" title="Close" onclick="cancelUsageLogEdits();closeModal('modal-usage-log-detail')">&times;</button>
   `:`
-    <button class="btn btn-secondary" onclick="toggleUsageLogHeaderPin()">${usageLogHeaderPinned?'Unpin':'Pin'}</button>
-    <button class="btn btn-secondary" onclick="downloadUsageLogSource('${log.id}')">Download File</button>
-    <button class="btn btn-secondary" onclick="setUsageLogEditMode(true)">Edit</button>
-    <button class="btn btn-secondary" onclick="archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button>
-    <button class="btn btn-ghost-danger" onclick="deleteUsageLog('${log.id}',true)">Delete</button>
+    <button class="icon-btn" type="button" aria-label="Edit usage log" title="Edit usage log" onclick="setUsageLogEditMode(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+    <div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Usage log actions" title="Usage log actions" onclick="event.stopPropagation();toggleMenu('usage-detail-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="usage-detail-actions-menu"><button onclick="closeAllMenus();downloadUsageLogSource('${log.id}')">Download File</button><button onclick="closeAllMenus();archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteUsageLog('${log.id}',true)">Delete</button></div></div>
+    <button class="detail-close" type="button" aria-label="Close usage log" title="Close" onclick="closeModal('modal-usage-log-detail')">&times;</button>
   `;
   filterUsageLogDetailRows();
 }
@@ -1734,9 +1772,33 @@ function toggleUsageLogHeaderPin(){
 }
 
 function setUsageLogEditMode(edit){
-  usageLogEditMode=!!edit;
+  const log=selectedUsageLog();
+  if(edit){
+    usageLogEditSnapshot=log?JSON.parse(JSON.stringify(log)):null;
+    usageLogEditMode=!!log;
+  }else{
+    usageLogEditMode=false;
+    usageLogEditSnapshot=null;
+  }
   renderUploadedUsageDetails();
   if(edit)setTimeout(()=>document.querySelector('#modal-usage-log-detail input, #modal-usage-log-detail select')?.focus(),0);
+}
+
+function cancelUsageLogEdits(){
+  const snapshot=usageLogEditSnapshot;
+  if(snapshot){
+    const index=state.usageLogs.findIndex(log=>log.id===snapshot.id);
+    if(index>=0)state.usageLogs[index]=JSON.parse(JSON.stringify(snapshot));
+    state.uploadedUsage=state.usageLogs[index]?.rows||[];
+  }
+  usageLogEditMode=false;
+  usageLogEditSnapshot=null;
+  save();
+  renderUsageLogs();
+  renderUsageSummaryOnly();
+  renderUploadedUsageDetails();
+  refreshLiveInventoryIfVisible();
+  toast('Usage changes cancelled.');
 }
 
 function saveUsageLogEdits(){
@@ -1789,7 +1851,7 @@ function renderUsageSummaryOnly(){
 function addUsageLogRow(){
   const log=selectedUsageLog();
   if(!log)return;
-  log.rows.push({productId:'',productName:'',reportProductName:'',sku:'',unitSize:'',qty:0,actualUsage:'',begin:'',end:'',purch:'',periodStart:log.periodStart||'',periodEnd:log.periodEnd||'',matched:false,matchedName:null,sizeMatched:true,sourceFile:log.fileName,importedAt:new Date().toISOString()});
+  log.rows.push({productId:'',productName:'',reportProductName:'',sku:'',unitSize:'',qty:0,actualUsage:'',idealUsage:'',begin:'',end:'',purch:'',periodStart:log.periodStart||'',periodEnd:log.periodEnd||'',matched:false,matchedName:null,sizeMatched:true,sourceFile:log.fileName,importedAt:new Date().toISOString()});
   state.uploadedUsage=log.rows;
   save();
   renderUsageLogs();

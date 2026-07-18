@@ -40,10 +40,27 @@ function setTheme(theme,savePreference=true){
 function syncEmbeddedTheme(theme=document.documentElement.dataset.theme||'slate'){
   const frame=document.querySelector('.settings-users-frame');
   if(!frame?.contentWindow)return;
-  frame.contentWindow.postMessage({type:'month-end-theme',theme},window.location.origin);
+  const styles=getComputedStyle(document.documentElement);
+  const tokens={
+    ink:styles.getPropertyValue('--text').trim(),muted:styles.getPropertyValue('--text-muted').trim(),line:styles.getPropertyValue('--border').trim(),
+    paper:styles.getPropertyValue('--surface').trim(),canvas:styles.getPropertyValue('--bg').trim(),accent:styles.getPropertyValue('--accent').trim(),
+    accentDark:styles.getPropertyValue('--accent2').trim(),accentSoft:styles.getPropertyValue('--surface2').trim(),surface3:styles.getPropertyValue('--surface3').trim(),
+    danger:styles.getPropertyValue('--danger').trim(),success:styles.getPropertyValue('--success').trim()
+  };
+  frame.contentWindow.postMessage({type:'month-end-theme',theme,tokens},window.location.origin);
 }
 window.addEventListener('message',event=>{
-  if(event.origin===window.location.origin&&event.data?.type==='month-end-theme-ready')syncEmbeddedTheme();
+  if(event.origin===window.location.origin&&event.data?.type==='month-end-theme-ready'){
+    syncEmbeddedTheme();
+    const detail=document.querySelector('.settings-detail');
+    if(activeSettingsSection==='profiles'&&detail){detail.scrollTop=0;requestAnimationFrame(()=>{detail.scrollTop=0;});}
+  }
+  if(event.origin===window.location.origin&&event.data?.type==='month-end-team-resize'){
+    const frame=document.querySelector('.settings-users-frame');
+    const height=Math.max(520,Math.min(1400,Number(event.data.height)||520));
+    if(frame)frame.style.height=`${height}px`;
+  }
+  if(event.origin===window.location.origin&&event.data?.type==='month-end-team-focus')document.querySelector('.settings-users-frame')?.scrollIntoView({behavior:'smooth',block:'start'});
 });
 
 function setSettingsSidebarCollapsed(collapsed,savePreference=true){
@@ -92,6 +109,15 @@ function toggleSidebar(){
   try{localStorage.setItem(SIDEBAR_STORAGE_KEY,String(collapsed));}catch(e){}
 }
 initSidebar();
+
+function syncSidebarSettingsFlyout(){
+  document.querySelectorAll('[data-sidebar-settings-key]').forEach(item=>{
+    const key=item.dataset.sidebarSettingsKey;
+    const source=document.querySelector(`.settings-nav-item[data-settings-key="${key}"]`);
+    item.classList.toggle('active',key===activeSettingsSection);
+    item.hidden=source?.style.display==='none';
+  });
+}
 
 function resetFloatingMenuPosition(menu){
   menu.style.removeProperty('top');
@@ -177,6 +203,21 @@ function toggleMenu(id){
   }
 }
 function toggleProfileMenu(){toggleMenu('profile-menu');}
+let profileMenuCloseTimer=null;
+function initProfileMenuHover(){
+  const wrap=document.querySelector('.profile-menu-wrap');
+  const menu=document.getElementById('profile-menu');
+  if(!wrap||!menu)return;
+  wrap.addEventListener('mouseenter',()=>{
+    clearTimeout(profileMenuCloseTimer);
+    menu.classList.add('open');
+  });
+  wrap.addEventListener('mouseleave',()=>{
+    clearTimeout(profileMenuCloseTimer);
+    profileMenuCloseTimer=setTimeout(()=>menu.classList.remove('open'),250);
+  });
+}
+initProfileMenuHover();
 function openCurrentProfileSettings(){
   closeAllMenus();
   showPage('settings',{profileOnly:true});
@@ -451,7 +492,10 @@ function setSettingsSection(section){
   activeSettingsSection=section;
   document.querySelectorAll('.settings-nav-item').forEach(item=>item.classList.toggle('active',item.dataset.settingsKey===section));
   document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.settingsPane===section));
+  syncSidebarSettingsFlyout();
   if(app)app.classList.add('detail-open');
+  const detail=app?.querySelector('.settings-detail');
+  if(detail){detail.scrollTop=0;requestAnimationFrame(()=>{detail.scrollTop=0;});}
   renderSettings();
 }
 function filterSettingsNav(){
@@ -470,8 +514,11 @@ function renderSettings(){
     item.style.display=canUseSettings||item.dataset.settingsKey==='profiles'?'flex':'none';
   });
   document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.settingsPane===activeSettingsSection));
+  syncSidebarSettingsFlyout();
   if(window.innerWidth>820)document.getElementById('settings-app')?.classList.add('detail-open');
   if(typeof renderFloorPlanRooms==='function')renderFloorPlanRooms();
+  if(typeof renderInventoryCategorySettings==='function')renderInventoryCategorySettings();
+  if(typeof refreshCategorySelects==='function')refreshCategorySelects();
   if(typeof renderDepartmentSettings==='function')renderDepartmentSettings();
   if(typeof renderProductMenuSettings==='function')renderProductMenuSettings();
   renderProfileSettings();
@@ -516,6 +563,7 @@ function renderAccessControlledNav(){
     const allowed=profileCanAccessPage(profile,page);
     item.classList.toggle('access-disabled',!allowed);
     item.title=allowed?'':'You do not have access to this area.';
+    if(page==='settings')item.closest('.sidebar-settings-wrap').hidden=!allowed;
   });
   document.querySelectorAll('[data-mobile-page]').forEach(item=>{
     const allowed=profileCanAccessPage(profile,item.dataset.mobilePage);

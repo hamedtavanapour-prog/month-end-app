@@ -28,7 +28,8 @@ function normalizeProductUnits(product){
   product.sku=product.sku||primary.sku||'';
   return product.units;
 }
-function catBadge(cat){return`<span class="badge cat-${(cat||'Other').replace(/[\s\/]/g,'')}">${cat||'Other'}</span>`;}
+function categoryBadgeClass(cat){return String(cat||'Other').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/gi,'')||'Other';}
+function catBadge(cat){return`<span class="badge cat-${categoryBadgeClass(cat)}">${escapeHtml(cat||'Other')}</span>`;}
 function subBadge(sub){return sub?`<span class="sub-badge">${sub}</span>`:'';}
 function aliasBadges(a){if(!a)return'';const chips=a.split(',').map(x=>x.trim()).filter(Boolean);if(!chips.length)return'';return'<div class="alias-chips">'+chips.map(x=>`<span class="alias-chip">${x}</span>`).join('')+'</div>';}
 function previewAliases(){const v=document.getElementById('pm-aliases').value;document.getElementById('pm-aliases-preview').innerHTML=v.split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="alias-chip">${x}</span>`).join('');}

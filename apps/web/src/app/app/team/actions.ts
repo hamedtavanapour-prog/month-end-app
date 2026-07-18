@@ -102,14 +102,18 @@ export async function createPreparedAccount(formData: FormData) {
 export async function updateTeamMember(formData: FormData) {
   await requireAccessContext();
   const membershipId = String(formData.get("membershipId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const jobTitle = String(formData.get("jobTitle") ?? "").trim();
   const role = String(formData.get("role") ?? "staff");
   const status = String(formData.get("status") ?? "active");
   const departmentIds = values(formData, "departments");
   const permissionKeys = values(formData, "permissions");
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("update_team_member", {
+  const { error } = await supabase.rpc("update_team_member_profile", {
     p_membership_id: membershipId,
+    p_display_name: displayName,
+    p_job_title: jobTitle,
     p_role: role,
     p_status: status,
     p_department_ids: departmentIds,

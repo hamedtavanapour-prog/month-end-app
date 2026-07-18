@@ -1192,7 +1192,7 @@ function viewOrderDetail(id){
         <h3 id="order-detail-title">${order.isRefund?'Refund / Credit':'Invoice'} ${order.invoiceNumber?escapeHtml(order.invoiceNumber):''}</h3>
         <p style="color:var(--text-muted);font-size:0.86rem;">${escapeHtml(order.supplier||'No supplier')}</p>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="openOrderModal('${order.id}');closeModal('modal-order-detail')">Edit</button>
+      <div class="detail-heading-actions"><button class="icon-btn" type="button" aria-label="Edit invoice" title="Edit invoice" onclick="openOrderModal('${order.id}');closeModal('modal-order-detail')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><button class="detail-close" type="button" aria-label="Close invoice detail" title="Close" onclick="closeModal('modal-order-detail')">&times;</button></div>
     </div>
     <div class="invoice-detail-meta">
       ${detailField('Invoice Number',order.invoiceNumber)}

@@ -18,7 +18,7 @@ function ensureFloorPlanRoom(name,id=null){
   const key=roomKey(clean);
   let room=state.rooms.find(item=>roomKey(item.name)===key);
   if(room)return room;
-  room={id:id||uid(),name:clean,archived:false,productIds:null,departmentId:'bar'};
+  room={id:id||uid(),name:clean,archived:false,productIds:null,categoryNames:typeof inventoryCategoryNames==='function'?inventoryCategoryNames():[],manualProductIds:[],departmentId:'bar'};
   state.rooms.push(room);
   return room;
 }
@@ -26,6 +26,27 @@ function normalizeRoomProductIds(room){
   if(!Array.isArray(room.productIds))return null;
   const activeIds=new Set(state.products.filter(product=>!product.archived).map(product=>product.id));
   return [...new Set(room.productIds)].filter(id=>activeIds.has(id));
+}
+function floorPlanProductsForDepartment(departmentId='bar'){
+  return state.products.filter(product=>!product.archived&&(!departmentId||typeof productInDepartment!=='function'||productInDepartment(product,departmentId)));
+}
+function normalizeRoomAssignmentRules(room,productIds){
+  const products=floorPlanProductsForDepartment(String(room.departmentId||'bar'));
+  const configuredCategories=typeof inventoryCategoryNames==='function'?inventoryCategoryNames():[...new Set(products.map(product=>product.category||'Other'))];
+  if(Array.isArray(room.categoryNames)||Array.isArray(room.manualProductIds)){
+    const categoryNames=[...new Set((room.categoryNames||[]).map(name=>String(name||'').trim()).filter(name=>configuredCategories.includes(name)))];
+    const activeIds=new Set(products.map(product=>product.id));
+    const manualProductIds=[...new Set(room.manualProductIds||[])].filter(id=>activeIds.has(id));
+    return{categoryNames,manualProductIds};
+  }
+  const selected=new Set(Array.isArray(productIds)?productIds:products.map(product=>product.id));
+  const categoryNames=configuredCategories.filter(category=>{
+    const categoryProducts=products.filter(product=>(product.category||'Other')===category);
+    return categoryProducts.length>0&&categoryProducts.every(product=>selected.has(product.id));
+  });
+  const coveredCategories=new Set(categoryNames);
+  const manualProductIds=products.filter(product=>selected.has(product.id)&&!coveredCategories.has(product.category||'Other')).map(product=>product.id);
+  return{categoryNames,manualProductIds};
 }
 function normalizeFloorPlanRooms(){
   if(!Array.isArray(state.rooms))state.rooms=[];
@@ -35,8 +56,9 @@ function normalizeFloorPlanRooms(){
     let clean=String(room.name||`Room ${index+1}`).trim()||`Room ${index+1}`;
     if(clean==='Unassigned')clean=defaultFloorPlanRoomName();
     const productIds=normalizeRoomProductIds(room);
-    const normalized={id:room.id||uid(),name:clean,archived:!!room.archived,productIds,departmentId:String(room.departmentId||'bar')};
-    if(normalized.id!==room.id||normalized.name!==room.name||normalized.archived!==room.archived||normalized.departmentId!==room.departmentId||JSON.stringify(productIds)!==JSON.stringify(room.productIds??null))changed=true;
+    const assignments=normalizeRoomAssignmentRules(room,productIds);
+    const normalized={id:room.id||uid(),name:clean,archived:!!room.archived,productIds,categoryNames:assignments.categoryNames,manualProductIds:assignments.manualProductIds,departmentId:String(room.departmentId||'bar')};
+    if(normalized.id!==room.id||normalized.name!==room.name||normalized.archived!==room.archived||normalized.departmentId!==room.departmentId||JSON.stringify(productIds)!==JSON.stringify(room.productIds??null)||JSON.stringify(normalized.categoryNames)!==JSON.stringify(room.categoryNames)||JSON.stringify(normalized.manualProductIds)!==JSON.stringify(room.manualProductIds))changed=true;
     return normalized;
   }).filter(room=>{
     const key=roomKey(room.name);
@@ -52,7 +74,7 @@ function normalizeFloorPlanRooms(){
     });
   });
   if(!state.rooms.length){
-    state.rooms=[{id:uid(),name:defaultFloorPlanRoomName(),archived:false,productIds:null,departmentId:'bar'}];
+    state.rooms=[{id:uid(),name:defaultFloorPlanRoomName(),archived:false,productIds:null,categoryNames:typeof inventoryCategoryNames==='function'?inventoryCategoryNames():[],manualProductIds:[],departmentId:'bar'}];
     changed=true;
   }
   return changed;
@@ -66,8 +88,14 @@ function floorPlanRoomById(id){
   return state.rooms.find(room=>room.id===id);
 }
 function roomProductIds(room){
-  const products=state.products.filter(product=>!product.archived&&(!room?.departmentId||typeof productInDepartment!=='function'||productInDepartment(product,room.departmentId)));
-  if(!room||!Array.isArray(room.productIds))return products.map(product=>product.id);
+  const products=floorPlanProductsForDepartment(room?.departmentId||'bar');
+  if(!room)return products.map(product=>product.id);
+  if(Array.isArray(room.categoryNames)||Array.isArray(room.manualProductIds)){
+    const categories=new Set(room.categoryNames||[]);
+    const manual=new Set(room.manualProductIds||[]);
+    return products.filter(product=>categories.has(product.category||'Other')||manual.has(product.id)).map(product=>product.id);
+  }
+  if(!Array.isArray(room.productIds))return products.map(product=>product.id);
   const allowed=new Set(room.productIds);
   return products.filter(product=>allowed.has(product.id)).map(product=>product.id);
 }
@@ -102,64 +130,14 @@ function currentCountProducts(){
   return currentRoomProducts();
 }
 function roomProductSummary(room){
-  const activeCount=state.products.filter(product=>!product.archived).length;
-  if(!Array.isArray(room.productIds))return`All ${activeCount} active items`;
   const count=roomProductIds(room).length;
-  return`${count} selected item${count===1?'':'s'}`;
-}
-function renderRoomProductPicker(room){
-  const cats=[...new Set(state.products.filter(product=>!product.archived).map(product=>product.category||'Other'))].sort();
-  const allowed=new Set(roomProductIds(room));
-  const products=state.products.filter(product=>!product.archived).sort((a,b)=>
-    (a.category||'').localeCompare(b.category||'')||
-    (a.subcategory||'').localeCompare(b.subcategory||'')||
-    a.name.localeCompare(b.name)
-  );
-  const allSelected=products.length>0&&products.every(product=>allowed.has(product.id));
-  const noneSelected=!products.some(product=>allowed.has(product.id));
-  return`
-    <div class="room-product-editor floor-plan-edit-only">
-      <div class="room-product-toolbar">
-        <span>${roomProductSummary(room)}</span>
-        <div>
-          <button class="btn btn-secondary btn-sm room-filter-chip ${allSelected?'active':''}" type="button" aria-pressed="${allSelected}" onclick="setRoomProducts('${room.id}','all')">All</button>
-          <button class="btn btn-secondary btn-sm room-filter-chip ${noneSelected?'active':''}" type="button" aria-pressed="${noneSelected}" onclick="setRoomProducts('${room.id}','none')">None</button>
-          ${cats.map(cat=>{
-            const categoryProducts=products.filter(product=>(product.category||'Other')===cat);
-            const selected=categoryProducts.length>0&&categoryProducts.every(product=>allowed.has(product.id));
-            return`<button class="btn btn-secondary btn-sm room-filter-chip ${selected?'active':''}" type="button" aria-pressed="${selected}" onclick="setRoomProducts('${room.id}','cat:${escapeHtml(cat)}')">${escapeHtml(cat)}</button>`;
-          }).join('')}
-        </div>
-      </div>
-      <div class="room-product-list">
-        ${products.map(product=>`
-          <label class="room-product-option">
-            <input type="checkbox" ${allowed.has(product.id)?'checked':''} onchange="toggleRoomProduct('${room.id}','${product.id}',this.checked)">
-            <span><strong>${escapeHtml(product.name)}</strong><em>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''}</em></span>
-          </label>
-        `).join('')||'<div class="empty-cell">No active products.</div>'}
-      </div>
-    </div>
-  `;
+  const categoryCount=(room.categoryNames||[]).length;
+  return`${count} item${count===1?'':'s'} · ${categoryCount} categor${categoryCount===1?'y':'ies'}`;
 }
 function renderFloorPlanRooms(){
   const list=document.getElementById('settings-room-list');
   const rooms=activeFloorPlanRooms();
-  if(list)list.innerHTML=rooms.map(room=>`
-    <div class="settings-list-row">
-      <div class="settings-room-main">
-        <div>
-          <span class="room-chip">${escapeHtml(room.name)}</span>
-          <span class="room-product-count">${roomProductSummary(room)}</span>
-        </div>
-        <div class="settings-row-actions floor-plan-edit-only">
-          <button class="btn btn-secondary btn-sm" type="button" onclick="startRenameRoom('${room.id}')">Rename</button>
-          <button class="btn btn-ghost-danger btn-sm" type="button" onclick="archiveRoom('${room.id}')">Remove</button>
-        </div>
-      </div>
-      ${renderRoomProductPicker(room)}
-    </div>
-  `).join('')||`<div class="empty-cell">No rooms defined.</div>`;
+  if(list)list.innerHTML=rooms.map(room=>`<button class="settings-room-card" type="button" onclick="openFloorPlanRoomEditor('${room.id}')"><span><strong>${escapeHtml(room.name)}</strong><small>${roomProductSummary(room)}</small></span><em aria-hidden="true">›</em></button>`).join('')||`<div class="empty-cell">No rooms defined.</div>`;
   const count=document.getElementById('settings-room-count');
   if(count)count.textContent=`${rooms.length} room${rooms.length===1?'':'s'}`;
   const saveBtn=document.getElementById('settings-room-save');
@@ -171,55 +149,8 @@ function renderFloorPlanRooms(){
   if(createForm)createForm.hidden=!formOpen;
   const formLabel=document.getElementById('settings-room-form-label');
   if(formLabel)formLabel.textContent=editingSettingsRoomId?'Rename room':'Room name';
-  const editBtn=document.getElementById('floor-plan-edit-btn');
-  if(editBtn)editBtn.textContent=floorPlanEditMode?'Done':'Edit';
-  document.getElementById('settings-room-group')?.classList.toggle('editing',floorPlanEditMode);
-}
-function setRoomProducts(roomId,scope){
-  if(!floorPlanEditMode)return;
-  const room=floorPlanRoomById(roomId);
-  if(!room)return;
-  const activeProducts=state.products.filter(product=>!product.archived);
-  if(scope==='all')room.productIds=null;
-  else if(scope==='none')room.productIds=[];
-  else if(String(scope).startsWith('cat:')){
-    const cat=String(scope).slice(4);
-    const categoryIds=activeProducts.filter(product=>(product.category||'Other')===cat).map(product=>product.id);
-    const selected=new Set(roomProductIds(room));
-    const categorySelected=categoryIds.length>0&&categoryIds.every(id=>selected.has(id));
-    categoryIds.forEach(id=>categorySelected?selected.delete(id):selected.add(id));
-    room.productIds=[...selected];
-  }
-  save();
-  renderFloorPlanRooms();
-  refreshLiveInventoryIfVisible();
-  toast('Room items updated.');
-}
-function toggleRoomProduct(roomId,productId,checked){
-  if(!floorPlanEditMode)return;
-  const room=floorPlanRoomById(roomId);
-  if(!room)return;
-  if(!Array.isArray(room.productIds))room.productIds=state.products.filter(product=>!product.archived).map(product=>product.id);
-  const ids=new Set(room.productIds);
-  if(checked)ids.add(productId);
-  else ids.delete(productId);
-  room.productIds=[...ids];
-  save();
-  renderFloorPlanRooms();
-  refreshLiveInventoryIfVisible();
-}
-function toggleFloorPlanEdit(){
-  floorPlanEditMode=!floorPlanEditMode;
-  if(!floorPlanEditMode){
-    editingSettingsRoomId=null;
-    addingSettingsRoom=false;
-    const input=document.getElementById('settings-room-name');
-    if(input)input.value='';
-  }
-  renderFloorPlanRooms();
 }
 function startAddSettingsRoom(){
-  if(!floorPlanEditMode)return;
   editingSettingsRoomId=null;
   addingSettingsRoom=true;
   const input=document.getElementById('settings-room-name');
@@ -235,7 +166,6 @@ function cancelSettingsRoomForm(){
   renderFloorPlanRooms();
 }
 function addSettingsRoom(){
-  if(!floorPlanEditMode)return;
   const input=document.getElementById('settings-room-name');
   const name=(input?.value||'').trim();
   if(!name){toast('Enter a room name.',true);return;}
@@ -250,28 +180,26 @@ function addSettingsRoom(){
       });
     }
     editingSettingsRoomId=null;
-  }else ensureFloorPlanRoom(name);
+  }else{
+    const room=ensureFloorPlanRoom(name);
+    room.categoryNames=[];
+    room.manualProductIds=[];
+    room.productIds=[];
+    editingFloorPlanRoomId=room.id;
+  }
   addingSettingsRoom=false;
   if(input)input.value='';
   save();
   renderFloorPlanRooms();
   renderInventoryTable();
   renderLiveInventoryRoomTabs();
-  toast(editingSettingsRoomId?'Room saved.':'Room saved.');
+  if(editingFloorPlanRoomId)openFloorPlanRoomEditor(editingFloorPlanRoomId);
+  else toast('Room saved.');
 }
 function startRenameRoom(roomId){
-  if(!floorPlanEditMode)return;
-  const room=floorPlanRoomById(roomId);
-  if(!room)return;
-  editingSettingsRoomId=roomId;
-  addingSettingsRoom=false;
-  const input=document.getElementById('settings-room-name');
-  if(input)input.value=room.name;
-  renderFloorPlanRooms();
-  requestAnimationFrame(()=>document.getElementById('settings-room-name')?.focus());
+  openFloorPlanRoomEditor(roomId);
 }
 function archiveRoom(roomId){
-  if(!floorPlanEditMode)return;
   const active=activeFloorPlanRooms();
   if(active.length<=1){toast('Keep at least one room.',true);return;}
   const room=floorPlanRoomById(roomId);
@@ -284,6 +212,93 @@ function archiveRoom(roomId){
   renderInventoryTable();
   renderLiveInventoryPage();
   toast('Room removed from active floor plan.');
+}
+function openFloorPlanRoomEditor(roomId){
+  const room=floorPlanRoomById(roomId);if(!room)return;
+  editingFloorPlanRoomId=room.id;
+  floorPlanRoomDraft={name:room.name,categoryNames:[...(room.categoryNames||[])],manualProductIds:[...(room.manualProductIds||[])],departmentId:room.departmentId||'bar'};
+  floorPlanManualSearchOpen=false;
+  const query=document.getElementById('floor-plan-product-query');if(query)query.value='';
+  renderFloorPlanRoomEditor();
+  openModal('modal-floor-plan-room');
+}
+function closeFloorPlanRoomEditor(){
+  editingFloorPlanRoomId=null;floorPlanRoomDraft=null;floorPlanManualSearchOpen=false;
+  closeModal('modal-floor-plan-room');
+}
+function renderFloorPlanRoomEditor(){
+  if(!floorPlanRoomDraft)return;
+  const room=floorPlanRoomById(editingFloorPlanRoomId);
+  const name=document.getElementById('floor-plan-room-name');if(name)name.value=floorPlanRoomDraft.name;
+  const categories=document.getElementById('floor-plan-room-categories');
+  if(categories)categories.innerHTML=(typeof inventoryCategoryNames==='function'?inventoryCategoryNames():[]).map(category=>{
+    const count=floorPlanProductsForDepartment(floorPlanRoomDraft.departmentId).filter(product=>(product.category||'Other')===category).length;
+    const selected=floorPlanRoomDraft.categoryNames.includes(category);
+    return`<label class="room-category-option"><input type="checkbox" data-category="${escapeHtml(category)}" ${selected?'checked':''} onchange="toggleFloorPlanRoomCategory(this.dataset.category,this.checked)"><span><strong>${escapeHtml(category)}</strong><small>${count} product${count===1?'':'s'}</small></span></label>`;
+  }).join('');
+  const products=floorPlanProductsForDepartment(floorPlanRoomDraft.departmentId);
+  const manualProducts=floorPlanRoomDraft.manualProductIds.map(id=>products.find(product=>product.id===id)).filter(Boolean).filter(product=>!floorPlanRoomDraft.categoryNames.includes(product.category||'Other'));
+  const manual=document.getElementById('floor-plan-manual-products');
+  if(manual)manual.innerHTML=manualProducts.map(product=>`<span class="room-manual-product"><span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.category||'Other')}</small></span><button type="button" aria-label="Remove ${escapeHtml(product.name)}" onclick="removeFloorPlanManualProduct('${product.id}')">&times;</button></span>`).join('')||'<small class="room-editor-empty">No individual products added.</small>';
+  const search=document.getElementById('floor-plan-product-search');if(search)search.hidden=!floorPlanManualSearchOpen;
+  const toggle=document.getElementById('floor-plan-manual-toggle');if(toggle)toggle.textContent=floorPlanManualSearchOpen?'Close Search':'＋ Add an item manually';
+  const remove=document.getElementById('floor-plan-room-delete');if(remove)remove.hidden=activeFloorPlanRooms().length<=1||!room;
+  if(floorPlanManualSearchOpen)renderFloorPlanProductSearch();
+}
+function toggleFloorPlanRoomCategory(category,checked){
+  if(!floorPlanRoomDraft)return;
+  const categories=new Set(floorPlanRoomDraft.categoryNames);
+  if(checked){
+    categories.add(category);
+    const productIds=new Set(floorPlanProductsForDepartment(floorPlanRoomDraft.departmentId).filter(product=>(product.category||'Other')===category).map(product=>product.id));
+    floorPlanRoomDraft.manualProductIds=floorPlanRoomDraft.manualProductIds.filter(id=>!productIds.has(id));
+  }else categories.delete(category);
+  floorPlanRoomDraft.categoryNames=[...categories];
+  renderFloorPlanRoomEditor();
+}
+function toggleFloorPlanManualSearch(){
+  floorPlanManualSearchOpen=!floorPlanManualSearchOpen;
+  renderFloorPlanRoomEditor();
+  if(floorPlanManualSearchOpen)requestAnimationFrame(()=>document.getElementById('floor-plan-product-query')?.focus());
+}
+function renderFloorPlanProductSearch(){
+  const results=document.getElementById('floor-plan-product-results');if(!results||!floorPlanRoomDraft)return;
+  const query=(document.getElementById('floor-plan-product-query')?.value||'').trim().toLowerCase();
+  if(!query){results.innerHTML='<small class="room-editor-empty">Start typing to find a product.</small>';return;}
+  const matches=floorPlanProductsForDepartment(floorPlanRoomDraft.departmentId).filter(product=>[product.name,product.inventoryName,product.alias,product.sku,product.category,product.subcategory].some(value=>String(value||'').toLowerCase().includes(query))).slice(0,12);
+  const manual=new Set(floorPlanRoomDraft.manualProductIds);
+  results.innerHTML=matches.map(product=>{
+    const byCategory=floorPlanRoomDraft.categoryNames.includes(product.category||'Other');
+    const added=manual.has(product.id);
+    return`<button class="room-product-search-result" type="button" ${byCategory||added?'disabled':''} onclick="addFloorPlanManualProduct('${product.id}')"><span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''}</small></span><em>${byCategory?'Included by category':added?'Added':'＋ Add'}</em></button>`;
+  }).join('')||'<small class="room-editor-empty">No matching products.</small>';
+}
+function addFloorPlanManualProduct(productId){
+  if(!floorPlanRoomDraft)return;
+  floorPlanRoomDraft.manualProductIds=[...new Set([...floorPlanRoomDraft.manualProductIds,productId])];
+  renderFloorPlanRoomEditor();
+}
+function removeFloorPlanManualProduct(productId){
+  if(!floorPlanRoomDraft)return;
+  floorPlanRoomDraft.manualProductIds=floorPlanRoomDraft.manualProductIds.filter(id=>id!==productId);
+  renderFloorPlanRoomEditor();
+}
+function saveFloorPlanRoomEditor(){
+  const room=floorPlanRoomById(editingFloorPlanRoomId);if(!room||!floorPlanRoomDraft)return;
+  const name=(document.getElementById('floor-plan-room-name')?.value||'').trim();
+  if(!name){toast('Enter a room name.',true);return;}
+  if(state.rooms.some(candidate=>candidate.id!==room.id&&!candidate.archived&&roomKey(candidate.name)===roomKey(name))){toast('Room already exists.',true);return;}
+  room.name=name;
+  room.categoryNames=[...floorPlanRoomDraft.categoryNames];
+  room.manualProductIds=[...floorPlanRoomDraft.manualProductIds];
+  room.productIds=roomProductIds(room);
+  state.inventories.forEach(inv=>(inv.rooms||[]).forEach(invRoom=>{if(invRoom.roomId===room.id)invRoom.name=room.name;}));
+  save();closeFloorPlanRoomEditor();renderFloorPlanRooms();renderInventoryTable();renderLiveInventoryRoomTabs();refreshLiveInventoryIfVisible();toast('Room saved.');
+}
+function removeEditedFloorPlanRoom(){
+  const roomId=editingFloorPlanRoomId;
+  closeFloorPlanRoomEditor();
+  archiveRoom(roomId);
 }
 function defaultInventoryRoom(){
   const room=activeFloorPlanRooms()[0]||ensureFloorPlanRoom(defaultFloorPlanRoomName());
@@ -704,6 +719,7 @@ function openLiveInventoryDetail(productId){
         <h3 id="live-inv-detail-title">${escapeHtml(row.name)}</h3>
         <div class="product-view-meta">${liveStatusBadge(row)} ${catBadge(row.category)} ${subBadge(row.subcategory)} <span class="sub-badge">${escapeHtml(row.roomName)}</span></div>
       </div>
+      <div class="detail-heading-actions"><button class="detail-close" type="button" aria-label="Close live inventory detail" title="Close" onclick="closeModal('modal-live-inv-detail')">&times;</button></div>
     </div>
     <div class="product-detail-grid">
       <div class="product-detail-field"><div class="label">Live Quantity</div><div class="value">${liveQty(row.live)}</div></div>
@@ -1249,7 +1265,7 @@ function viewInvItemDetailHtml(inv,product){
     const displayValue=value===undefined||value===null||value===''?'Not counted':liveQty(value);
     return`<div class="view-inv-room-field"><span>${escapeHtml(room.name)}</span>${editing?`<input type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" autocomplete="off" data-view-room-id="${room.id}" value="${value===undefined||value===null?'':value}" placeholder="Not counted">`:`<output>${displayValue}</output>`}</div>`;
   }).join('');
-  return`<div class="view-inv-item-detail ${editing?'is-editing':''}" data-view-product-id="${product.id}" onclick="event.stopPropagation()"><div class="view-inv-item-detail-head"><strong>Room breakdown</strong><div class="view-inv-item-edit-control">${editing?'<span>Editing</span>':''}<button class="icon-btn view-inv-item-edit" type="button" aria-label="${editing?'Stop editing':'Edit room counts'}" title="${editing?'Editing room counts':'Edit room counts'}" onclick="setViewInvItemEditMode('${product.id}',${editing?'false':'true'})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button></div></div><div class="view-inv-room-grid">${roomFields}</div>${editing?`<button class="btn btn-primary" type="button" onclick="saveViewedInventoryItem('${product.id}',this)">Save Item</button>`:''}</div>`;
+  return`<div class="view-inv-item-detail ${editing?'is-editing':''}" data-view-product-id="${product.id}" onclick="event.stopPropagation()"><div class="view-inv-item-detail-head"><strong>Room breakdown</strong><div class="view-inv-item-edit-control">${editing?'<span>Editing</span>':''}<button class="icon-btn view-inv-item-edit" type="button" aria-label="${editing?'Cancel room count editing':'Edit room counts'}" title="${editing?'Cancel room count editing':'Edit room counts'}" onclick="setViewInvItemEditMode('${product.id}',${editing?'false':'true'})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button></div></div><div class="view-inv-room-grid">${roomFields}</div>${editing?`<div class="view-inv-item-actions"><button class="btn btn-secondary" type="button" onclick="setViewInvItemEditMode('${product.id}',false)">Cancel</button><button class="btn btn-primary" type="button" onclick="saveViewedInventoryItem('${product.id}',this)">Save Item</button></div>`:''}</div>`;
 }
 function saveViewedInventoryItem(productId,button){
   const inv=state.inventories.find(item=>item.id===viewInvId);if(!inv)return;

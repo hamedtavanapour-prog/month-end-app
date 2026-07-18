@@ -668,6 +668,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_team_member_profile: {
+        Args: {
+          p_department_ids: string[]
+          p_display_name: string
+          p_job_title: string
+          p_membership_id: string
+          p_permission_keys: string[]
+          p_role: string
+          p_status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

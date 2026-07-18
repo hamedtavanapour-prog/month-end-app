@@ -1,6 +1,6 @@
 // state.js — in-memory app state and transient UI flags.
 
-let state={products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[]};
+let state={products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[],inventoryCategories:null};
 let editingProductId=null,editingOrderId=null,editingSupId=null;
 let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
 let mobileExpandedInventoryId=null;
@@ -14,6 +14,7 @@ let expandedInventorySections=new Set();
 let scanFileData=null,scanFileName=null;
 let selectedUsageLogId=null;
 let usageLogEditMode=false;
+let usageLogEditSnapshot=null;
 let usageLogHeaderPinned=true;
 let usageSummaryExpanded=false;
 let liveInventoryViewMode='list';
@@ -26,13 +27,19 @@ let settingsProductMenuWorkspace='bar';
 let selectedSettingsDepartmentId=null;
 let creatingSettingsDepartment=false;
 let departmentSettingsEditMode=false;
+let departmentSettingsEditSnapshot=null;
 let selectedSettingsMenuId=null;
 let settingsMenuEditMode=false;
+let settingsMenuEditSnapshot=null;
 let draggedSettingsMenuId=null;
 let settingsMenuPointerTargetId=null;
 let settingsMenuPointerAfter=false;
 let productCatalogMenuExpanded=false;
 let floorPlanEditMode=false;
+let editingFloorPlanRoomId=null;
+let floorPlanRoomDraft=null;
+let floorPlanManualSearchOpen=false;
+let editingInventoryCategoryName=null;
 let pendingInventoryEntryTemplate=null;
 let pendingUsageImport=null;
 let draggedInventoryTemplateIndex=null;

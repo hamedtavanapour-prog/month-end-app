@@ -19,6 +19,8 @@ async function init(){
     if(cloud===null){await cloudPush();}            // cloud reachable but empty → seed it
     else{toast('Offline — changes save locally and sync when reconnected.',true);}
   }
+  if(typeof normalizeInventoryCategories==='function'&&normalizeInventoryCategories())save();
+  if(typeof refreshCategorySelects==='function')refreshCategorySelects();
   const activePage=document.querySelector('.page.active')?.id?.replace('page-','')||'dashboard';
   if(typeof handleInviteFromUrl==='function')handleInviteFromUrl();
   if(activePage==='dashboard')renderDashboard();

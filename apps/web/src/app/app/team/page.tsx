@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { requireAccessContext } from "@/lib/auth/context";
 import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
-import { revokeInvitation, updateTeamMember } from "./actions";
+import { revokeInvitation } from "./actions";
+import { MemberDirectory } from "./member-directory";
 import { PreparedAccountWizard } from "./prepared-account-wizard";
 import { ThemeBridge } from "./theme-bridge";
 
@@ -80,6 +81,22 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
   const configuredPublicUrl = getPublicAppUrl();
   const pageOrigin = configuredPublicUrl.includes("localhost") ? `${protocol}://${host}` : configuredPublicUrl;
   const inviteUrl = params.token ? `${pageOrigin}/invite/${params.token}` : null;
+  const visibleDepartments = departments.filter((department) => context.role !== "manager" || context.departmentIds.includes(department.id));
+  const teamMembers = memberships.map((member) => {
+    const profile = profiles.get(member.user_id);
+    return {
+      id: member.id,
+      name: profile?.display_name || profile?.email || "Team member",
+      email: profile?.email || "No email available",
+      role: member.role,
+      jobTitle: member.job_title || member.role,
+      status: member.status,
+      mustChangePassword: member.must_change_password,
+      protected: member.role === "owner" || member.id === context.membershipId,
+      departmentIds: departmentAssignments.filter((row) => row.membership_id === member.id).map((row) => row.department_id),
+      permissionKeys: permissionAssignments.filter((row) => row.membership_id === member.id && row.allowed).map((row) => row.permission_key),
+    };
+  });
 
   return (
     <main className={`team-shell ${params.embedded === "1" ? "team-shell-embedded" : ""}`}>
@@ -119,57 +136,13 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
         ) : null}
 
         <PreparedAccountWizard
-          departments={departments.filter((department) => context.role !== "manager" || context.departmentIds.includes(department.id))}
+          departments={visibleDepartments}
           permissions={assignablePermissions}
           creatorRole={context.role}
           embedded={params.embedded === "1"}
         />
 
-        <section className="access-card active-team-card">
-          <div className="access-card-heading"><div><h2>Active team</h2><p>{memberships.length} people currently visible to you.</p></div></div>
-          <div className="member-list">
-            {memberships.map((member) => {
-              const profile = profiles.get(member.user_id);
-              const name = profile?.display_name || profile?.email || "Team member";
-              const title = member.job_title || member.role;
-              const assignedDepartments = new Set(departmentAssignments.filter((row) => row.membership_id === member.id).map((row) => row.department_id));
-              const assignedPermissions = new Set(permissionAssignments.filter((row) => row.membership_id === member.id && row.allowed).map((row) => row.permission_key));
-              const protectedMember = member.role === "owner" || member.id === context.membershipId;
-              return (
-                <details className="member-card" key={member.id}>
-                  <summary><b>{initials(name)}</b><span><strong>{name}</strong><small>{title} · {profile?.email || "No email available"}{member.must_change_password ? " · Password setup required" : ""}</small></span><em className={`role-pill ${member.status}`}>{member.status}</em><i>⌄</i></summary>
-                  {protectedMember ? (
-                    <div className="protected-access"><strong>{member.role === "owner" ? "Owner access" : "Your account"}</strong><span>This account is protected from changes here.</span></div>
-                  ) : (
-                    <form action={updateTeamMember} className="member-editor">
-                      {params.embedded === "1" ? <input name="embedded" type="hidden" value="1" /> : null}
-                      <input name="membershipId" type="hidden" value={member.id} />
-                      <div className="team-form-grid compact">
-                        <label><span>Role</span><select name="role" defaultValue={member.role}>
-                          {context.role === "owner" ? <option value="admin">Administrator</option> : null}
-                          {context.role !== "manager" ? <option value="manager">Manager</option> : null}
-                          <option value="staff">Staff</option>
-                        </select></label>
-                        <label><span>Status</span><select name="status" defaultValue={member.status}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
-                      </div>
-                      <fieldset><legend>Departments</legend><div className="choice-grid">
-                        {departments.filter((department) => context.role !== "manager" || context.departmentIds.includes(department.id)).map((department) => (
-                          <label className="choice" key={department.id}><input name="departments" type="checkbox" value={department.id} defaultChecked={assignedDepartments.has(department.id)} /><span>{department.name}</span></label>
-                        ))}
-                      </div></fieldset>
-                      <fieldset><legend>Permissions</legend><div className="choice-grid">
-                        {assignablePermissions.map((permission) => (
-                          <label className="choice" key={permission.key}><input name="permissions" type="checkbox" value={permission.key} defaultChecked={assignedPermissions.has(permission.key)} /><span>{permission.label}</span></label>
-                        ))}
-                      </div></fieldset>
-                      <div className="team-form-actions"><button type="submit">Save access</button></div>
-                    </form>
-                  )}
-                </details>
-              );
-            })}
-          </div>
-        </section>
+        <MemberDirectory members={teamMembers} departments={visibleDepartments} permissions={assignablePermissions} contextRole={context.role} embedded={params.embedded === "1"} />
 
         {invitations.length ? <section className="access-card pending-invitations-card">
           <div className="access-card-heading"><div><h2>Pending invitations</h2><p>Invitations expire automatically after seven days.</p></div></div>

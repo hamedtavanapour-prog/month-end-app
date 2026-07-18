@@ -564,6 +564,11 @@ function openProductView(id){
         <h3 id="product-view-title">${escapeHtml(p.name)}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
         <div class="product-view-meta">${departmentBadges} ${catBadge(p.category)} ${subBadge(p.subcategory)} ${low?'<span class="missing-pill"><span class="missing-dot"></span>At / below par</span>':''}</div>
       </div>
+      <div class="detail-heading-actions">
+        <button class="icon-btn" type="button" aria-label="Edit product" title="Edit product" onclick="openProductModal('${p.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+        <div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Product actions" title="Product actions" onclick="event.stopPropagation();toggleMenu('product-view-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="product-view-actions-menu"><button onclick="closeAllMenus();openProductQuickAction('count','${p.id}')">Add Count</button><button onclick="closeAllMenus();openProductQuickAction('usage','${p.id}')">Add Usage</button><button onclick="closeAllMenus();openProductQuickAction('order','${p.id}')">Add Order</button><div class="drop-divider"></div><button onclick="closeAllMenus();archiveProduct('${p.id}',${p.archived?'false':'true'})">${p.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteProduct('${p.id}')">Delete</button></div></div>
+        <button class="detail-close" type="button" aria-label="Close product detail" title="Close" onclick="closeModal('modal-product-view')">&times;</button>
+      </div>
     </div>
     <div class="product-detail-grid">
       <div class="product-detail-field"><div class="label">Inventory Name</div><div class="value">${escapeHtml(p.inventoryName||p.name||'—')}</div></div>
@@ -581,14 +586,7 @@ function openProductView(id){
         ${units.map((unit,index)=>`<tr><td>${index===0?'Yes':'—'}</td><td>${unit.unit||'—'}</td><td>${unit.unitSize||'—'}</td><td>${unit.sku||'—'}</td><td>${unit.cost?fmt(unit.cost):'—'}</td><td>${unit.par||'—'}</td></tr>`).join('')}
       </tbody></table></div>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="openProductModal('${p.id}')">Edit</button>
-      <button class="btn btn-secondary" onclick="openProductQuickAction('count','${p.id}')">Add Count</button>
-      <button class="btn btn-secondary" onclick="openProductQuickAction('usage','${p.id}')">Add Usage</button>
-      <button class="btn btn-secondary" onclick="openProductQuickAction('order','${p.id}')">Add Order</button>
-      <button class="btn btn-secondary" onclick="archiveProduct('${p.id}',${p.archived?'false':'true'})">${p.archived?'Restore':'Archive'}</button>
-      <button class="btn btn-ghost-danger" onclick="deleteProduct('${p.id}')">Delete</button>
-    </div>`;
+    `;
   openModal('modal-product-view');
 }
 
@@ -939,6 +937,7 @@ function addSettingsMenu(){
   state.menus.push(menu);
   selectedSettingsMenuId=menu.id;
   settingsMenuEditMode=true;
+  settingsMenuEditSnapshot=JSON.parse(JSON.stringify(menu));
   if(input)input.value='';
   save();
   renderProductMenuSettings();
@@ -950,13 +949,38 @@ function selectSettingsMenu(id){
   const menu=getSettingsMenu(id);
   selectedSettingsMenuId=menu?.departmentId===settingsProductMenuWorkspace?menu.id:null;
   settingsMenuEditMode=false;
+  settingsMenuEditSnapshot=null;
   renderProductMenuSettings();
   document.getElementById('settings-menu-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function closeSettingsMenuEditor(){selectedSettingsMenuId=null;settingsMenuEditMode=false;renderProductMenuSettings();}
+function closeSettingsMenuEditor(){selectedSettingsMenuId=null;settingsMenuEditMode=false;settingsMenuEditSnapshot=null;renderProductMenuSettings();}
 
-function setSettingsMenuEditMode(editing){settingsMenuEditMode=!!editing;renderProductMenuSettings();}
+function setSettingsMenuEditMode(editing){
+  if(editing){
+    const menu=getSettingsMenu(selectedSettingsMenuId);
+    settingsMenuEditSnapshot=menu?JSON.parse(JSON.stringify(menu)):null;
+    settingsMenuEditMode=!!menu;
+  }else{
+    settingsMenuEditMode=false;
+    settingsMenuEditSnapshot=null;
+  }
+  renderProductMenuSettings();
+}
+
+function cancelSettingsMenuEdit(){
+  const snapshot=settingsMenuEditSnapshot;
+  if(snapshot){
+    const index=state.menus.findIndex(menu=>menu.id===snapshot.id);
+    if(index>=0)state.menus[index]=JSON.parse(JSON.stringify(snapshot));
+  }
+  settingsMenuEditMode=false;
+  settingsMenuEditSnapshot=null;
+  save();
+  renderProductMenuSettings();
+  refreshProductCatalogIfVisible();
+  toast('Menu changes cancelled.');
+}
 
 function updateSettingsMenu(id,field,value){
   const menu=getSettingsMenu(id);
@@ -984,7 +1008,7 @@ function archiveSettingsMenu(id,archived=true){
   const menu=getSettingsMenu(id);
   if(!menu)return;
   menu.archived=!!archived;
-  if(selectedSettingsMenuId===id){selectedSettingsMenuId=null;settingsMenuEditMode=false;}
+  if(selectedSettingsMenuId===id){selectedSettingsMenuId=null;settingsMenuEditMode=false;settingsMenuEditSnapshot=null;}
   save();
   renderProductMenuSettings();
   refreshProductCatalogIfVisible();
@@ -1076,7 +1100,7 @@ function deleteSettingsMenu(id){
   const menu=getSettingsMenu(id);
   if(!menu||!confirm(`Delete “${menu.name}” and its ${menu.items.length} item${menu.items.length===1?'':'s'}?`))return;
   state.menus=state.menus.filter(entry=>entry.id!==id);
-  if(selectedSettingsMenuId===id)selectedSettingsMenuId=null;
+  if(selectedSettingsMenuId===id){selectedSettingsMenuId=null;settingsMenuEditMode=false;settingsMenuEditSnapshot=null;}
   save();
   renderProductMenuSettings();
   refreshProductCatalogIfVisible();
@@ -1176,9 +1200,9 @@ function renderSettingsMenuEditor(menu){
   }
   editor.innerHTML=`
     <div class="menu-editor-heading">
-      <button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="setSettingsMenuEditMode(false)" aria-label="Back to menu view" title="Back to menu view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>View</span></button>
+      <button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="cancelSettingsMenuEdit()" aria-label="Cancel menu editing" title="Cancel menu editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Cancel</span></button>
       <div><h3>Edit ${escapeHtml(menu.name)}</h3><p>${escapeHtml(departmentName(menu.departmentId))} menu</p></div>
-      <button class="btn btn-primary" type="button" onclick="setSettingsMenuEditMode(false)">Done</button>
+      <div class="editor-completion-actions"><button class="btn btn-secondary" type="button" onclick="cancelSettingsMenuEdit()">Cancel</button><button class="btn btn-primary" type="button" onclick="setSettingsMenuEditMode(false)">Done</button></div>
     </div>
     <div class="menu-edit-status"><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="toggleSettingsMenuActive('${menu.id}',this.checked)"><span>Active in Products</span></label><button class="btn btn-ghost-danger btn-sm" type="button" onclick="archiveSettingsMenu('${menu.id}',true)">Archive menu</button></div>
     <div class="menu-editor-fields">
@@ -1217,7 +1241,7 @@ function renderProductMenuSettings(){
   const tabs=document.getElementById('settings-menu-department-tabs');
   if(tabs)tabs.innerHTML=activeDepartments().map(item=>`<button type="button" class="${item.id===settingsProductMenuWorkspace?'active':''}" data-menu-department="${escapeHtml(item.id)}" onclick="setSettingsMenuDepartment(this.dataset.menuDepartment)">${escapeHtml(item.name)}</button>`).join('');
   const selectedMenu=getSettingsMenu(selectedSettingsMenuId);
-  if(selectedSettingsMenuId&&(selectedMenu?.departmentId!==settingsProductMenuWorkspace||selectedMenu.archived)){selectedSettingsMenuId=null;settingsMenuEditMode=false;}
+  if(selectedSettingsMenuId&&(selectedMenu?.departmentId!==settingsProductMenuWorkspace||selectedMenu.archived)){selectedSettingsMenuId=null;settingsMenuEditMode=false;settingsMenuEditSnapshot=null;}
   list.innerHTML=departmentMenus.length?departmentMenus.map(menu=>`<div class="menu-overview-card ${menu.active?'':'is-inactive'}" data-menu-id="${escapeHtml(menu.id)}" draggable="true" ondragstart="beginSettingsMenuDrag(event,this.dataset.menuId)" ondragover="event.preventDefault()" ondrop="dropSettingsMenu(event,this.dataset.menuId)" ondragend="endSettingsMenuDrag(event)">
     <span class="menu-setting-drag" aria-label="Drag to reorder" title="Hold and drag to reorder" onpointerdown="beginSettingsMenuPointerDrag(event,this.closest('.menu-overview-card').dataset.menuId)">⋮⋮</span>
     <button class="menu-setting-main" type="button" onclick="selectSettingsMenu(this.closest('.menu-overview-card').dataset.menuId)"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></button>
@@ -1233,6 +1257,7 @@ function setSettingsMenuDepartment(departmentId){
   settingsProductMenuWorkspace=departmentId;
   selectedSettingsMenuId=null;
   settingsMenuEditMode=false;
+  settingsMenuEditSnapshot=null;
   setMenuImportStatus('');
   renderProductMenuSettings();
 }
@@ -1404,6 +1429,7 @@ async function handleMenuImport(event){
     state.menus.push(menu);
     selectedSettingsMenuId=menu.id;
     settingsMenuEditMode=true;
+    settingsMenuEditSnapshot=JSON.parse(JSON.stringify(menu));
     save();
     renderProductMenuSettings();
     setMenuImportStatus(`Imported ${items.length} item${items.length===1?'':'s'} from ${file.name}. Review the draft below, then activate it when ready.`);
@@ -1463,7 +1489,7 @@ function renderDepartmentSettings(){
   overview.hidden=true;
   detail.hidden=false;
   detail.innerHTML=`
-    <div class="department-detail-head"><button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="closeDepartmentSettings()" aria-label="Back to departments" title="Back to departments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Departments</span></button><div><h3>${escapeHtml(department.name)}</h3><p>Independent inventory and menu workspace</p></div><button class="btn ${departmentSettingsEditMode?'btn-primary':'btn-secondary'} department-detail-edit" type="button" onclick="setDepartmentSettingsEditMode(${departmentSettingsEditMode?'false':'true'})">${departmentSettingsEditMode?'Done':'Edit'}</button></div>
+    <div class="department-detail-head"><button class="btn btn-secondary btn-sm mobile-back-button" type="button" onclick="closeDepartmentSettings()" aria-label="Back to departments" title="Back to departments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Departments</span></button><div><h3>${escapeHtml(department.name)}</h3><p>Independent inventory and menu workspace</p></div>${departmentSettingsEditMode?`<div class="editor-completion-actions"><button class="btn btn-secondary" type="button" onclick="cancelDepartmentSettingsEdit()">Cancel</button><button class="btn btn-primary" type="button" onclick="setDepartmentSettingsEditMode(false)">Done</button></div>`:`<button class="btn btn-secondary department-detail-edit" type="button" onclick="setDepartmentSettingsEditMode(true)">Edit</button>`}</div>
     <div class="department-detail-stats">
       <div class="department-detail-stat"><span>Inventory items</span><strong>${products.length}</strong></div>
       <div class="department-detail-stat"><span>Menus</span><strong>${menuCount}</strong></div>
@@ -1488,6 +1514,7 @@ function startDepartmentCreation(){
   selectedSettingsDepartmentId=null;
   creatingSettingsDepartment=true;
   departmentSettingsEditMode=false;
+  departmentSettingsEditSnapshot=null;
   renderDepartmentSettings();
   document.getElementById('settings-department-create-name')?.focus();
 }
@@ -1498,13 +1525,49 @@ function selectDepartmentSettings(id){
   if(!getDepartment(id))return;
   creatingSettingsDepartment=false;
   departmentSettingsEditMode=false;
+  departmentSettingsEditSnapshot=null;
   selectedSettingsDepartmentId=id;
   renderDepartmentSettings();
 }
 
-function closeDepartmentSettings(){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;renderDepartmentSettings();}
+function closeDepartmentSettings(){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;departmentSettingsEditSnapshot=null;renderDepartmentSettings();}
 
-function setDepartmentSettingsEditMode(editing){departmentSettingsEditMode=!!editing;renderDepartmentSettings();}
+function setDepartmentSettingsEditMode(editing){
+  if(editing){
+    const department=getDepartment(selectedSettingsDepartmentId);
+    departmentSettingsEditSnapshot=department?{
+      department:JSON.parse(JSON.stringify(department)),
+      roomDepartments:(state.rooms||[]).map(room=>({id:room.id,departmentId:room.departmentId}))
+    }:null;
+    departmentSettingsEditMode=!!department;
+  }else{
+    departmentSettingsEditMode=false;
+    departmentSettingsEditSnapshot=null;
+  }
+  renderDepartmentSettings();
+}
+
+function cancelDepartmentSettingsEdit(){
+  const snapshot=departmentSettingsEditSnapshot;
+  if(snapshot){
+    const index=state.departments.findIndex(department=>department.id===snapshot.department.id);
+    if(index>=0)state.departments[index]=JSON.parse(JSON.stringify(snapshot.department));
+    snapshot.roomDepartments.forEach(saved=>{
+      const room=(state.rooms||[]).find(item=>item.id===saved.id);
+      if(room)room.departmentId=saved.departmentId;
+    });
+    fetch('/api/department-manager',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({department:snapshot.department.id||snapshot.department.name,membershipId:snapshot.department.managerId||null})}).catch(()=>{});
+  }
+  departmentSettingsEditMode=false;
+  departmentSettingsEditSnapshot=null;
+  ensureDepartmentAssignments();
+  save();
+  renderDepartmentSettings();
+  renderProductMenuSettings();
+  renderProductDepartmentTabs();
+  refreshProductCatalogIfVisible();
+  toast('Department changes cancelled.');
+}
 
 function openDepartmentMenus(id){
   const department=getDepartment(id);
@@ -1588,7 +1651,7 @@ function toggleDepartmentArchived(id,archived){
   if(!department)return;
   if(archived&&state.departments.filter(item=>!item.archived).length<=1){toast('Keep at least one department active.',true);return;}
   department.archived=!!archived;
-  if(department.archived){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;}
+  if(department.archived){selectedSettingsDepartmentId=null;departmentSettingsEditMode=false;departmentSettingsEditSnapshot=null;}
   ensureCurrentDepartmentView();
   if(!getDepartment(settingsProductMenuWorkspace)||getDepartment(settingsProductMenuWorkspace).archived)settingsProductMenuWorkspace=activeDepartments()[0]?.id||'bar';
   save();renderDepartmentSettings();renderProductMenuSettings();renderProductDepartmentTabs();refreshProductCatalogIfVisible();

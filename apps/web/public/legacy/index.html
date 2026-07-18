@@ -31,7 +31,25 @@
   <button class="nav-item" type="button" onclick="showPage('insights')" id="nav-insights" aria-label="Insights"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8.5 15.5A7 7 0 1 1 15.5 15.5C14.5 16.2 14 17 14 18h-4c0-1-.5-1.8-1.5-2.5Z"/></svg></span><span>Insights</span></button>
   <button class="nav-item" type="button" onclick="showPage('suppliers')" id="nav-suppliers" aria-label="Suppliers"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21V8l6 3V8l6 3V4h6v17H3Z"/><path d="M7 15h2M7 18h2M13 15h2M13 18h2M18 9h1M18 13h1M18 17h1"/></svg></span><span>Suppliers</span></button>
   <button class="nav-item" type="button" onclick="showPage('reports')" id="nav-reports" aria-label="Reports"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3Z"/><path d="M15 3v5h5M9 12h7M9 16h7"/></svg></span><span>Reports</span></button>
-  <button class="nav-item" type="button" onclick="showPage('settings')" id="nav-settings" aria-label="Settings"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span>Settings</span></button>
+  <div class="sidebar-settings-wrap">
+    <button class="nav-item" type="button" onclick="showPage('settings')" id="nav-settings" aria-label="Settings" aria-haspopup="menu"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span>Settings</span></button>
+    <div class="sidebar-settings-flyout" role="menu" aria-label="Settings pages">
+      <div class="sidebar-settings-flyout-card">
+        <div class="sidebar-settings-flyout-head"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span><strong>Settings</strong><small>Workspace setup</small></span></div>
+        <div class="sidebar-settings-flyout-list">
+          <button type="button" role="menuitem" data-sidebar-settings-key="general" onclick="showPage('settings');setSettingsSection('general')">General</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="floor-plan" onclick="showPage('settings');setSettingsSection('floor-plan')">Floor Plan</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="categories" onclick="showPage('settings');setSettingsSection('categories')">Categories</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="departments" onclick="showPage('settings');setSettingsSection('departments')">Departments</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="product-menus" onclick="showPage('settings');setSettingsSection('product-menus')">Menu</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="profiles" onclick="showPage('settings');setSettingsSection('profiles')">Users &amp; Access</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="appearance" onclick="showPage('settings');setSettingsSection('appearance')">Appearance</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="sync" onclick="showPage('settings');setSettingsSection('sync')">Sync &amp; Storage</button>
+          <button type="button" role="menuitem" data-sidebar-settings-key="exports" onclick="showPage('settings');setSettingsSection('exports')">Exports</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="sidebar-footer">
     <div class="profile-menu-wrap">
       <button class="profile-button" id="profile-button" type="button" onclick="openCurrentProfileSettings()">
@@ -142,7 +160,7 @@
           <div class="product-filter-fields">
             <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-cat-f">Category</label>
               <select id="prod-cat-f" onchange="updateSubcatFilter('prod-sub-f','prod-cat-f');renderProducts()">
-                <option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option>
+                <option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option>
               </select>
             </div>
             <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-sub-f">Subcategory</label><select id="prod-sub-f" onchange="renderProducts()"><option value="">All</option></select></div>
@@ -177,7 +195,7 @@
   <div class="card" style="margin-bottom:14px;">
     <div class="form-row">
       <div class="form-group" style="flex:2;min-width:130px;"><label>Search</label><input type="text" id="live-inv-search" placeholder="Name, alias…" oninput="renderLiveInventoryPage()"></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+      <div class="form-group" style="flex:1;min-width:110px;"><label>Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
       <div class="form-group" style="flex:1;min-width:110px;"><label>Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
       <div class="form-group" style="flex:1;min-width:110px;"><label>Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
       <div class="form-group live-room-group"><label>Rooms</label><div class="drop-wrap live-room-picker"><button class="btn btn-secondary live-room-picker-button" id="live-room-picker-button" type="button" onclick="toggleMenu('live-room-menu')"><span id="live-room-picker-label">All rooms</span><span aria-hidden="true">▾</span></button><div class="drop-menu live-room-menu" id="live-room-menu" onclick="event.stopPropagation()"><div class="live-room-menu-head"><strong>Select rooms</strong><button type="button" onclick="selectAllLiveInventoryRooms()">All rooms</button></div><div id="live-room-options"></div><button class="live-room-done" type="button" onclick="closeAllMenus()">Done</button></div></div></div>
@@ -242,7 +260,7 @@
       <h3 style="font-size:0.95rem;">Usage Logs</h3>
       <div class="form-group" style="min-width:120px;margin:0;"><label>Status</label><select id="usage-log-status-f" onchange="renderUsageLogs()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Period</th><th>File</th><th>Products</th><th>Total Usage</th><th>Imported</th><th>Actions</th></tr></thead><tbody id="usage-log-tbody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Period</th><th>File</th><th>Products</th><th>Total Usage</th><th>Total Ideal Usage</th><th>Created By</th><th>Imported</th><th>Actions</th></tr></thead><tbody id="usage-log-tbody"></tbody></table></div>
   </div>
   <div class="card" id="usage-summary-card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -252,7 +270,7 @@
     <div id="usage-summary-body" style="display:none;margin-top:14px;">
       <div class="form-row" style="margin:0 0 14px;gap:10px;justify-content:flex-end;">
         <div class="form-group"><label>Source</label><select id="usage-source" onchange="renderUsagePage()"><option value="computed">From Inventory Counts</option><option value="uploaded">Uploaded Data</option></select></div>
-        <div class="form-group"><label>Category</label><select id="usage-cat-f" onchange="renderUsagePage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+        <div class="form-group"><label>Category</label><select id="usage-cat-f" onchange="renderUsagePage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Unit</th><th>Avg / Week</th><th>Avg / Month</th><th>Data Points</th><th>Trend</th></tr></thead><tbody id="usage-tbody"></tbody></table></div>
     </div>
@@ -309,7 +327,7 @@
   <div id="rep-usage">
     <div class="form-row" style="margin-bottom:14px;">
       <div class="form-group"><label>Period</label><select id="rep-period" onchange="renderReport()"><option value="weekly">Weekly Avg</option><option value="monthly" selected>Monthly Avg</option></select></div>
-      <div class="form-group"><label>Category</label><select id="rep-cat" onchange="updateSubcatFilter('rep-sub','rep-cat');renderReport()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+      <div class="form-group"><label>Category</label><select id="rep-cat" onchange="updateSubcatFilter('rep-sub','rep-cat');renderReport()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
       <div class="form-group"><label>Subcategory</label><select id="rep-sub" onchange="renderReport()"><option value="">All</option></select></div>
     </div>
     <div class="card"><div class="table-wrap"><table><thead id="rep-thead"></thead><tbody id="rep-tbody"></tbody></table></div></div>
@@ -340,6 +358,7 @@
       <div class="settings-nav-list" id="settings-nav-list">
         <button class="settings-nav-item active" type="button" data-settings-key="general" onclick="setSettingsSection('general')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span>General</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="floor-plan" onclick="setSettingsSection('floor-plan')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg></span><span>Floor Plan</span></button>
+        <button class="settings-nav-item" type="button" data-settings-key="categories" onclick="setSettingsSection('categories')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z"/></svg></span><span>Categories</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="departments" onclick="setSettingsSection('departments')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V5h10v16M14 9h6v12M8 9h2M8 13h2M8 17h2M17 13h1M17 17h1M2 21h20"/></svg></span><span>Departments</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="product-menus" onclick="setSettingsSection('product-menus')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/></svg></span><span>Menu</span></button>
         <button class="settings-nav-item" type="button" data-settings-key="profiles" onclick="setSettingsSection('profiles')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 5a3 3 0 0 1 0 6M17 14c2.6.4 4 2.3 4 5"/></svg></span><span>Profiles</span></button>
@@ -370,12 +389,9 @@
         </div>
       </div>
       <div class="settings-pane" data-settings-pane="floor-plan">
-        <div class="settings-section-head settings-section-head-row">
-          <div><h3>Floor Plan</h3><p>Rooms defined here appear in new counts and Live Inventory.</p><span id="settings-room-count" class="settings-count">0 rooms</span></div>
-          <button class="btn btn-secondary btn-sm" id="floor-plan-edit-btn" type="button" onclick="toggleFloorPlanEdit()">Edit</button>
-        </div>
+        <div class="settings-section-head"><h3>Floor Plan</h3><p>Choose a room to edit its name and inventory items.</p><span id="settings-room-count" class="settings-count">0 rooms</span></div>
         <div class="settings-group" id="settings-room-group">
-          <div class="room-create-control floor-plan-edit-only">
+          <div class="room-create-control">
             <button class="btn btn-primary room-add-trigger" id="settings-room-add-trigger" type="button" onclick="startAddSettingsRoom()">＋ Add Room</button>
             <div class="room-create-form" id="settings-room-create-form" hidden>
               <label for="settings-room-name" id="settings-room-form-label">Room name</label>
@@ -384,6 +400,10 @@
           </div>
           <div class="settings-list" id="settings-room-list"></div>
         </div>
+      </div>
+      <div class="settings-pane" data-settings-pane="categories">
+        <div class="settings-section-head settings-section-head-row"><div><h3>Inventory Categories</h3><p>Manage the categories and subcategories used for products, filters, and floor-plan rooms.</p></div><button class="btn btn-primary" type="button" onclick="openInventoryCategoryEditor()">＋ Add Category</button></div>
+        <div class="settings-group category-settings-list" id="settings-category-list"></div>
       </div>
       <div class="settings-pane" data-settings-pane="departments">
         <div id="settings-department-overview">
@@ -439,6 +459,29 @@
 </main>
 </div>
 
+<!-- FLOOR PLAN ROOM EDITOR -->
+<div class="modal-overlay" id="modal-floor-plan-room">
+<div class="modal floor-plan-room-modal" role="dialog" aria-modal="true" aria-labelledby="floor-plan-room-title">
+  <button class="modal-close" type="button" aria-label="Close room editor" onclick="closeFloorPlanRoomEditor()">&times;</button>
+  <div class="settings-section-head"><h3 id="floor-plan-room-title">Edit Room</h3><p>Select whole categories, then add individual exceptions only when needed.</p></div>
+  <div class="form-group"><label for="floor-plan-room-name">Room name</label><input type="text" id="floor-plan-room-name" maxlength="80"></div>
+  <div class="room-editor-section"><div class="room-editor-section-head"><div><strong>Categories</strong><small>Products in selected categories are automatically included.</small></div></div><div class="room-category-grid" id="floor-plan-room-categories"></div></div>
+  <div class="room-editor-section"><div class="room-editor-section-head"><div><strong>Individual items</strong><small>Add products that are not covered by the selected categories.</small></div><button class="btn btn-secondary btn-sm" id="floor-plan-manual-toggle" type="button" onclick="toggleFloorPlanManualSearch()">＋ Add an item manually</button></div><div class="room-manual-products" id="floor-plan-manual-products"></div><div class="room-product-search" id="floor-plan-product-search" hidden><input type="search" id="floor-plan-product-query" placeholder="Search products…" oninput="renderFloorPlanProductSearch()"><div class="room-product-search-results" id="floor-plan-product-results"></div></div></div>
+  <div class="modal-actions room-editor-actions"><button class="btn btn-ghost-danger" id="floor-plan-room-delete" type="button" onclick="removeEditedFloorPlanRoom()">Remove Room</button><span></span><button class="btn btn-secondary" type="button" onclick="closeFloorPlanRoomEditor()">Cancel</button><button class="btn btn-primary" type="button" onclick="saveFloorPlanRoomEditor()">Save Room</button></div>
+</div>
+</div>
+
+<!-- INVENTORY CATEGORY EDITOR -->
+<div class="modal-overlay" id="modal-category-editor">
+<div class="modal category-editor-modal" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
+  <button class="modal-close" type="button" aria-label="Close category editor" onclick="closeModal('modal-category-editor')">&times;</button>
+  <h3 id="category-editor-title">Edit Category</h3>
+  <div class="form-group"><label for="category-editor-name">Category name</label><input type="text" id="category-editor-name" maxlength="60"></div>
+  <div class="form-group"><label for="category-editor-subcategories">Subcategories</label><textarea id="category-editor-subcategories" rows="9" placeholder="One subcategory per line"></textarea><small class="field-help">Enter one per line. These appear when editing a product.</small></div>
+  <div class="modal-actions category-editor-actions"><button class="btn btn-ghost-danger" id="category-editor-delete" type="button" onclick="deleteInventoryCategory()">Delete Category</button><span></span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-category-editor')">Cancel</button><button class="btn btn-primary" type="button" onclick="saveInventoryCategory()">Save Category</button></div>
+</div>
+</div>
+
 <!-- INV ROOM SELECT MODAL -->
 <div class="modal-overlay" id="modal-inv-room-select">
 <div class="modal room-select-modal" role="dialog" aria-modal="true" aria-labelledby="room-count-title">
@@ -481,7 +524,7 @@
       <div class="inv-filter-sheet" id="inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="inv-filter-title">
         <div class="inv-filter-sheet-head mobile-only"><div><span>Count options</span><h4 id="inv-filter-title">Sort & Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeInventoryFilterSheet()">&times;</button></div>
         <div class="inv-filter-sheet-fields">
-          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
           <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
@@ -527,7 +570,7 @@
       <label id="pm-departments-label">Departments <span class="field-help">(select every department that uses this item)</span></label>
       <div class="product-department-options" id="pm-department-list" role="group" aria-labelledby="pm-departments-label"></div>
     </div>
-    <div class="form-group"><label for="pm-cat">Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Wine</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+    <div class="form-group"><label for="pm-cat">Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
     <div class="form-group"><label for="pm-sub">Subcategory</label><select id="pm-sub"></select></div>
     <div class="form-group"><label id="pm-unit-label" for="pm-unit">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
     <div class="form-group"><label id="pm-cost-label" for="pm-cost">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
@@ -551,7 +594,6 @@
 <!-- PRODUCT VIEW MODAL -->
 <div class="modal-overlay" id="modal-product-view">
 <div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="product-view-title">
-  <button type="button" class="modal-close" onclick="closeModal('modal-product-view')" aria-label="Close product detail">&times;</button>
   <div id="product-view-body"></div>
 </div>
 </div>
@@ -572,7 +614,6 @@
 <!-- VIEW INV MODAL -->
 <div class="modal-overlay" id="modal-view-inv">
 <div class="modal view-inv-modal" role="dialog" aria-modal="true" aria-labelledby="view-inv-title">
-  <button class="modal-close" type="button" aria-label="Close saved count preview" onclick="closeModal('modal-view-inv')">&times;</button>
   <div class="view-inv-heading">
     <div><h3 id="view-inv-title">Inventory Count</h3><p class="view-inv-attribution" id="view-inv-attribution" hidden></p></div>
     <div class="view-inv-heading-actions">
@@ -585,6 +626,7 @@
         </button>
         <div class="drop-menu" id="view-inventory-actions-menu"></div>
       </div>
+      <button class="detail-close" type="button" aria-label="Close saved count preview" title="Close" onclick="closeModal('modal-view-inv')">&times;</button>
     </div>
   </div>
   <div class="view-inv-controls">
@@ -596,14 +638,12 @@
     <div class="view-inv-list mobile-only" id="view-inv-list"></div>
     <div class="view-inv-total" id="view-inv-total" aria-live="polite"></div>
   </div>
-  <div class="modal-actions view-inv-actions"><button class="btn btn-secondary" onclick="closeModal('modal-view-inv')">Close</button></div>
 </div>
 </div>
 
 <!-- LIVE INVENTORY DETAIL MODAL -->
 <div class="modal-overlay" id="modal-live-inv-detail">
 <div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="live-inv-detail-title">
-  <button class="modal-close" type="button" aria-label="Close live inventory detail" onclick="closeModal('modal-live-inv-detail')">&times;</button>
   <div id="live-inv-detail-body"></div>
 </div>
 </div>
@@ -695,7 +735,6 @@
 <!-- INVOICE DETAIL MODAL -->
 <div class="modal-overlay" id="modal-order-detail">
 <div class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
-  <button type="button" class="modal-close" onclick="closeModal('modal-order-detail')" aria-label="Close invoice detail">&times;</button>
   <div id="order-detail-body"></div>
 </div>
 </div>
@@ -705,7 +744,7 @@
 <div class="modal usage-import-modal" role="dialog" aria-modal="true" aria-labelledby="usage-upload-title">
   <button class="modal-close" type="button" aria-label="Close usage report upload" onclick="closeModal('modal-usage-upload')">&times;</button>
   <h3 id="usage-upload-title" style="margin-bottom:10px;">Upload Usage Report</h3>
-  <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
+  <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Ideal Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
   <div class="upload-zone" id="usage-zone" role="button" tabindex="0" aria-label="Upload a usage report" onclick="document.getElementById('usage-file').click()" onkeydown="activateFilePicker(event,'usage-file')">
     <div class="up-icon">DATA</div>
     <p><strong>Click or drag & drop</strong> an Excel / CSV / PDF file</p>
@@ -768,7 +807,6 @@
 <!-- USAGE LOG DETAIL MODAL -->
 <div class="modal-overlay" id="modal-usage-log-detail">
 <div class="modal invoice-modal">
-  <button class="modal-close" onclick="closeModal('modal-usage-log-detail')">&times;</button>
   <div id="usage-upload-detail-card">
     <div class="usage-detail-header" id="usage-detail-header">
       <div>
@@ -814,7 +852,6 @@
 <!-- SUPPLIER VIEW MODAL -->
 <div class="modal-overlay" id="modal-supplier-view">
 <div class="modal product-view-modal" role="dialog" aria-modal="true" aria-labelledby="supplier-view-title">
-  <button type="button" class="modal-close" onclick="closeModal('modal-supplier-view')" aria-label="Close supplier detail">&times;</button>
   <div id="supplier-view-body"></div>
 </div>
 </div>
