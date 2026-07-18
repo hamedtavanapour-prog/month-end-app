@@ -1215,11 +1215,12 @@ function toggleArchivedInventories(){showArchivedInventories=!showArchivedInvent
 function archiveInventory(id,archived=true){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);if(!inv)return;
-  inv.archived=archived;save();renderInventoryTable();refreshLiveInventoryIfVisible();
+  inv.archived=archived;inv.updatedBy=currentAuditStamp();inv.updatedAt=new Date().toISOString();save();renderInventoryTable();refreshLiveInventoryIfVisible();
   window.recordServerEvent?.({action:archived?'count.archived':'count.restored',entityType:'count',entityId:id,details:{label:inv.label||'',date:inv.date}});
   if(viewInvId===id){
     document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
     renderViewInventoryActions(inv);
+    renderViewedInventoryHistory(inv);
   }
   toast(archived?'Count archived.':'Count restored.');
 }
@@ -1228,8 +1229,10 @@ function viewInventory(id){
   document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
   const attribution=document.getElementById('view-inv-attribution');if(attribution){attribution.textContent=inv.createdBy?.name?`Created by ${inv.createdBy.name} · ${inv.createdBy.role||'Team member'}${inv.createdAt?` · ${new Date(inv.createdAt).toLocaleString()}`:''}`:'';attribution.hidden=!attribution.textContent;}
   document.getElementById('view-inv-search').value='';
-  renderViewInventoryActions(inv);renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
+  renderViewInventoryActions(inv);renderViewedInventoryHistory(inv);const history=document.getElementById('view-inv-history');if(history)history.hidden=true;document.getElementById('view-inv-history-toggle')?.setAttribute('aria-expanded','false');renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
 }
+function renderViewedInventoryHistory(inv){const panel=document.getElementById('view-inv-history');if(panel)panel.innerHTML=recordHistoryMarkup(inv,'Created');}
+function toggleViewedInventoryHistory(){const inv=state.inventories.find(item=>item.id===viewInvId);const panel=document.getElementById('view-inv-history');const toggle=document.getElementById('view-inv-history-toggle');if(!inv||!panel)return;renderViewedInventoryHistory(inv);panel.hidden=!panel.hidden;toggle?.setAttribute('aria-expanded',String(!panel.hidden));}
 function renderViewInventoryActions(inv){
   const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
   menu.innerHTML=`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="exportViewedInventoryExcel()">Export Excel / CSV</button><button onclick="printViewedInventory()">Print / PDF</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button><button onclick="deleteInventory('${inv.id}')">Delete count</button>`;
@@ -1278,8 +1281,9 @@ function saveViewedInventoryItem(productId,button){
   });
   inv.items=mergeInventoryRoomItems(inv.rooms);
   inv.draft=!Object.keys(inv.items).length;
+  inv.updatedBy=currentAuditStamp();inv.updatedAt=new Date().toISOString();
   viewInvExpandedProductId=null;viewInvEditingProductId=null;
-  save();renderInventoryTable();refreshLiveInventoryIfVisible();renderViewInvTable();toast('Item count updated.');
+  save();renderInventoryTable();refreshLiveInventoryIfVisible();renderViewedInventoryHistory(inv);renderViewInvTable();toast('Item count updated.');
 }
 function renderViewInvTable(){
   const inv=state.inventories.find(i=>i.id===viewInvId);if(!inv)return;normalizeInventoryRooms(inv);

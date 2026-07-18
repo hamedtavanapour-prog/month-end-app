@@ -135,6 +135,29 @@ function closeAllMenus(){
   });
   syncMobileSheetBackdrop();
 }
+function currentAuditStamp(){
+  const serverUser=window.serverAccessContext?.user||{};
+  const profile=typeof currentProfile==='function'?currentProfile():null;
+  return{
+    id:serverUser.id||profile?.id||'',
+    name:serverUser.name||profile?.name||'Team member',
+    role:serverUser.jobTitle||serverUser.role||profile?.role||'Team member',
+    email:serverUser.email||profile?.email||''
+  };
+}
+function auditDateLabel(value){
+  if(!value)return'Not recorded';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'Not recorded':date.toLocaleString();
+}
+function auditActorLabel(actor){
+  if(!actor?.name)return'Unknown (older record)';
+  return[actor.name,actor.role||actor.email].filter(Boolean).join(' · ');
+}
+function recordHistoryMarkup(record,createdLabel='Created'){
+  const wasModified=Boolean(record?.updatedAt);
+  return`<div class="record-history-title"><strong>History</strong><small>Creation and latest saved change</small></div><div class="record-history-timeline"><div class="record-history-event"><span class="record-history-dot" aria-hidden="true"></span><div><strong>${escapeHtml(createdLabel)}</strong><time>${escapeHtml(auditDateLabel(record?.createdAt))}</time><small>By ${escapeHtml(auditActorLabel(record?.createdBy))}</small></div></div><div class="record-history-event"><span class="record-history-dot" aria-hidden="true"></span><div><strong>Last modified</strong><time>${wasModified?escapeHtml(auditDateLabel(record.updatedAt)):'No changes since creation'}</time><small>${wasModified?`By ${escapeHtml(auditActorLabel(record.updatedBy))}`:'—'}</small></div></div></div>`;
+}
 function syncMobileSheetBackdrop(){
   const backdrop=document.getElementById('mobile-sheet-backdrop');
   if(!backdrop)return;

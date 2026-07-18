@@ -1469,11 +1469,27 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
 .view-inv-heading-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;}
 .detail-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;}
 .detail-close{display:grid;width:38px;height:38px;min-width:38px;place-items:center;border:0;padding:0;background:transparent;color:var(--text-muted);font-size:1.35rem;line-height:1;cursor:pointer;}
-.detail-close:hover,.detail-close:focus-visible{background:transparent;color:var(--text);outline:none;}
+.detail-close:hover,.detail-close:focus-visible{background:transparent;color:var(--text);font-weight:800;outline:none;}
 .icon-btn,.overflow-menu-button{display:grid;width:38px;height:38px;min-width:38px;place-items:center;border:0!important;border-radius:9px;padding:0!important;background:transparent!important;color:var(--text);box-shadow:none!important;cursor:pointer;}
 .icon-btn:hover,.icon-btn:focus-visible,.overflow-menu-button:hover,.overflow-menu-button:focus-visible{background:var(--surface2)!important;color:var(--text);outline:none;}
 .icon-btn svg,.overflow-menu-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;}
 .overflow-menu-button svg circle{fill:currentColor;stroke:none;}
+.view-inv-heading-actions .icon-btn,.usage-header-actions .icon-btn{color:var(--text-muted);}
+.view-inv-heading-actions .icon-btn:hover,.view-inv-heading-actions .icon-btn:focus-visible,.usage-header-actions .icon-btn:hover,.usage-header-actions .icon-btn:focus-visible{background:transparent!important;color:var(--text);}
+.view-inv-heading-actions .icon-btn:hover svg,.view-inv-heading-actions .icon-btn:focus-visible svg,.usage-header-actions .icon-btn:hover svg,.usage-header-actions .icon-btn:focus-visible svg{stroke-width:2.5;transform:scale(1.06);}
+.view-inv-heading-actions .overflow-menu-button:hover svg circle,.view-inv-heading-actions .overflow-menu-button:focus-visible svg circle,.usage-header-actions .overflow-menu-button:hover svg circle,.usage-header-actions .overflow-menu-button:focus-visible svg circle{transform:scale(1.12);transform-origin:center;}
+.record-history-panel{margin:10px 0 14px;border:1px solid var(--border);border-radius:13px;background:var(--surface2);padding:14px 16px;animation:page-enter .16s ease both;}
+.record-history-panel[hidden]{display:none;}
+.record-history-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.record-history-title strong{font-size:.84rem;}
+.record-history-title small{color:var(--text-muted);font-size:.68rem;}
+.record-history-timeline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.record-history-event{display:grid;grid-template-columns:10px minmax(0,1fr);gap:9px;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:11px;}
+.record-history-dot{width:8px;height:8px;margin-top:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.13);}
+.record-history-event>div{display:flex;min-width:0;flex-direction:column;gap:3px;}
+.record-history-event strong{font-size:.74rem;}
+.record-history-event time{font-size:.78rem;font-weight:750;}
+.record-history-event small{overflow-wrap:anywhere;color:var(--text-muted);font-size:.68rem;}
 .view-inv-controls{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(240px,1.3fr);gap:12px;margin:14px 0;}
 .view-inv-controls .form-group{margin:0;}
 .view-inv-scroll{min-height:0;overflow:auto;padding-right:2px;}
@@ -1782,6 +1798,7 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   .view-inv-modal{height:100dvh;max-height:100dvh;padding:18px 12px 0;}
   .view-inv-heading{padding-right:0;}
   .view-inv-controls{grid-template-columns:1fr;gap:10px;margin:12px 0;}
+  .record-history-timeline{grid-template-columns:1fr;}
   .view-inv-scroll{padding:0 1px 10px;}
   .view-inv-list{display:grid;gap:10px;}
   .view-inv-item-card{overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface);}

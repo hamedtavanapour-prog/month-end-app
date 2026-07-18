@@ -813,7 +813,7 @@ function createUsageLog(fileName,rows,sourceFile=null){
     periodStart:period.start,
     periodEnd:period.end,
     createdAt:new Date().toISOString(),
-    createdBy:profile?{id:profile.id||'',name:profile.name||'',email:profile.email||''}:null,
+    createdBy:profile?{id:profile.id||'',name:profile.name||'',role:profile.role||'',email:profile.email||''}:null,
     archived:false,
     rows
   };
@@ -1597,6 +1597,7 @@ function openUsageLogView(id,edit=false){
   if(source)source.value='uploaded';
   const detailSearch=document.getElementById('usage-detail-search');
   if(detailSearch)detailSearch.value='';
+  const history=document.getElementById('usage-log-history');if(history)history.hidden=true;
   renderUsageLogs();
   renderUsageSummaryOnly();
   renderUploadedUsageDetails();
@@ -1677,6 +1678,9 @@ function renderUploadedUsageDetails(){
   const totalIdealUsage=idealValues.reduce((sum,value)=>sum+value,0);
   const creatorName=log.createdBy?.name||'Unknown (older log)';
   const creatorDetail=log.createdBy?.email?`${creatorName} · ${log.createdBy.email}`:creatorName;
+  renderUsageLogHistory(log);
+  const historyOpen=!document.getElementById('usage-log-history')?.hidden;
+  const historyButton=`<button class="icon-btn record-history-toggle" type="button" aria-label="View usage history" title="History" aria-expanded="${historyOpen}" onclick="toggleUsageLogHistory()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></button>`;
   header.classList.toggle('pinned',usageLogHeaderPinned);
   document.getElementById('usage-detail-title').textContent=log.fileName||'Usage Log';
   periodFields.innerHTML=usageLogEditMode?`
@@ -1730,15 +1734,21 @@ function renderUploadedUsageDetails(){
   actions.innerHTML=usageLogEditMode?`
     <div class="editor-completion-actions"><button class="btn btn-secondary" onclick="cancelUsageLogEdits()">Cancel</button><button class="btn btn-primary" onclick="setUsageLogEditMode(false)">Done</button></div>
     <button class="btn btn-secondary" onclick="addUsageLogRow()">+ Add Row</button>
+    ${historyButton}
     <div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Usage log actions" title="Usage log actions" onclick="event.stopPropagation();toggleMenu('usage-detail-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="usage-detail-actions-menu"><button onclick="closeAllMenus();downloadUsageLogSource('${log.id}')">Download File</button><button onclick="closeAllMenus();archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteUsageLog('${log.id}',true)">Delete</button></div></div>
     <button class="detail-close" type="button" aria-label="Close usage log" title="Close" onclick="cancelUsageLogEdits();closeModal('modal-usage-log-detail')">&times;</button>
   `:`
+    ${historyButton}
     <button class="icon-btn" type="button" aria-label="Edit usage log" title="Edit usage log" onclick="setUsageLogEditMode(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
     <div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Usage log actions" title="Usage log actions" onclick="event.stopPropagation();toggleMenu('usage-detail-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="usage-detail-actions-menu"><button onclick="closeAllMenus();downloadUsageLogSource('${log.id}')">Download File</button><button onclick="closeAllMenus();archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteUsageLog('${log.id}',true)">Delete</button></div></div>
     <button class="detail-close" type="button" aria-label="Close usage log" title="Close" onclick="closeModal('modal-usage-log-detail')">&times;</button>
   `;
   filterUsageLogDetailRows();
 }
+
+function renderUsageLogHistory(log){const panel=document.getElementById('usage-log-history');if(panel)panel.innerHTML=recordHistoryMarkup(log,'Imported');}
+function toggleUsageLogHistory(){const log=selectedUsageLog();const panel=document.getElementById('usage-log-history');if(!log||!panel)return;renderUsageLogHistory(log);panel.hidden=!panel.hidden;renderUploadedUsageDetails();}
+function markUsageLogUpdated(log){if(!log)return;log.updatedBy=currentAuditStamp();log.updatedAt=new Date().toISOString();}
 
 function usageLogRowSearchText(row){
   const product=row.productId?getProduct(row.productId):null;
@@ -1822,6 +1832,7 @@ function saveUsageLogEdits(){
     row.periodStart=log.periodStart||row.periodStart||'';
     row.periodEnd=log.periodEnd||row.periodEnd||'';
   });
+  markUsageLogUpdated(log);
   state.uploadedUsage=log.rows;
   save();
   renderUsageLogs();
@@ -1852,6 +1863,7 @@ function addUsageLogRow(){
   const log=selectedUsageLog();
   if(!log)return;
   log.rows.push({productId:'',productName:'',reportProductName:'',sku:'',unitSize:'',qty:0,actualUsage:'',idealUsage:'',begin:'',end:'',purch:'',periodStart:log.periodStart||'',periodEnd:log.periodEnd||'',matched:false,matchedName:null,sizeMatched:true,sourceFile:log.fileName,importedAt:new Date().toISOString()});
+  markUsageLogUpdated(log);
   state.uploadedUsage=log.rows;
   save();
   renderUsageLogs();
@@ -1864,6 +1876,7 @@ function deleteUsageLogRow(index){
   const log=selectedUsageLog();
   if(!log)return;
   log.rows.splice(index,1);
+  markUsageLogUpdated(log);
   state.uploadedUsage=log.rows;
   save();
   renderUsageLogs();
@@ -1881,7 +1894,7 @@ function deleteSelectedUsageLog(){
 function archiveUsageLog(id,archived=true){
   const log=ensureUsageLogs().find(item=>item.id===id);
   if(!log)return;
-  log.archived=archived;
+  log.archived=archived;markUsageLogUpdated(log);
   save();
   closeModal('modal-usage-log-detail');
   renderUsagePage();
