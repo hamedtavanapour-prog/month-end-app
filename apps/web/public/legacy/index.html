@@ -22,6 +22,10 @@
     <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Toggle sidebar">ME</button>
     <div class="sidebar-logo"><h1><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>Keg Bar</h1><span>Inventory Manager</span></div>
   </div>
+  <button class="master-search-trigger" id="master-search-trigger" type="button" onclick="openMasterSearch(this)" aria-label="Search everything" aria-haspopup="dialog">
+    <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>
+    <span class="master-search-trigger-label">Search anything</span><kbd aria-hidden="true">⌘ K</kbd>
+  </button>
   <button class="nav-item active" type="button" onclick="showPage('dashboard')" id="nav-dashboard" aria-label="Dashboard" aria-current="page"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Dashboard</span></button>
   <button class="nav-item" type="button" onclick="showPage('products')" id="nav-products" aria-label="Products"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7 8 4 8-4M4 7v10l8 4 8-4V7M12 11v10"/></svg></span><span>Products</span></button>
   <button class="nav-item" type="button" onclick="showPage('live-inventory')" id="nav-live-inventory" aria-label="Live Inventory"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span>Live Inventory</span></button>
@@ -80,6 +84,9 @@
       <button type="button" role="menuitem" data-mobile-page="reports"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3Z"/><path d="M15 3v5h5M9 12h7M9 16h7"/></svg></span><span><strong>Reports</strong><small>Review and export reports</small></span></button>
     </div>
   </div>
+  <button class="mobile-nav-item" id="mobile-nav-search" type="button" aria-haspopup="dialog">
+    <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span><span>Search</span>
+  </button>
   <button class="mobile-nav-item" id="mobile-nav-live" type="button" data-mobile-page="live-inventory">
     <span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span>Live Inventory</span>
   </button>
@@ -192,13 +199,21 @@
     <button class="btn btn-secondary btn-sm" onclick="renderLiveInventoryPage()"> Refresh</button>
   </div>
   <div class="stat-grid" id="live-inv-stats"></div>
-  <div class="card" style="margin-bottom:14px;">
-    <div class="form-row">
-      <div class="form-group" style="flex:2;min-width:130px;"><label>Search</label><input type="text" id="live-inv-search" placeholder="Name, alias…" oninput="renderLiveInventoryPage()"></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
-      <div class="form-group" style="flex:1;min-width:110px;"><label>Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
-      <div class="form-group live-room-group"><label>Rooms</label><div class="drop-wrap live-room-picker"><button class="btn btn-secondary live-room-picker-button" id="live-room-picker-button" type="button" onclick="toggleMenu('live-room-menu')"><span id="live-room-picker-label">All rooms</span><span aria-hidden="true">▾</span></button><div class="drop-menu live-room-menu" id="live-room-menu" onclick="event.stopPropagation()"><div class="live-room-menu-head"><strong>Select rooms</strong><button type="button" onclick="selectAllLiveInventoryRooms()">All rooms</button></div><div id="live-room-options"></div><button class="live-room-done" type="button" onclick="closeAllMenus()">Done</button></div></div></div>
+  <div class="card live-inv-filter-card" style="margin-bottom:14px;">
+    <div class="form-row live-inv-filter-row">
+      <div class="form-group live-inv-search-field" style="flex:2;min-width:130px;"><label for="live-inv-search">Search</label><input type="text" id="live-inv-search" placeholder="Name, alias…" oninput="renderLiveInventoryPage()"></div>
+      <button class="btn btn-secondary live-inv-filter-trigger mobile-only" type="button" onclick="openLiveInventoryFilterSheet()"><span>Sort &amp; Filter</span><small id="live-inv-filter-summary">Default</small></button>
+      <div class="live-inv-filter-sheet" id="live-inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="live-inv-filter-title">
+        <div class="live-inv-filter-sheet-head mobile-only"><div><span>Live inventory options</span><h4 id="live-inv-filter-title">Sort &amp; Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeLiveInventoryFilterSheet()">&times;</button></div>
+        <div class="live-inv-filter-fields">
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-cat-f">Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-sub-f">Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
+          <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-status-f">Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
+          <div class="form-group" style="flex:1;min-width:130px;"><label for="live-inv-sort-f">Sort</label><select id="live-inv-sort-f" onchange="renderLiveInventoryPage()"><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="live-desc">Live quantity — highest</option><option value="live-asc">Live quantity — lowest</option><option value="base-desc">Count — highest</option><option value="base-asc">Count — lowest</option><option value="value-desc">Value — highest</option><option value="value-asc">Value — lowest</option></select></div>
+          <div class="form-group live-room-group"><label>Rooms</label><div class="drop-wrap live-room-picker"><button class="btn btn-secondary live-room-picker-button" id="live-room-picker-button" type="button" onclick="toggleMenu('live-room-menu')"><span id="live-room-picker-label">All rooms</span><span aria-hidden="true">▾</span></button><div class="drop-menu live-room-menu" id="live-room-menu" onclick="event.stopPropagation()"><div class="live-room-menu-head"><strong>Select rooms</strong><button type="button" onclick="selectAllLiveInventoryRooms()">All rooms</button></div><div id="live-room-options"></div><button class="live-room-done" type="button" onclick="closeAllMenus()">Done</button></div></div></div>
+        </div>
+        <button class="btn btn-primary live-inv-filter-done mobile-only" type="button" onclick="closeLiveInventoryFilterSheet()">Done</button>
+      </div>
       <div class="form-group live-view-mode-group"><label>View As</label><div class="segmented-control" id="live-inv-view-mode">
         <button type="button" title="List view" onclick="setLiveInventoryViewMode('list')">List</button>
         <button type="button" title="Icon view" onclick="setLiveInventoryViewMode('icons')">▦</button>
@@ -457,6 +472,23 @@
 </div>
 
 </main>
+</div>
+
+<!-- MASTER SEARCH -->
+<div class="master-search-overlay" id="master-search-overlay" aria-hidden="true">
+  <section class="master-search-dialog" role="dialog" aria-modal="true" aria-labelledby="master-search-title">
+    <h2 class="sr-only" id="master-search-title">Search anything</h2>
+    <div class="master-search-input-row">
+      <span class="master-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>
+      <input id="master-search-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="master-search-results" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="Search products, counts, pages, or actions…">
+      <button class="master-search-clear" id="master-search-clear" type="button" aria-label="Clear search" hidden>&times;</button>
+      <kbd class="master-search-escape" aria-hidden="true">Esc</kbd>
+      <button class="master-search-mobile-close" type="button" onclick="closeMasterSearch()">Cancel</button>
+    </div>
+    <div class="master-search-summary"><span id="master-search-status" role="status" aria-live="polite">Start typing or choose a suggestion</span><span>Searches only what you can access</span></div>
+    <div class="master-search-results" id="master-search-results" role="listbox" aria-label="Search results"></div>
+    <footer class="master-search-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+  </section>
 </div>
 
 <!-- FLOOR PLAN ROOM EDITOR -->
@@ -906,6 +938,7 @@
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/master-search.js"></script>
 <script src="js/main.js"></script>
 <script src="js/access.js?v=settings-layout-1"></script>
 </body>

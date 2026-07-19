@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { requireAccessContext } from "@/lib/auth/context";
 
 export const metadata: Metadata = { title: "Workspace" };
@@ -15,6 +16,7 @@ export default async function AppHome() {
         src="/legacy/index.html?v=department-setup-1"
         title={`${context.organizationName} inventory workspace for ${context.email}`}
       />
+      <Script src="/legacy/js/search-bridge.js" strategy="afterInteractive" />
     </main>
   );
 }

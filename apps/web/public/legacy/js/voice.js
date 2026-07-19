@@ -40,6 +40,7 @@ function setVoiceModal(text){
   document.getElementById('voice-hint').textContent=hints[voiceContext]||'';
   document.getElementById('voice-live').textContent=text||'Listening...';
   document.getElementById('voice-modal').classList.add('open');
+  if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
 }
 
 function setVoiceActionState(state){
@@ -156,6 +157,7 @@ function resetVoiceState(){
   voiceRecorder=null;
   setVoiceButtons(null);
   document.getElementById('voice-modal').classList.remove('open');
+  if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
   setVoiceActionState('recording');
 }
 

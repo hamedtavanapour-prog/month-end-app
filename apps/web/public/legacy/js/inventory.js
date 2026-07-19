@@ -613,6 +613,32 @@ function setLiveInventoryViewMode(mode){
   renderLiveInventoryPage();
 }
 
+function openLiveInventoryFilterSheet(){
+  closeAllMenus();
+  const sheet=document.getElementById('live-inv-filter-sheet');
+  if(!sheet)return;
+  sheet.scrollTop=0;
+  sheet.classList.add('open');
+  syncMobileSheetBackdrop();
+}
+
+function closeLiveInventoryFilterSheet(){
+  document.getElementById('live-inv-filter-sheet')?.classList.remove('open');
+  syncMobileSheetBackdrop();
+}
+
+function updateLiveInventoryFilterSummary(){
+  const summary=document.getElementById('live-inv-filter-summary');
+  if(!summary)return;
+  const category=document.getElementById('live-inv-cat-f')?.value||'';
+  const subcategory=document.getElementById('live-inv-sub-f')?.value||'';
+  const status=document.getElementById('live-inv-status-f')?.value||'';
+  const sort=document.getElementById('live-inv-sort-f')?.value||'name-asc';
+  const roomFiltered=liveInventoryRoomIds!==null;
+  const active=[category,subcategory,status,sort!=='name-asc'?sort:'',roomFiltered?'rooms':''].filter(Boolean).length;
+  summary.textContent=active?`${active} active`:'Default';
+}
+
 function renderLiveInventoryViewButtons(){
   document.querySelectorAll('#live-inv-view-mode button').forEach(button=>{
     const onclick=button.getAttribute('onclick')||'';
@@ -663,6 +689,7 @@ function renderLiveInventoryPage(){
   if(!results)return;
   renderLiveInventoryRoomTabs();
   renderLiveInventoryViewButtons();
+  updateLiveInventoryFilterSummary();
   if(!state.products.length){
     results.innerHTML=liveInventoryEmpty('Loading live inventory...');
     setTimeout(()=>{if(document.getElementById('page-live-inventory')?.classList.contains('active'))renderLiveInventoryPage();},600);
@@ -672,6 +699,7 @@ function renderLiveInventoryPage(){
   const cat=document.getElementById('live-inv-cat-f')?.value||'';
   const sub=document.getElementById('live-inv-sub-f')?.value||'';
   const status=document.getElementById('live-inv-status-f')?.value||'';
+  const sort=document.getElementById('live-inv-sort-f')?.value||'name-asc';
   const baseline=latestInventoryCount();
   const allLiveRows=liveInventoryRows();
   const selectedRooms=selectedLiveInventoryRooms();
@@ -685,6 +713,8 @@ function renderLiveInventoryPage(){
   if(status==='low')rows=rows.filter(row=>row.par>0&&row.live<=row.par);
   if(status==='negative')rows=rows.filter(row=>row.live<0);
   if(status==='movement')rows=rows.filter(row=>row.ordered||row.used);
+  const [sortColumn,sortDirection]=sort.split('-');
+  sortState.liveInventory={col:sortColumn||'name',dir:sortDirection||'asc'};
   rows=sortArr(rows,sortState.liveInventory.col,sortState.liveInventory.dir);
   const totalValue=rows.reduce((sum,row)=>sum+row.value,0);
   const lowCount=allLiveRows.filter(row=>row.par>0&&row.live<=row.par).length;
