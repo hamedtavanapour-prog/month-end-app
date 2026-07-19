@@ -161,9 +161,11 @@ function recordHistoryMarkup(record,createdLabel='Created'){
 function syncMobileSheetBackdrop(){
   const backdrop=document.getElementById('mobile-sheet-backdrop');
   if(!backdrop)return;
-  // Modal-contained controls already have their modal overlay. Only page-level
-  // sheets need this separate dimming layer.
-  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.main .drop-menu.open,.main .col-menu.open,.main .product-filter-sheet.open,.main .live-inv-filter-sheet.open,.mobile-nav-popover.open,#voice-modal.open');
+  // In-page filter sheets follow the Count sheet behavior: they stay in the
+  // active page/modal and must remain directly touchable. A separate top-level
+  // backdrop can sit above them on iOS and steal taps from native selects.
+  // Only top-level panels use this shared dimming layer.
+  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.mobile-nav-popover.open,#voice-modal.open');
   backdrop.classList.toggle('open',hasOpenSheet);
   backdrop.setAttribute('aria-hidden',String(!hasOpenSheet));
   syncBlockingUiState();
@@ -183,7 +185,7 @@ function mobileBlockingUiOpen(){
   return window.innerWidth<=820&&!!document.querySelector('.modal-overlay.open,#voice-modal.open,#master-search-overlay.open,.mobile-sheet-backdrop.open,.product-filter-sheet.open,.inv-filter-sheet.open,.live-inv-filter-sheet.open,.drop-menu.open,.col-menu.open,.mobile-nav-popover.open');
 }
 function syncBlockingUiState(){
-  const hardBlock=window.innerWidth<=820&&!!document.querySelector('.modal-overlay.open,#voice-modal.open,#master-search-overlay.open');
+  const hardBlock=window.innerWidth<=820&&!!document.querySelector('.modal-overlay.open,#voice-modal.open,#master-search-overlay.open,.live-inv-filter-overlay.open');
   const navBlock=hardBlock||window.innerWidth<=820&&!!document.querySelector('.product-filter-sheet.open,.inv-filter-sheet.open,.live-inv-filter-sheet.open,.drop-menu.open,.col-menu.open');
   const main=document.querySelector('.main');
   const nav=document.querySelector('.mobile-nav');

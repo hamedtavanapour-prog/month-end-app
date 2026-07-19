@@ -613,18 +613,41 @@ function setLiveInventoryViewMode(mode){
   renderLiveInventoryPage();
 }
 
+let liveInventoryFilterHome=null;
+let liveInventoryFilterNextSibling=null;
+
 function openLiveInventoryFilterSheet(){
   closeAllMenus();
   const sheet=document.getElementById('live-inv-filter-sheet');
+  const overlay=document.getElementById('live-inv-filter-overlay');
   if(!sheet)return;
+  if(window.innerWidth<=820&&overlay){
+    if(!liveInventoryFilterHome){
+      liveInventoryFilterHome=sheet.parentElement;
+      liveInventoryFilterNextSibling=sheet.nextSibling;
+    }
+    overlay.appendChild(sheet);
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden','false');
+  }
   sheet.scrollTop=0;
   sheet.classList.add('open');
-  syncMobileSheetBackdrop();
+  syncBlockingUiState();
 }
 
 function closeLiveInventoryFilterSheet(){
-  document.getElementById('live-inv-filter-sheet')?.classList.remove('open');
-  syncMobileSheetBackdrop();
+  const sheet=document.getElementById('live-inv-filter-sheet');
+  const overlay=document.getElementById('live-inv-filter-overlay');
+  sheet?.classList.remove('open');
+  overlay?.classList.remove('open');
+  overlay?.setAttribute('aria-hidden','true');
+  if(sheet&&liveInventoryFilterHome&&sheet.parentElement!==liveInventoryFilterHome){
+    if(liveInventoryFilterNextSibling?.parentElement===liveInventoryFilterHome)liveInventoryFilterHome.insertBefore(sheet,liveInventoryFilterNextSibling);
+    else liveInventoryFilterHome.appendChild(sheet);
+  }
+  liveInventoryFilterHome=null;
+  liveInventoryFilterNextSibling=null;
+  syncBlockingUiState();
 }
 
 function updateLiveInventoryFilterSummary(){
@@ -779,7 +802,20 @@ function initLiveCounts(ex){
   currentInvRoomId=currentInvRooms[0].id;
   currentRoomProducts().forEach(p=>{liveInvCounts[p.id]='';});
 }
-function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);hideInventoryFinishMessage();const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');const section=row.closest('.inv-count-section');if(section){const inputs=[...section.querySelectorAll('input[data-count-input="true"]')];const filled=inputs.filter(input=>input.value!=='').length;const count=section.querySelector('.inv-section-summary-count');if(count)count.textContent=`${filled}/${inputs.length}`;}prepareFollowingInventorySection(el);updateInvProgress();}
+function inventorySectionProgress(category,subcategory){
+  const items=currentCountProducts().filter(product=>product.category===category&&(product.subcategory||'Other')===subcategory);
+  const filled=items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
+  return{filled,total:items.length,complete:items.length>0&&filled===items.length};
+}
+function syncInventorySectionCompletion(section){
+  if(!section?.dataset.sectionToken)return;
+  const token=decodeURIComponent(section.dataset.sectionToken).split('|||');
+  const progress=inventorySectionProgress(token[1]||'',token[2]||'Other');
+  section.classList.toggle('complete',progress.complete);
+  const count=section.querySelector('.inv-section-summary-count');
+  if(count)count.textContent=`${progress.filled}/${progress.total}`;
+}
+function onInvInput(pid,el){liveInvCounts[pid]=el.value===''?'':parseFloat(el.value);hideInventoryFinishMessage();const row=document.getElementById('row-'+pid);if(!row)return;const dot=row.querySelector('.missing-dot,.filled-dot');const f=el.value!=='';if(dot)dot.className=f?'filled-dot':'missing-dot';row.className='inv-count-row '+(f?'filled-row':'missing-row');syncInventorySectionCompletion(row.closest('.inv-count-section'));prepareFollowingInventorySection(el);updateInvProgress();}
 function invQtyInputs(){return[...document.querySelectorAll('#inv-rows input[data-count-input="true"]')];}
 function expandInventorySectionElement(section){
   if(!section||!section.classList.contains('collapsed'))return;
@@ -1069,11 +1105,11 @@ function renderInvRows(skipCapture=false){
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!expandedInventorySections.has(sectionToken);
-    const filledCount=g.items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
-    html+=`<section class="inv-count-section ${collapsed?'collapsed':''}" data-section-token="${sectionToken}">
+    const progress=inventorySectionProgress(g.cat,g.sub);
+    html+=`<section class="inv-count-section ${collapsed?'collapsed':''} ${progress.complete?'complete':''}" data-section-token="${sectionToken}">
       <button class="inv-section-header" type="button" aria-expanded="${!collapsed}" onclick="toggleInventorySection('${sectionToken}')">
         <span class="inv-section-title">${catBadge(g.cat)} <span>${escapeHtml(g.sub)}</span></span>
-        <span class="inv-section-summary"><span class="inv-section-summary-count">${filledCount}/${g.items.length}</span><span class="inv-section-chevron" aria-hidden="true">⌄</span></span>
+        <span class="inv-section-summary"><span class="inv-section-complete-mark" aria-label="Complete" title="All items counted">✓</span><span class="inv-section-summary-count">${progress.filled}/${progress.total}</span><span class="inv-section-chevron" aria-hidden="true">⌄</span></span>
       </button>
       <div class="inv-section-items" ${collapsed?'hidden':''}>${g.items.map(renderProduct).join('')}</div>
     </section>`;
