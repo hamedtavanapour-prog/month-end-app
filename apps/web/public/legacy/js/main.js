@@ -32,4 +32,4 @@ async function init(){
   if(typeof renderProfileMenu==='function')renderProfileMenu();
   if(typeof renderAccessControlledNav==='function')renderAccessControlledNav();
 }
-init();
+init().finally(()=>window.legacyRoutingReady?.());
