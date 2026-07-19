@@ -1574,7 +1574,7 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface2) 72%,transparent);}
   .product-mobile-details strong{font-size:.76rem;line-height:1.35;overflow-wrap:anywhere;}
   .product-mobile-details .product-mobile-wide{grid-column:1/-1;}
   .product-mobile-actions{grid-column:1/-1;display:flex;justify-content:flex-end;}
-  .mobile-sheet-backdrop{position:fixed;z-index:4100;inset:0;display:none;width:100%;height:100%;border:0;padding:0;background:rgba(15,23,42,.42);backdrop-filter:blur(2px);}
+  .mobile-sheet-backdrop{position:fixed;z-index:4100;inset:0;display:none;width:100%;height:100%;border:0;padding:0;background:rgba(3,8,14,.58);backdrop-filter:none;}
   .mobile-sheet-backdrop.open{display:block;animation:fade-in .14s ease both;}
   .drop-menu,.col-menu{z-index:4200!important;inset:auto 10px calc(10px + env(safe-area-inset-bottom))!important;width:calc(100% - 20px)!important;max-width:calc(100% - 20px)!important;margin:0!important;box-sizing:border-box;min-width:0!important;max-height:min(520px,70dvh)!important;overflow:auto;border:1px solid var(--border);border-radius:20px;padding:15px 8px 8px;background:var(--surface);box-shadow:0 28px 80px rgba(0,0,0,.5);}
   .drop-menu.open,.col-menu.open{animation:mobile-menu-enter .16s ease both;}
@@ -1877,7 +1877,9 @@ body.sidebar-collapsed .master-search-trigger:hover::after,body.sidebar-collapse
   @keyframes master-search-mobile-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   .master-search-input-row{min-height:70px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;}
   .master-search-icon{width:25px;flex-basis:25px;}
-  #master-search-input{font-size:.96rem;}
+  /* iOS zooms focused form controls rendered below 16px. Keep Spotlight at
+     the native threshold while preserving normal page pinch-to-zoom. */
+  #master-search-input{font-size:16px;}
   .master-search-escape{display:none;}
   .master-search-mobile-close{display:block;min-width:50px;min-height:44px;}
   .master-search-summary{padding:9px 14px;}
@@ -1915,6 +1917,15 @@ body.sidebar-collapsed .master-search-trigger:hover::after,body.sidebar-collapse
   #page-products .product-filter-sheet,.inv-filter-sheet,.drop-menu,.col-menu{bottom:calc(12px + var(--phone-safe-bottom))!important;}
   .view-inv-actions{padding-bottom:calc(16px + var(--phone-safe-bottom));}
   body.blocking-ui-open{overscroll-behavior:none;}
+  /* A retained page-entry transform creates a stacking context that can trap
+     fixed sheets underneath the shared backdrop on iOS. */
+  .page{animation:none!important;transform:none!important;}
+  /* Mobile nav popovers live inside the nav stacking context. Lift that
+     context only while its popover is open, and disable the underlying tabs. */
+  .mobile-nav:has(.mobile-nav-popover.open){z-index:4150;pointer-events:none;}
+  .mobile-nav:has(.mobile-nav-popover.open) .mobile-nav-item{pointer-events:none;}
+  .mobile-nav:has(.mobile-nav-popover.open) .mobile-nav-popover.open,
+  .mobile-nav:has(.mobile-nav-popover.open) .mobile-nav-popover.open *{pointer-events:auto;}
 }
 
 /* Live Inventory uses the same phone filter sheet pattern as Counts. */

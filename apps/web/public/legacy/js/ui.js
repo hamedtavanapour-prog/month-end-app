@@ -161,7 +161,9 @@ function recordHistoryMarkup(record,createdLabel='Created'){
 function syncMobileSheetBackdrop(){
   const backdrop=document.getElementById('mobile-sheet-backdrop');
   if(!backdrop)return;
-  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.drop-menu.open,.col-menu.open,.product-filter-sheet.open,.inv-filter-sheet.open,.live-inv-filter-sheet.open,.mobile-nav-popover.open,#voice-modal.open');
+  // Modal-contained controls already have their modal overlay. Only page-level
+  // sheets need this separate dimming layer.
+  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.main .drop-menu.open,.main .col-menu.open,.main .product-filter-sheet.open,.main .live-inv-filter-sheet.open,.mobile-nav-popover.open,#voice-modal.open');
   backdrop.classList.toggle('open',hasOpenSheet);
   backdrop.setAttribute('aria-hidden',String(!hasOpenSheet));
   syncBlockingUiState();
@@ -811,6 +813,7 @@ function closeModal(id){
   syncBlockingUiState();
 }
 function openModal(id){
+  if(window.innerWidth<=820)closeMobileSheets();
   const modal=document.getElementById(id);
   const openModals=[...document.querySelectorAll('.modal-overlay.open')];
   const topZ=openModals.reduce((max,item)=>Math.max(max,parseInt(item.style.zIndex,10)||2500),2500);
