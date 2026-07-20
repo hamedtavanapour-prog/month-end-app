@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
+import { renameCategoryInWorkspace } from "@/lib/workspace/category-state";
 import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
 
@@ -178,18 +179,41 @@ export async function PATCH(request: Request) {
   try {
     body = await request.json() as Json;
   } catch {
-    return jsonResponse({ error: "Invalid product update" }, 400);
+    return jsonResponse({ error: "Invalid workspace update" }, 400);
   }
-  if (!isJsonObject(body) || !isJsonObject(body.product)) {
-    return jsonResponse({ error: "A product update is required" }, 400);
+  if (!isJsonObject(body)) return jsonResponse({ error: "A workspace update is required" }, 400);
+
+  const categoryRename = isJsonObject(body.categoryRename) ? body.categoryRename : null;
+  const product = isJsonObject(body.product) ? body.product : null;
+  if (!categoryRename && !product) return jsonResponse({ error: "A supported workspace update is required" }, 400);
+
+  let buildNextData: (data: Json) => Json;
+  let entityLabel: string;
+  if (categoryRename) {
+    const previousName = typeof categoryRename.previousName === "string" ? categoryRename.previousName.trim() : "";
+    const name = typeof categoryRename.name === "string" ? categoryRename.name.trim() : "";
+    const subcategories = Array.isArray(categoryRename.subcategories)
+      ? categoryRename.subcategories
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+      : [];
+    if (!name || name.length > 60 || subcategories.some((value) => value.length > 80)) {
+      return jsonResponse({ error: "Valid category names are required" }, 400);
+    }
+    const uniqueSubcategories = [...new Set(subcategories)];
+    buildNextData = (data) => renameCategoryInWorkspace(data, previousName, name, uniqueSubcategories);
+    entityLabel = "category";
+  } else {
+    if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
+      return jsonResponse({ error: "Product ID and name are required" }, 400);
+    }
+    const productCatalogVersion = typeof body.productCatalogVersion === "string" && body.productCatalogVersion.length <= 64
+      ? body.productCatalogVersion
+      : undefined;
+    buildNextData = (data) => mergeProductIntoWorkspace(data, product, productCatalogVersion);
+    entityLabel = "product";
   }
-  const product = body.product;
-  if (typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
-    return jsonResponse({ error: "Product ID and name are required" }, 400);
-  }
-  const productCatalogVersion = typeof body.productCatalogVersion === "string" && body.productCatalogVersion.length <= 64
-    ? body.productCatalogVersion
-    : undefined;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { data: current, error: readError } = await supabase
@@ -200,7 +224,7 @@ export async function PATCH(request: Request) {
     if (readError) return jsonResponse({ error: "Could not load the shared workspace" }, 500);
     if (!current) return jsonResponse({ error: "Shared workspace is not initialized" }, 409);
 
-    const nextData = mergeProductIntoWorkspace(current.data, product, productCatalogVersion);
+    const nextData = buildNextData(current.data);
     const currentTimestamp = new Date(current.updated_at).getTime();
     const nextUpdatedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
     const { data: saved, error: saveError } = await supabase
@@ -210,12 +234,12 @@ export async function PATCH(request: Request) {
       .eq("updated_at", current.updated_at)
       .select("data, updated_at")
       .maybeSingle();
-    if (saveError) return jsonResponse({ error: "Could not save the shared product" }, 500);
+    if (saveError) return jsonResponse({ error: `Could not save the shared ${entityLabel}` }, 500);
     if (!saved) continue;
 
     await supabase.rpc("record_workspace_save", { p_organization_id: context.organizationId });
     return jsonResponse({ saved: true, data: saved.data, updatedAt: saved.updated_at });
   }
 
-  return jsonResponse({ error: "The workspace changed while this product was saving. Try again." }, 409);
+  return jsonResponse({ error: `The workspace changed while this ${entityLabel} was saving. Try again.` }, 409);
 }

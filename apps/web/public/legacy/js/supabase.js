@@ -53,6 +53,25 @@ async function cloudSaveProduct(product){
   }
 }
 
+async function cloudSaveInventoryCategory(previousName,name,subcategories){
+  try{
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({categoryRename:{previousName,name,subcategories}})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const categories=payload.data?.inventoryCategories;
+    if(!categories||!Object.prototype.hasOwnProperty.call(categories,name)||(previousName!==name&&Object.prototype.hasOwnProperty.call(categories,previousName)))throw new Error('The shared workspace did not return the renamed category.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared category save failed:',error);
+    return null;
+  }
+}
+
 function cloudCanApplyRefresh(){
   const modalOpen=document.querySelector('.modal-overlay.open');
   const inlineEdits=typeof pendingEdits==='object'&&Object.keys(pendingEdits).length>0;
