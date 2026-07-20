@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
+import { createCountDraftInWorkspace, isCountJsonObject, saveCountRoomInWorkspace } from "@/lib/workspace/count-state";
 import { renameCategoryInWorkspace } from "@/lib/workspace/category-state";
 import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
@@ -171,10 +172,6 @@ export async function PATCH(request: Request) {
   if ("error" in result) return result.error;
 
   const { context, supabase } = result;
-  if (!isAllowed(context, new Set(["products.manage"]))) {
-    return jsonResponse({ error: "You do not have permission to manage products" }, 403);
-  }
-
   let body: Json;
   try {
     body = await request.json() as Json;
@@ -184,8 +181,16 @@ export async function PATCH(request: Request) {
   if (!isJsonObject(body)) return jsonResponse({ error: "A workspace update is required" }, 400);
 
   const categoryRename = isJsonObject(body.categoryRename) ? body.categoryRename : null;
+  const countDraft = isJsonObject(body.countDraft) ? body.countDraft : null;
+  const countRoomSave = isJsonObject(body.countRoomSave) ? body.countRoomSave : null;
   const product = isJsonObject(body.product) ? body.product : null;
-  if (!categoryRename && !product) return jsonResponse({ error: "A supported workspace update is required" }, 400);
+  if (!categoryRename && !countDraft && !countRoomSave && !product) {
+    return jsonResponse({ error: "A supported workspace update is required" }, 400);
+  }
+  const requiredPermission = countDraft || countRoomSave ? "counts.create" : "products.manage";
+  if (!isAllowed(context, new Set([requiredPermission]))) {
+    return jsonResponse({ error: "You do not have permission to make this change" }, 403);
+  }
 
   let buildNextData: (data: Json) => Json;
   let entityLabel: string;
@@ -204,6 +209,59 @@ export async function PATCH(request: Request) {
     const uniqueSubcategories = [...new Set(subcategories)];
     buildNextData = (data) => renameCategoryInWorkspace(data, previousName, name, uniqueSubcategories);
     entityLabel = "category";
+  } else if (countDraft) {
+    const id = typeof countDraft.id === "string" ? countDraft.id.trim() : "";
+    const date = typeof countDraft.date === "string" ? countDraft.date.trim() : "";
+    const label = typeof countDraft.label === "string" ? countDraft.label.trim() : "";
+    const rooms = Array.isArray(countDraft.rooms) ? countDraft.rooms.filter(isCountJsonObject) : [];
+    if (!id || id.length > 100 || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !label || label.length > 120 || !rooms.length) {
+      return jsonResponse({ error: "Valid count details and rooms are required" }, 400);
+    }
+    const safeRooms = rooms.map((room) => ({
+      id: typeof room.id === "string" ? room.id.slice(0, 100) : "",
+      roomId: typeof room.roomId === "string" ? room.roomId.slice(0, 100) : "",
+      name: typeof room.name === "string" ? room.name.slice(0, 120) : "Room",
+      items: {},
+    })).filter((room) => room.id && room.roomId);
+    if (!safeRooms.length) return jsonResponse({ error: "At least one valid room is required" }, 400);
+    const actor = {
+      id: context.userId,
+      name: typeof countDraft.createdBy === "object" && countDraft.createdBy && !Array.isArray(countDraft.createdBy)
+        && typeof countDraft.createdBy.name === "string" ? countDraft.createdBy.name.slice(0, 160) : "Team member",
+      role: typeof countDraft.createdBy === "object" && countDraft.createdBy && !Array.isArray(countDraft.createdBy)
+        && typeof countDraft.createdBy.role === "string" ? countDraft.createdBy.role.slice(0, 80) : "Team member",
+    };
+    const safeDraft = { id, date, label, items: {}, rooms: safeRooms, draft: true, createdBy: actor, createdAt: new Date().toISOString() };
+    buildNextData = (data) => createCountDraftInWorkspace(data, safeDraft);
+    entityLabel = "count draft";
+  } else if (countRoomSave) {
+    const countId = typeof countRoomSave.countId === "string" ? countRoomSave.countId.trim() : "";
+    const roomId = typeof countRoomSave.roomId === "string" ? countRoomSave.roomId.trim() : "";
+    const items = isCountJsonObject(countRoomSave.items) ? countRoomSave.items : null;
+    if (!countId || countId.length > 100 || !roomId || roomId.length > 100 || !items) {
+      return jsonResponse({ error: "Valid count room details are required" }, 400);
+    }
+    const safeItems: { [key: string]: Json | undefined } = {};
+    for (const [productId, quantity] of Object.entries(items)) {
+      if (!productId || productId.length > 100 || typeof quantity !== "number" || !Number.isFinite(quantity) || quantity < 0) {
+        return jsonResponse({ error: "Count quantities must be valid non-negative numbers" }, 400);
+      }
+      safeItems[productId] = quantity;
+    }
+    const { data: ownedLock, error: lockError } = await supabase
+      .from("count_room_locks")
+      .select("room_id")
+      .eq("organization_id", context.organizationId)
+      .eq("count_id", countId)
+      .eq("room_id", roomId)
+      .eq("user_id", context.userId)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (lockError) return jsonResponse({ error: "Could not verify the room reservation" }, 500);
+    if (!ownedLock) return jsonResponse({ error: "This room is no longer reserved for you" }, 409);
+    const actor = { userId: context.userId };
+    buildNextData = (data) => saveCountRoomInWorkspace(data, countId, roomId, safeItems, actor);
+    entityLabel = "count room";
   } else {
     if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
       return jsonResponse({ error: "Product ID and name are required" }, 400);
@@ -224,7 +282,15 @@ export async function PATCH(request: Request) {
     if (readError) return jsonResponse({ error: "Could not load the shared workspace" }, 500);
     if (!current) return jsonResponse({ error: "Shared workspace is not initialized" }, 409);
 
-    const nextData = buildNextData(current.data);
+    let nextData: Json;
+    try {
+      nextData = buildNextData(current.data);
+    } catch (error) {
+      if (error instanceof Error && error.message === "count_room_not_found") {
+        return jsonResponse({ error: "That count room no longer exists" }, 404);
+      }
+      throw error;
+    }
     const currentTimestamp = new Date(current.updated_at).getTime();
     const nextUpdatedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
     const { data: saved, error: saveError } = await supabase

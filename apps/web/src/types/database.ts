@@ -71,6 +71,47 @@ export type Database = {
           },
         ]
       }
+      count_room_locks: {
+        Row: {
+          acquired_at: string
+          count_id: string
+          expires_at: string
+          heartbeat_at: string
+          holder_name: string
+          organization_id: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          count_id: string
+          expires_at: string
+          heartbeat_at?: string
+          holder_name: string
+          organization_id: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          acquired_at?: string
+          count_id?: string
+          expires_at?: string
+          heartbeat_at?: string
+          holder_name?: string
+          organization_id?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_room_locks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           archived_at: string | null
@@ -568,6 +609,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_count_room_lock: {
+        Args: {
+          p_count_id: string
+          p_organization_id: string
+          p_room_id: string
+        }
+        Returns: {
+          acquired: boolean
+          expires_at: string
+          holder_name: string
+          user_id: string
+        }[]
+      }
       accept_team_invitation: {
         Args: { p_token_hash: string }
         Returns: string
@@ -613,6 +667,14 @@ export type Database = {
       record_workspace_save: {
         Args: { p_organization_id: string }
         Returns: undefined
+      }
+      release_count_room_lock: {
+        Args: {
+          p_count_id: string
+          p_organization_id: string
+          p_room_id: string
+        }
+        Returns: boolean
       }
       resolve_workspace: {
         Args: { p_identifier: string }
