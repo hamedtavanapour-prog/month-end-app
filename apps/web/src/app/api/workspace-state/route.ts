@@ -222,6 +222,7 @@ export async function PATCH(request: Request) {
       roomId: typeof room.roomId === "string" ? room.roomId.slice(0, 100) : "",
       name: typeof room.name === "string" ? room.name.slice(0, 120) : "Room",
       items: {},
+      extraProductIds: [],
     })).filter((room) => room.id && room.roomId);
     if (!safeRooms.length) return jsonResponse({ error: "At least one valid room is required" }, 400);
     const actor = {
@@ -238,7 +239,11 @@ export async function PATCH(request: Request) {
     const countId = typeof countRoomSave.countId === "string" ? countRoomSave.countId.trim() : "";
     const roomId = typeof countRoomSave.roomId === "string" ? countRoomSave.roomId.trim() : "";
     const items = isCountJsonObject(countRoomSave.items) ? countRoomSave.items : null;
-    if (!countId || countId.length > 100 || !roomId || roomId.length > 100 || !items) {
+    const extraProductIds = Array.isArray(countRoomSave.extraProductIds)
+      ? countRoomSave.extraProductIds.filter((value): value is string => typeof value === "string").map((value) => value.trim())
+      : [];
+    if (!countId || countId.length > 100 || !roomId || roomId.length > 100 || !items
+      || extraProductIds.length > 100 || extraProductIds.some((productId) => !productId || productId.length > 100)) {
       return jsonResponse({ error: "Valid count room details are required" }, 400);
     }
     const safeItems: { [key: string]: Json | undefined } = {};
@@ -260,7 +265,7 @@ export async function PATCH(request: Request) {
     if (lockError) return jsonResponse({ error: "Could not verify the room reservation" }, 500);
     if (!ownedLock) return jsonResponse({ error: "This room is no longer reserved for you" }, 409);
     const actor = { userId: context.userId };
-    buildNextData = (data) => saveCountRoomInWorkspace(data, countId, roomId, safeItems, actor);
+    buildNextData = (data) => saveCountRoomInWorkspace(data, countId, roomId, safeItems, [...new Set(extraProductIds)], actor);
     entityLabel = "count room";
   } else {
     if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {

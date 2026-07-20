@@ -641,6 +641,18 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
 .count-room-current span{color:var(--accent);font-size:.64rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;}
 .count-room-current strong{font-size:.9rem;}
 .count-room-current small{color:var(--text-muted);font-size:.7rem;}
+.count-add-extra-trigger{flex:0 0 auto;}
+.count-add-extra-help{width:100%;color:var(--text-muted);font-size:.68rem;text-align:right;}
+.count-extra-product-modal{max-width:620px;}
+.count-extra-product-list{display:grid;gap:8px;max-height:48vh;margin-top:12px;overflow-y:auto;}
+.count-extra-product-card{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;border:1px solid var(--border);border-radius:9px;padding:11px 12px;background:var(--surface2);color:var(--text);text-align:left;cursor:pointer;}
+.count-extra-product-card:hover,.count-extra-product-card:focus-visible{border-color:var(--accent);outline:none;background:var(--surface3);}
+.count-extra-product-card span{display:grid;gap:3px;min-width:0;}
+.count-extra-product-card strong{font-size:.84rem;overflow-wrap:anywhere;}
+.count-extra-product-card small{color:var(--text-muted);font-size:.7rem;}
+.count-extra-product-card em{flex:0 0 auto;color:var(--accent);font-size:.72rem;font-style:normal;font-weight:850;text-transform:uppercase;}
+.count-extra-product-empty{padding:24px;border:1px dashed var(--border);border-radius:9px;color:var(--text-muted);font-size:.8rem;text-align:center;}
+.count-only-product-label{color:var(--accent);font-weight:800;}
 .inv-filter-sheet,.inv-filter-sheet-fields{display:contents;}
 .inv-modal-header{padding:20px 24px 0;flex-shrink:0;}
 .inv-modal-header>.form-grid{display:none;}
@@ -986,6 +998,8 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
   .inv-modal{width:100vw;height:100dvh;border-radius:0;}
   .inv-modal-header{padding:16px 14px 0;}
   .inv-room-manager{align-items:stretch;}
+  .count-add-extra-trigger{width:100%;justify-content:center;}
+  .count-add-extra-help{text-align:center;}
   .inv-room-name-field{width:100%;flex-basis:100%;}
   .inv-room-tabs{width:100%;flex-basis:100%;}
   .inv-room-actions{width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;}

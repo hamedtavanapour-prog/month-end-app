@@ -14,6 +14,7 @@ let countRoomPickerLocks=[];
 let countRoomLockHeartbeatTimer=null;
 let countRoomPickerRefreshTimer=null;
 let inventoryRoomExitInProgress=false;
+let currentInventoryRoomOriginalExtraProductIds=[];
 let dirtyInventoryRoomIds=new Set();
 let deletedInventoryRoomIds=new Set();
 let expandedInventorySections=new Set();

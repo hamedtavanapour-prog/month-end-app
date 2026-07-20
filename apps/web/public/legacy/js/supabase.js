@@ -92,12 +92,12 @@ async function cloudCreateCountDraft(draft){
   }
 }
 
-async function cloudSaveCountRoom(countId,roomId,items){
+async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
   try{
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
-      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countRoomSave:{countId,roomId,items}})
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countRoomSave:{countId,roomId,items,extraProductIds}})
     });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);

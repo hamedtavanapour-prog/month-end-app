@@ -106,12 +106,13 @@ function roomProducts(room){
 function expectedInventoryProductIds(inv,room=null){
   if(room){
     const floorRoom=room.roomId?floorPlanRoomById(room.roomId):null;
-    return new Set(roomProductIds(floorRoom));
+    return new Set([...roomProductIds(floorRoom),...(room.extraProductIds||[])]);
   }
   const ids=new Set();
   (inv?.rooms||[]).forEach(invRoom=>{
     const floorRoom=invRoom.roomId?floorPlanRoomById(invRoom.roomId):null;
     roomProductIds(floorRoom).forEach(id=>ids.add(id));
+    (invRoom.extraProductIds||[]).forEach(id=>ids.add(id));
   });
   if(!ids.size)state.products.filter(product=>!product.archived).forEach(product=>ids.add(product.id));
   return ids;
@@ -119,7 +120,9 @@ function expectedInventoryProductIds(inv,room=null){
 function currentRoomProducts(){
   const room=currentInventoryRoom();
   const floorRoom=room?.roomId?floorPlanRoomById(room.roomId):null;
-  return roomProducts(floorRoom);
+  const allowed=new Set(roomProductIds(floorRoom));
+  (room?.extraProductIds||[]).forEach(id=>allowed.add(id));
+  return state.products.filter(product=>!product.archived&&allowed.has(product.id));
 }
 function currentCountProducts(){
   if(currentInvMergedView&&currentInvEdit){
@@ -302,7 +305,7 @@ function removeEditedFloorPlanRoom(){
 }
 function defaultInventoryRoom(){
   const room=activeFloorPlanRooms()[0]||ensureFloorPlanRoom(defaultFloorPlanRoomName());
-  return{id:uid(),roomId:room.id,name:room.name,items:{}};
+  return{id:uid(),roomId:room.id,name:room.name,items:{},extraProductIds:[]};
 }
 function normalizeInventoryRooms(inv){
   if(!inv)return[];
@@ -319,6 +322,8 @@ function normalizeInventoryRooms(inv){
     room.roomId=floorRoom.id;
     room.name=floorRoom.name;
     if(!room.items||typeof room.items!=='object')room.items={};
+    const activeProductIds=new Set(state.products.filter(product=>!product.archived).map(product=>product.id));
+    room.extraProductIds=[...new Set(Array.isArray(room.extraProductIds)?room.extraProductIds:[])].filter(id=>activeProductIds.has(id));
     return room;
   });
   inv.items=mergeInventoryRoomItems(inv.rooms);
@@ -329,7 +334,7 @@ function ensureInventoryHasFloorPlanRooms(inv){
   normalizeInventoryRooms(inv);
   activeFloorPlanRooms().forEach(floorRoom=>{
     if(inv.rooms.some(room=>room.roomId===floorRoom.id))return;
-    inv.rooms.push({id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{}});
+    inv.rooms.push({id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{},extraProductIds:[]});
   });
   inv.items=mergeInventoryRoomItems(inv.rooms);
 }
@@ -412,7 +417,7 @@ function addInventoryRoom(){
       renderFloorPlanRooms();
       return;
     }
-    const room={id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{}};
+    const room={id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{},extraProductIds:[]};
     currentInvRooms.push(room);
     currentInvRoomId=room.id;
     liveInvCounts={};
@@ -435,7 +440,7 @@ function addInventoryRoom(){
     renderFloorPlanRooms();
     return;
   }
-  const room={id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{}};
+  const room={id:uid(),roomId:floorRoom.id,name:floorRoom.name,items:{},extraProductIds:[]};
   ex.rooms.push(room);
   dirtyInventoryRoomIds.add(room.id);
   currentInvRoomId=room.id;
@@ -779,7 +784,7 @@ function initLiveCounts(ex,selectedRoomId=null){
     currentRoomProducts().forEach(p=>{liveInvCounts[p.id]=room.items[p.id]!==undefined?room.items[p.id]:'';});
     return;
   }
-  currentInvRooms=activeFloorPlanRooms().map(room=>({id:uid(),roomId:room.id,name:room.name,items:{}}));
+  currentInvRooms=activeFloorPlanRooms().map(room=>({id:uid(),roomId:room.id,name:room.name,items:{},extraProductIds:[]}));
   if(!currentInvRooms.length)currentInvRooms=[defaultInventoryRoom()];
   currentInvRoomId=currentInvRooms[0].id;
   currentRoomProducts().forEach(p=>{liveInvCounts[p.id]='';});
@@ -904,7 +909,7 @@ async function continueMobileCountSetup(){
   }
 }
 function draftRoomsFromFloorPlan(floorRooms=activeFloorPlanRooms()){
-  return floorRooms.map(room=>({id:uid(),roomId:room.id,name:room.name,items:{}}));
+  return floorRooms.map(room=>({id:uid(),roomId:room.id,name:room.name,items:{},extraProductIds:[]}));
 }
 async function createCountDraft(date,label,floorRooms=activeFloorPlanRooms()){
   const existing=findInventorySession(date,label);
@@ -1025,7 +1030,7 @@ function inventoryRoomHasUnsavedChanges(){
     const value=liveInvCounts[product.id];
     if(value!==''&&value!==null&&value!==undefined&&!isNaN(value))visible[product.id]=parseFloat(value);
   });
-  return!inventoryRoomItemsEqual(room.items,visible);
+  return dirtyInventoryRoomIds.has(room.id)||!inventoryRoomItemsEqual(room.items,visible);
 }
 async function exitInventoryRoom(force=false){
   if(inventoryRoomExitInProgress||inventoryCountSaving)return;
@@ -1034,6 +1039,10 @@ async function exitInventoryRoom(force=false){
   const lock=currentCountRoomLock?{...currentCountRoomLock}:null;
   clearInterval(countRoomLockHeartbeatTimer);
   countRoomLockHeartbeatTimer=null;
+  const room=currentInventoryRoom();
+  if(room)room.extraProductIds=[...currentInventoryRoomOriginalExtraProductIds];
+  currentInventoryRoomOriginalExtraProductIds=[];
+  closeModal('modal-count-add-item');
   if(lock&&typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
   currentCountRoomLock=null;
   closeModal('modal-inventory');
@@ -1049,13 +1058,13 @@ function findInventorySession(date,label){
 function replaceInventoryRoom(inv,room){
   ensureInventoryHasFloorPlanRooms(inv);
   const index=inv.rooms.findIndex(item=>(room.roomId&&item.roomId===room.roomId)||item.id===room.id);
-  if(index>=0)inv.rooms[index]={...inv.rooms[index],name:room.name,roomId:room.roomId,items:room.items};
+  if(index>=0)inv.rooms[index]={...inv.rooms[index],name:room.name,roomId:room.roomId,items:room.items,extraProductIds:[...(room.extraProductIds||[])]};
   else inv.rooms.push(room);
   inv.items=mergeInventoryRoomItems(inv.rooms);
   inv.draft=!Object.keys(inv.items).length;
 }
 function cloneInventoryRoom(room){
-  return{...room,items:{...(room.items||{})}};
+  return{...room,items:{...(room.items||{})},extraProductIds:[...(room.extraProductIds||[])]};
 }
 function mergeEditedInventoryRooms(cloudRooms,editedRooms,deletedIds=new Set()){
   const rooms=(cloudRooms||[]).filter(room=>!deletedIds.has(room.id)).map(cloneInventoryRoom);
@@ -1070,7 +1079,9 @@ function inventoryRoomsEqual(a=[],b=[]){
   if(a.length!==b.length)return false;
   return a.every(room=>{
     const match=b.find(candidate=>candidate.id===room.id||(room.roomId&&candidate.roomId===room.roomId));
-    return!!match&&room.name===match.name&&inventoryRoomItemsEqual(room.items,match.items);
+    const leftExtras=[...(room.extraProductIds||[])].sort();
+    const rightExtras=[...(match?.extraProductIds||[])].sort();
+    return!!match&&room.name===match.name&&inventoryRoomItemsEqual(room.items,match.items)&&JSON.stringify(leftExtras)===JSON.stringify(rightExtras);
   });
 }
 async function inventorySavedInCloud(id,date,label,rooms){
@@ -1101,6 +1112,7 @@ function openInventoryModal(existingId=null,selectedRoomId=null){
   if(!ex.rooms.some(room=>room.id===selectedRoomId)){toast('That room is no longer part of this count.',true);return;}
   document.getElementById('inv-date').value=ex.date;document.getElementById('inv-label').value=ex.label||'';
   initLiveCounts(ex,selectedRoomId);
+  currentInventoryRoomOriginalExtraProductIds=[...(currentInventoryRoom()?.extraProductIds||[])];
   currentInvMergedView=false;
   document.getElementById('inv-search').value='';document.getElementById('inv-cat-f').value='';
   document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';document.getElementById('inv-show-f').value='all';document.getElementById('inv-sort-f').value='category';
@@ -1109,6 +1121,52 @@ function openInventoryModal(existingId=null,selectedRoomId=null){
   document.getElementById('mobile-count-date').textContent=fmtDate(document.getElementById('inv-date').value);
   closeInventoryFilterSheet();
   renderInventoryRooms();renderInvRows(true);openModal('modal-inventory');
+}
+
+function countExtraProductCandidates(){
+  const assigned=new Set(currentRoomProducts().map(product=>product.id));
+  const query=(document.getElementById('count-extra-product-search')?.value||'').trim().toLowerCase();
+  return state.products.filter(product=>{
+    if(product.archived||assigned.has(product.id))return false;
+    if(!query)return true;
+    return[product.name,product.inventoryName,product.aliases,product.sku,product.category,product.subcategory]
+      .some(value=>String(value||'').toLowerCase().includes(query));
+  }).sort((a,b)=>String(a.inventoryName||a.name).localeCompare(String(b.inventoryName||b.name)));
+}
+function renderCountExtraProductPicker(){
+  const list=document.getElementById('count-extra-product-list');
+  if(!list)return;
+  const products=countExtraProductCandidates();
+  list.innerHTML=products.slice(0,100).map(product=>`<button class="count-extra-product-card" type="button" data-product-id="${escapeHtml(product.id)}"><span><strong>${escapeHtml(product.inventoryName||product.name)}</strong><small>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''} · ${escapeHtml(product.unit||'unit')}</small></span><em>Add</em></button>`).join('')||'<div class="count-extra-product-empty">No other products match your search.</div>';
+  list.querySelectorAll('[data-product-id]').forEach(button=>button.addEventListener('click',()=>addCountExtraProduct(button.dataset.productId)));
+}
+function openCountExtraProductPicker(){
+  if(!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==currentInvRoomId){toast('This room is not reserved for you.',true);return;}
+  const room=currentInventoryRoom();
+  document.getElementById('count-extra-product-room').textContent=`Add a product to ${room?.name||'this room'} for this count only. Room Settings and future counts will not change.`;
+  const search=document.getElementById('count-extra-product-search');
+  if(search)search.value='';
+  renderCountExtraProductPicker();
+  openModal('modal-count-add-item');
+  setTimeout(()=>search?.focus(),0);
+}
+function addCountExtraProduct(productId){
+  const room=currentInventoryRoom();
+  const product=state.products.find(item=>item.id===productId&&!item.archived);
+  if(!room||!product||!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==room.id){toast('This room is no longer reserved for you.',true);return;}
+  room.extraProductIds=[...new Set([...(room.extraProductIds||[]),product.id])];
+  liveInvCounts[product.id]=room.items?.[product.id]??'';
+  dirtyInventoryRoomIds.add(room.id);
+  closeModal('modal-count-add-item');
+  document.getElementById('inv-search').value='';
+  document.getElementById('inv-cat-f').value='';
+  document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';
+  document.getElementById('inv-show-f').value='all';
+  const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${product.category}|||${product.subcategory||'Other'}`);
+  expandedInventorySections.add(sectionToken);
+  renderInvRows();
+  setTimeout(()=>document.getElementById('invq-'+product.id)?.focus(),0);
+  toast(`${product.inventoryName||product.name} added to ${room.name} for this count only.`);
 }
 function openInventoryFilterSheet(){
   closeAllMenus();
@@ -1180,7 +1238,8 @@ function renderInvRows(skipCapture=false){
   const groups={};prods.forEach(p=>{const k=p.category+'|||'+(p.subcategory||'Other');if(!groups[k])groups[k]={cat:p.category,sub:p.subcategory||'Other',items:[]};groups[k].items.push(p);});
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
+  const extraIds=new Set(currentInventoryRoom()?.extraProductIds||[]);
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!expandedInventorySections.has(sectionToken);
@@ -1228,7 +1287,8 @@ async function saveInventory(){
     }
     captureCurrentRoomCounts();
     const items={...room.items};
-    const shared=typeof cloudSaveCountRoom==='function'?await cloudSaveCountRoom(lock.countId,lock.roomId,items):null;
+    const extraProductIds=[...(room.extraProductIds||[])];
+    const shared=typeof cloudSaveCountRoom==='function'?await cloudSaveCountRoom(lock.countId,lock.roomId,items,extraProductIds):null;
     if(!shared){
       showInventoryFinishMessage('The room could not be saved to the shared count. Please try again.');
       toast('The room could not be saved. Please try again.',true);
@@ -1241,6 +1301,7 @@ async function saveInventory(){
     countRoomLockHeartbeatTimer=null;
     if(typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
     currentCountRoomLock=null;
+    currentInventoryRoomOriginalExtraProductIds=[];
     inventoryRoomExitInProgress=true;
     closeModal('modal-inventory');
     inventoryRoomExitInProgress=false;

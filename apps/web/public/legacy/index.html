@@ -568,6 +568,8 @@
     </div>
     <div class="inv-room-manager">
       <div class="count-room-current"><span>Counting room</span><strong id="inv-room-current">Room</strong><small>This room is reserved for you until you save or exit.</small></div>
+      <button class="btn btn-secondary count-add-extra-trigger" type="button" onclick="openCountExtraProductPicker()"><span aria-hidden="true">＋</span> Add unlisted item</button>
+      <small class="count-add-extra-help">Adds an item to this room for this count only.</small>
     </div>
   </div>
   <div class="inv-modal-filters">
@@ -602,6 +604,21 @@
       <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
     </div>
   </div>
+</div>
+</div>
+
+<!-- TEMPORARY COUNT ITEM PICKER -->
+<div class="modal-overlay" id="modal-count-add-item">
+<div class="modal count-extra-product-modal" role="dialog" aria-modal="true" aria-labelledby="count-extra-product-title">
+  <button class="modal-close" type="button" aria-label="Close item picker" onclick="closeModal('modal-count-add-item')">&times;</button>
+  <h3 id="count-extra-product-title">Add Unlisted Item</h3>
+  <p class="count-setup-intro" id="count-extra-product-room">Add a product to this room for this count only.</p>
+  <div class="form-group">
+    <label for="count-extra-product-search">Search all products</label>
+    <input type="search" id="count-extra-product-search" placeholder="Product, category, SKU…" autocomplete="off" oninput="renderCountExtraProductPicker()">
+  </div>
+  <div class="count-extra-product-list" id="count-extra-product-list" aria-live="polite"></div>
+  <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-add-item')">Cancel</button></div>
 </div>
 </div>
 
@@ -936,18 +953,18 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=shared-room-count-1"></script>
+<script src="js/supabase.js?v=temporary-count-items-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=shared-room-count-1"></script>
+<script src="js/state.js?v=temporary-count-items-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
 <script src="js/ui.js?v=settings-layout-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=shared-room-count-1"></script>
+<script src="js/inventory.js?v=temporary-count-items-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>
@@ -955,7 +972,7 @@
 <script src="js/export-tools.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/master-search.js"></script>
-<script src="js/routing.js?v=shared-room-count-1"></script>
+<script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=routing-foundation-1"></script>
 <script src="js/access.js?v=settings-layout-1"></script>
 </body>
