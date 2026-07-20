@@ -1,22 +1,11 @@
-import type { Metadata } from "next";
-import Script from "next/script";
-import { requireAccessContext } from "@/lib/auth/context";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Workspace" };
+import { requireAccessContext } from "@/lib/auth/context";
+import { defaultWorkspacePath } from "@/lib/workspace/routes";
+
 export const dynamic = "force-dynamic";
 
 export default async function AppHome() {
   const context = await requireAccessContext();
-
-  return (
-    <main className="legacy-host">
-      <iframe
-        allow="microphone"
-        className="legacy-frame"
-        src="/legacy/index.html?v=department-setup-1"
-        title={`${context.organizationName} inventory workspace for ${context.email}`}
-      />
-      <Script src="/legacy/js/search-bridge.js" strategy="afterInteractive" />
-    </main>
-  );
+  redirect(defaultWorkspacePath(context));
 }
