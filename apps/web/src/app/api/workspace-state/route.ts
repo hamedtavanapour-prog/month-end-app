@@ -187,6 +187,9 @@ export async function PATCH(request: Request) {
   if (typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
     return jsonResponse({ error: "Product ID and name are required" }, 400);
   }
+  const productCatalogVersion = typeof body.productCatalogVersion === "string" && body.productCatalogVersion.length <= 64
+    ? body.productCatalogVersion
+    : undefined;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { data: current, error: readError } = await supabase
@@ -197,7 +200,7 @@ export async function PATCH(request: Request) {
     if (readError) return jsonResponse({ error: "Could not load the shared workspace" }, 500);
     if (!current) return jsonResponse({ error: "Shared workspace is not initialized" }, 409);
 
-    const nextData = mergeProductIntoWorkspace(current.data, product);
+    const nextData = mergeProductIntoWorkspace(current.data, product, productCatalogVersion);
     const currentTimestamp = new Date(current.updated_at).getTime();
     const nextUpdatedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
     const { data: saved, error: saveError } = await supabase

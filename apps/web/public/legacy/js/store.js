@@ -79,6 +79,7 @@ function compactStateForStorage(){
   if(typeof ensureProductMenuSettings==='function')ensureProductMenuSettings();
   return{
     products:state.products||[],
+    productCatalogVersion:state.productCatalogVersion||null,
     drinks:state.drinks||[],
     menus:state.menus||[],
     menuLibraryVersion:state.menuLibraryVersion||0,
@@ -150,18 +151,14 @@ function seedDefaultProducts(){
 
 function ensureProductCatalog(){
   if(!Array.isArray(state.products))state.products=[];
-  if(state.productCatalogVersion!==DEFAULT_PRODUCT_CATALOG_VERSION){
-    const existingByName=new Map(state.products.map(product=>[String(product.name||'').trim().toLowerCase(),product]).filter(([name])=>name));
-    const existingByInventoryName=new Map(state.products.map(product=>[String(product.inventoryName||'').trim().toLowerCase(),product]).filter(([name])=>name));
-    state.products=seedDefaultProducts().map(product=>{
-      const existing=existingByName.get(product.name.trim().toLowerCase())||existingByInventoryName.get(product.inventoryName.trim().toLowerCase());
-      return existing?{...product,id:existing.id}:product;
-    });
+  if(!state.products.length){
+    state.products=seedDefaultProducts();
     state.productCatalogVersion=DEFAULT_PRODUCT_CATALOG_VERSION;
     return true;
   }
-  if(!state.products.length){
-    state.products=seedDefaultProducts();
+  // A catalog version is migration metadata, not permission to replace a
+  // workspace's product records. Existing names and settings always win.
+  if(state.productCatalogVersion!==DEFAULT_PRODUCT_CATALOG_VERSION){
     state.productCatalogVersion=DEFAULT_PRODUCT_CATALOG_VERSION;
     return true;
   }
