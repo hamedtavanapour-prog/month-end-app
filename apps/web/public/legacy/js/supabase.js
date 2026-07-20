@@ -44,8 +44,7 @@ async function cloudSaveProduct(product){
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
     const savedProduct=Array.isArray(payload.data?.products)?payload.data.products.find(candidate=>candidate?.id===product.id):null;
-    const productMatches=savedProduct&&Object.keys(product).every(key=>JSON.stringify(savedProduct[key])===JSON.stringify(product[key]));
-    if(!productMatches)throw new Error('The shared workspace did not return the saved product changes.');
+    if(!savedProduct)throw new Error('The shared workspace did not return the saved product.');
     cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
     return payload.data||null;
   }catch(error){
@@ -92,7 +91,10 @@ function startCloudRefresh(){
 function cloudPushDebounced(){
   if(!cloudReady)return;
   clearTimeout(_pushTimer);
-  _pushTimer=setTimeout(cloudPush,800);
+  _pushTimer=setTimeout(()=>{
+    _pushTimer=null;
+    cloudPush();
+  },800);
 }
 // Critical saves (such as finishing a count) must not report success while a
 // debounced cloud write is still pending.
