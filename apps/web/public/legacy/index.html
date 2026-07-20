@@ -6,7 +6,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=settings-layout-1"/>
+<link rel="stylesheet" href="css/styles.css?v=voice-blocking-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -598,7 +598,7 @@
   </div>
   <div class="inv-modal-body" id="inv-rows"></div>
   <div class="inv-modal-footer">
-    <button class="voice-btn" id="voice-btn-inventory" onclick="toggleVoice('inventory')">Voice Count</button>
+    <button class="voice-btn" id="voice-btn-inventory" type="button" onclick="toggleVoice('inventory')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Voice Count</span></button>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
       <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
@@ -932,14 +932,15 @@
 </div>
 
 <!-- VOICE PANEL -->
-<div id="voice-modal">
+<div id="voice-backdrop" aria-hidden="true"></div>
+<div id="voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-ctx-label">
   <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-ctx-label">Listening…</span></div>
   <div id="voice-waveform"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
   <div id="voice-live">Listening…</div>
   <div id="voice-hint"></div>
   <div class="voice-actions">
-    <button class="btn btn-secondary" id="voice-cancel" onclick="cancelVoice()" style="display:none;">Cancel</button>
-    <button class="btn btn-danger" id="voice-stop" onclick="stopVoice()">Stop &amp; Review</button>
+    <button class="btn btn-secondary" id="voice-cancel" type="button" onclick="cancelVoice()" style="display:none;">Cancel</button>
+    <button class="btn btn-danger" id="voice-stop" type="button" onclick="stopVoice()">Stop &amp; Review</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -970,7 +971,7 @@
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js"></script>
-<script src="js/voice.js"></script>
+<script src="js/voice.js?v=voice-blocking-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=routing-foundation-1"></script>
