@@ -6,7 +6,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=voice-blocking-1"/>
+<link rel="stylesheet" href="css/styles.css?v=voice-workspace-2"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -932,16 +932,27 @@
 </div>
 
 <!-- VOICE PANEL -->
-<div id="voice-backdrop" aria-hidden="true"></div>
-<div id="voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-ctx-label">
-  <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-ctx-label">Listening…</span></div>
-  <div id="voice-waveform"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
-  <div id="voice-live">Listening…</div>
-  <div id="voice-hint"></div>
-  <div class="voice-actions">
-    <button class="btn btn-secondary" id="voice-cancel" type="button" onclick="cancelVoice()" style="display:none;">Cancel</button>
-    <button class="btn btn-danger" id="voice-stop" type="button" onclick="stopVoice()">Stop &amp; Review</button>
-  </div>
+<div id="voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-ctx-label" aria-hidden="true">
+  <section class="voice-workspace">
+    <header class="voice-workspace-head">
+      <span class="voice-workspace-icon" aria-hidden="true">🎙︎</span>
+      <div><span class="voice-workspace-kicker">Voice workspace</span><h2 id="voice-ctx-label">Listening…</h2></div>
+    </header>
+    <div class="voice-workspace-body">
+      <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-status-label">Microphone active</span></div>
+      <div id="voice-waveform"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+      <div id="voice-live" role="status" aria-live="polite">Listening…</div>
+      <div class="voice-review-field" id="voice-review-field" hidden>
+        <label for="voice-review-text">Review transcription</label>
+        <textarea id="voice-review-text" rows="5" spellcheck="true"></textarea>
+      </div>
+      <div id="voice-hint"></div>
+    </div>
+    <footer class="voice-actions">
+      <button class="btn btn-secondary" id="voice-cancel" type="button" onclick="cancelVoice()">Cancel Voice</button>
+      <button class="btn btn-danger" id="voice-stop" type="button" onclick="stopVoice()">Stop &amp; Review</button>
+    </footer>
+  </section>
 </div>
 <div id="toast"></div>
 
@@ -971,7 +982,7 @@
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js"></script>
-<script src="js/voice.js?v=voice-blocking-1"></script>
+<script src="js/voice.js?v=voice-workspace-2"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=routing-foundation-1"></script>
