@@ -49,6 +49,10 @@ function syncEmbeddedTheme(theme=document.documentElement.dataset.theme||'slate'
   };
   frame.contentWindow.postMessage({type:'month-end-theme',theme,tokens},window.location.origin);
 }
+function ensureSettingsUsersFrameLoaded(){
+  const frame=document.querySelector('.settings-users-frame');
+  if(frame&&!frame.getAttribute('src')&&frame.dataset.src)frame.src=frame.dataset.src;
+}
 window.addEventListener('message',event=>{
   if(event.origin===window.location.origin&&event.data?.type==='month-end-theme-ready'){
     syncEmbeddedTheme();
@@ -549,6 +553,7 @@ function setSettingsSection(section){
     section='profiles';
   }
   activeSettingsSection=section;
+  if(section==='profiles')ensureSettingsUsersFrameLoaded();
   document.querySelectorAll('.settings-nav-item').forEach(item=>item.classList.toggle('active',item.dataset.settingsKey===section));
   document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.settingsPane===section));
   syncSidebarSettingsFlyout();
@@ -567,6 +572,7 @@ function renderSettings(){
   if(!activeSettingsSection)activeSettingsSection='general';
   if(activeSettingsSection!=='profiles'&&!profileCanAccessPage(currentProfile(),'settings'))activeSettingsSection='profiles';
   if(!document.querySelector(`.settings-pane[data-settings-pane="${activeSettingsSection}"]`))activeSettingsSection='general';
+  if(activeSettingsSection==='profiles')ensureSettingsUsersFrameLoaded();
   const canUseSettings=profileCanAccessPage(currentProfile(),'settings');
   document.querySelectorAll('.settings-nav-item').forEach(item=>{
     item.classList.toggle('active',item.dataset.settingsKey===activeSettingsSection);

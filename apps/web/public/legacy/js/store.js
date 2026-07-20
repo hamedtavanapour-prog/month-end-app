@@ -1,5 +1,7 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
+const CURRENT_WORKSPACE_SCHEMA_VERSION=1;
+
 function compactUsageRow(row){
   return{
     productId:row.productId||'',
@@ -78,6 +80,7 @@ function compactStateForStorage(){
   if(typeof ensureDepartments==='function')ensureDepartments();
   if(typeof ensureProductMenuSettings==='function')ensureProductMenuSettings();
   return{
+    workspaceSchemaVersion:CURRENT_WORKSPACE_SCHEMA_VERSION,
     products:state.products||[],
     productCatalogVersion:state.productCatalogVersion||null,
     drinks:state.drinks||[],
@@ -110,6 +113,7 @@ function save(){
       toast('Browser storage is full. Deleted old unmatched usage rows; try again.',true);
     }
   }
+  if(typeof queueCloudStatePayload==='function')queueCloudStatePayload(payload);
   cloudPushDebounced();
 }
 
@@ -314,6 +318,7 @@ function normalizeLoadedState(){
   const productMenusChanged=typeof ensureProductMenuSettings==='function'?ensureProductMenuSettings():false;
   const menusChanged=typeof ensureMenuLibrary==='function'?ensureMenuLibrary():false;
   syncAllSupplierProductLinks();
+  state.workspaceSchemaVersion=CURRENT_WORKSPACE_SCHEMA_VERSION;
   return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
 }
 
@@ -321,9 +326,10 @@ function load(){
   const raw=localStorage.getItem('keg_bar_v5');
   if(raw){
     state=JSON.parse(raw);
-    if(normalizeLoadedState()){
+    const needsSchemaSave=(Number(state.workspaceSchemaVersion)||0)<CURRENT_WORKSPACE_SCHEMA_VERSION;
+    if(normalizeLoadedState()&&needsSchemaSave){
       save();
-      toast(`Restored ${state.products.length} default products.`);
+      toast('Updated saved workspace data.');
     }
   }else{
     if(typeof ensureDepartments==='function')ensureDepartments();

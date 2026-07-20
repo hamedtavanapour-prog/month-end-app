@@ -1,6 +1,6 @@
 // state.js — in-memory app state and transient UI flags.
 
-let state={products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[],inventoryCategories:null};
+let state={workspaceSchemaVersion:0,products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[],inventoryCategories:null};
 let editingProductId=null,editingOrderId=null,editingSupId=null;
 let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
 let mobileExpandedInventoryId=null;

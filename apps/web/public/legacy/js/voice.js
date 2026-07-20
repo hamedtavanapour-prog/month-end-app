@@ -10,6 +10,10 @@ let voiceStartedAt=0;
 let voicePendingTranscript='';
 let voiceReviewPending=false;
 let voicePreviousFocus=null;
+let voiceRecordingTimer=null;
+let voiceTranscriptionController=null;
+const VOICE_MAX_RECORDING_MS=2*60*1000;
+const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 
 function voiceHints(){
   return{
@@ -52,6 +56,7 @@ function setVoiceBlocking(active){
   document.body.classList.toggle('voice-ui-open',active);
   document.querySelector('.app')?.toggleAttribute('inert',active);
   document.querySelectorAll('.modal-overlay.open').forEach(overlay=>overlay.toggleAttribute('inert',active));
+  if(typeof syncBlockingUiState==='function')syncBlockingUiState();
 }
 
 function setVoiceActionState(state){
@@ -151,6 +156,12 @@ async function startVoice(){
     setVoiceModal('Listening... Click Stop & Review when finished.');
     setVoiceActionState('recording');
     voiceRecorder.start();
+    clearTimeout(voiceRecordingTimer);
+    voiceRecordingTimer=setTimeout(()=>{
+      if(!voiceActive)return;
+      toast('Two-minute recording limit reached. Preparing your review.');
+      stopVoice();
+    },VOICE_MAX_RECORDING_MS);
   }catch(error){
     toast('Microphone permission is required for voice.',true);
     resetVoiceState();
@@ -164,6 +175,8 @@ function stopVoice(){
   }
   if(!voiceActive)return;
   voiceActive=false;
+  clearTimeout(voiceRecordingTimer);
+  voiceRecordingTimer=null;
   setVoiceButtons(null);
   setVoiceModal('Transcribing...');
   setVoiceActionState('transcribing');
@@ -176,6 +189,12 @@ function stopVoice(){
 
 function resetVoiceState(){
   voiceActive=false;
+  clearTimeout(voiceRecordingTimer);
+  voiceRecordingTimer=null;
+  if(voiceTranscriptionController){
+    voiceTranscriptionController.abort();
+    voiceTranscriptionController=null;
+  }
   const recorder=voiceRecorder;
   voiceRecorder=null;
   if(recorder&&recorder.state!=='inactive'){
@@ -226,10 +245,20 @@ async function transcribeVoiceRecording(){
     const products=voiceContext==='inventory'&&typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
     const vocabulary=[...new Set(products.flatMap(product=>[product.name,product.inventoryName].filter(Boolean)))].join(', ');
     form.append('vocabulary',vocabulary.slice(0,6000));
-    const response=await fetch('/api/transcribe',{
-      method:'POST',
-      body:form
-    });
+    const controller=new AbortController();
+    voiceTranscriptionController=controller;
+    const timeout=setTimeout(()=>controller.abort(),VOICE_TRANSCRIPTION_TIMEOUT_MS);
+    let response;
+    try{
+      response=await fetch('/api/transcribe',{
+        method:'POST',
+        body:form,
+        signal:controller.signal
+      });
+    }finally{
+      clearTimeout(timeout);
+      if(voiceTranscriptionController===controller)voiceTranscriptionController=null;
+    }
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||'Transcription failed.');
 
@@ -243,7 +272,7 @@ async function transcribeVoiceRecording(){
     reviewVoiceTranscript(transcript);
   }catch(error){
     resetVoiceState();
-    toast(error.message||'Voice transcription failed.',true);
+    toast(error?.name==='AbortError'?'Voice transcription took too long. Try a shorter recording.':error.message||'Voice transcription failed.',true);
   }
 }
 

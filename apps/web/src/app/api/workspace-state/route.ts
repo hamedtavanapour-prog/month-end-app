@@ -93,13 +93,28 @@ async function importLegacyState(
   return error ? null : data;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const result = await getMembershipContext();
   if ("error" in result) return result.error;
 
   const { context, supabase } = result;
   if (!isAllowed(context, READ_PERMISSIONS)) {
     return jsonResponse({ error: "Workspace access is not assigned" }, 403);
+  }
+  const expectedVersion = request.headers.get("x-workspace-version");
+  if (expectedVersion) {
+    const { data: version, error: versionError } = await supabase
+      .from("workspace_states")
+      .select("updated_at")
+      .eq("organization_id", context.organizationId)
+      .maybeSingle();
+    if (versionError) return jsonResponse({ error: "Could not load workspace" }, 500);
+    if (version?.updated_at === expectedVersion) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: { "Cache-Control": "private, no-store, max-age=0" },
+      });
+    }
   }
   const { data: workspaceState, error } = await supabase
     .from("workspace_states")

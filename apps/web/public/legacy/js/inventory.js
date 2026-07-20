@@ -1512,6 +1512,7 @@ function singleInvPrint(){const id=document.getElementById('single-inv-sel').val
 
 document.getElementById('mobile-count-continue')?.addEventListener('click',continueMobileCountSetup);
 document.addEventListener('click',event=>{
+  if(document.getElementById('voice-modal')?.classList.contains('open'))return;
   const setup=document.getElementById('modal-inv-room-select');
   const button=document.getElementById('mobile-count-continue');
   if(!setup?.classList.contains('open')||!button)return;
@@ -1523,6 +1524,7 @@ document.addEventListener('click',event=>{
 },true);
 document.getElementById('inv-filter-done')?.addEventListener('click',closeInventoryFilterSheet);
 document.addEventListener('click',event=>{
+  if(document.getElementById('voice-modal')?.classList.contains('open'))return;
   const sheet=document.getElementById('inv-filter-sheet');
   const button=document.getElementById('inv-filter-done');
   if(!sheet?.classList.contains('open')||!button)return;
@@ -1535,6 +1537,10 @@ document.addEventListener('click',event=>{
 document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>exitInventoryRoom());
 document.getElementById('inventory-count-finish')?.addEventListener('click',saveInventory);
 document.addEventListener('click',event=>{
+  // This coordinate fallback is registered before voice.js. Without an
+  // explicit top-layer guard, a tap on Stop & Review can also activate the
+  // count footer underneath it on narrow mobile screens and exit the room.
+  if(document.getElementById('voice-modal')?.classList.contains('open'))return;
   if(!document.getElementById('modal-inventory')?.classList.contains('open'))return;
   const actions=[
     {button:document.getElementById('inventory-count-cancel'),run:()=>exitInventoryRoom()},

@@ -447,7 +447,7 @@
         <div class="settings-group menu-editor" id="settings-menu-editor" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="profiles">
-        <iframe class="settings-users-frame" src="/app/team?embedded=1" title="Users and access settings" onload="syncEmbeddedTheme(document.documentElement.dataset.theme||'slate')"></iframe>
+        <iframe class="settings-users-frame" data-src="/app/team?embedded=1" loading="lazy" title="Users and access settings" onload="syncEmbeddedTheme(document.documentElement.dataset.theme||'slate')"></iframe>
       </div>
       <div class="settings-pane" data-settings-pane="appearance">
         <div class="settings-section-head"><h3>Appearance</h3><p>Choose a saved visual theme for this device.</p></div>
@@ -965,27 +965,27 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=temporary-count-items-1"></script>
+<script src="js/supabase.js?v=performance-recovery-2"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=temporary-count-items-1"></script>
+<script src="js/state.js?v=performance-recovery-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
-<script src="js/store.js"></script>
-<script src="js/ui.js?v=settings-layout-1"></script>
+<script src="js/store.js?v=performance-recovery-3"></script>
+<script src="js/ui.js?v=performance-recovery-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=temporary-count-items-1"></script>
+<script src="js/inventory.js?v=voice-mobile-guard-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js"></script>
-<script src="js/voice.js?v=voice-workspace-2"></script>
+<script src="js/voice.js?v=voice-workspace-3"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
-<script src="js/main.js?v=routing-foundation-1"></script>
+<script src="js/main.js?v=performance-recovery-3"></script>
 <script src="js/access.js?v=settings-layout-1"></script>
 </body>
 </html>

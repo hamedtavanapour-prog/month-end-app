@@ -7,5 +7,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // The legacy workspace is a public-file bundle hosted inside the authenticated
+  // app shell. Its own API calls still pass through Proxy and authorize again,
+  // but running an auth refresh for every HTML/CSS/JS asset makes a hard refresh
+  // fan out into dozens of unnecessary Supabase checks.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|legacy(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
