@@ -869,11 +869,11 @@ function inferFoodtrakUsageCategory(row){
   if(group==='Entree'||group==='Not Applicable')return{category:'Food',subcategory:'Other Food'};
   if(group==='Misc'||group==='Supplies Non Inv')return{category:'Supplies',subcategory:subgroup==='Inventoried Supplies'?'Smallwares':'Other Supplies'};
   if(group==='Wine'){
-    if(['Reds','Whites','Rosé & Bubbles'].includes(nameInferred.category))return nameInferred;
+    if(['Red Wines','White Wines','Rosé & Bubbles'].includes(nameInferred.category))return nameInferred;
     if(/champagne|sparkling/i.test(subgroup))return{category:'Rosé & Bubbles',subcategory:'Bubbles'};
     if(/rose|rosé/i.test(subgroup))return{category:'Rosé & Bubbles',subcategory:'Rosé'};
-    if(/white/i.test(subgroup))return{category:'Whites',subcategory:'Other Whites'};
-    return{category:'Reds',subcategory:'Other Reds'};
+    if(/white/i.test(subgroup))return{category:'White Wines',subcategory:'Other Whites'};
+    return{category:'Red Wines',subcategory:'Other Reds'};
   }
   if(group==='Beer'){
     if(nameInferred.category==='Cider')return nameInferred;
@@ -1378,7 +1378,7 @@ function inferInventoryTemplateCategory(name,unit,section){
     else if(/rose|rosé/.test(text))subcategory='Rosé';
     else if(/shiraz|syrah/.test(text))subcategory='Syrah / Shiraz';
     else if(/cabernet|merlot/.test(text))subcategory='Cabernet & Blends';
-    return{category:typeof wineCategoryForSubcategory==='function'?wineCategoryForSubcategory(subcategory):'Reds',subcategory};
+    return{category:typeof wineCategoryForSubcategory==='function'?wineCategoryForSubcategory(subcategory):'Red Wines',subcategory};
   }
   return{category:'Other',subcategory:'Misc'};
 }
@@ -1388,7 +1388,7 @@ function inventoryTemplateUnitDescriptor(rawUnit,category='Other'){
   const lower=raw.toLowerCase();
   const direct=/^(can|bottle|keg|each|piece|lb|kg|doz|serv|por|recipe|skewer)$/i.test(raw);
   let unit=direct?lower:'unit';
-  if(!direct&&['Spirits','Liqueurs','Reds','Whites','Rosé & Bubbles'].includes(category))unit='bottle';
+  if(!direct&&['Spirits','Liqueurs','Red Wines','White Wines','Rosé & Bubbles'].includes(category))unit='bottle';
   else if(!direct&&['Beer','Cider'].includes(category))unit=/kg|\bl\b|lt/i.test(lower)?'keg':'bottle';
   else if(!direct&&/^cs\//i.test(lower))unit='case';
   return{unit,unitSize:direct?'':raw,sku:'',cost:0,par:0};

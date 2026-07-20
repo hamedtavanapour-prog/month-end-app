@@ -3,8 +3,8 @@
 const DEFAULT_INVENTORY_CATEGORIES={
   Spirits:['Vodka','Rum','Gin','Scotch (Single)','Scotch (Blend)','Irish Whiskey','Rye','Tequila','Brandy / Cognac','Aperitifs','Other Spirits'],
   Liqueurs:['Liqueurs','Ports'],
-  Reds:['Pinot Noir','Italian Reds','Cabernet & Blends','Cabernet Shiraz','Syrah / Shiraz','Syrah','Shiraz','Grenache','Grenache & Syrah','Malbec','Spanish Reds','Other Reds'],
-  Whites:['Pinot Gris / Grigio','Sauvignon Blanc','Chardonnay','Viognier','Other Whites','Non-Alcoholic'],
+  'Red Wines':['Pinot Noir','Italian Reds','Cabernet & Blends','Cabernet Shiraz','Syrah / Shiraz','Syrah','Shiraz','Grenache','Grenache & Syrah','Malbec','Spanish Reds','Other Reds'],
+  'White Wines':['Pinot Gris / Grigio','Sauvignon Blanc','Chardonnay','Viognier','Other Whites','Non-Alcoholic'],
   'Rosé & Bubbles':['Rosé','Bubbles'],
   Beer:['Kegs','Bottles','Cans','Features / Craft','Non-Alcoholic'],
   Cider:['Cans','Bottles'],
@@ -15,12 +15,13 @@ const DEFAULT_INVENTORY_CATEGORIES={
 
 let SUBCATS=JSON.parse(JSON.stringify(DEFAULT_INVENTORY_CATEGORIES));
 let categoryEditorSubcategories=[];
+let categorySaveInProgress=false;
 
 function wineCategoryForSubcategory(subcategory=''){
   const value=String(subcategory||'').trim();
   if(['Rosé','Bubbles'].includes(value))return'Rosé & Bubbles';
-  if((DEFAULT_INVENTORY_CATEGORIES.Whites||[]).includes(value))return'Whites';
-  return'Reds';
+  if((DEFAULT_INVENTORY_CATEGORIES['White Wines']||[]).includes(value))return'White Wines';
+  return'Red Wines';
 }
 
 function normalizeInventoryCategories(){
@@ -39,7 +40,7 @@ function normalizeInventoryCategories(){
     if(JSON.stringify(cleanSubs)!==JSON.stringify(subcategories)){state.inventoryCategories[name]=cleanSubs;changed=true;}
   });
   if(hadLegacyWineCategory){
-    ['Reds','Whites','Rosé & Bubbles'].forEach(name=>{
+    ['Red Wines','White Wines','Rosé & Bubbles'].forEach(name=>{
       if(!state.inventoryCategories[name]){state.inventoryCategories[name]=[...DEFAULT_INVENTORY_CATEGORIES[name]];changed=true;}
     });
   }
@@ -61,7 +62,7 @@ function normalizeInventoryCategories(){
   });
   (state.rooms||[]).forEach(room=>{
     if(!Array.isArray(room.categoryNames)||!room.categoryNames.includes('Wine'))return;
-    room.categoryNames=[...new Set(room.categoryNames.flatMap(name=>name==='Wine'?['Reds','Whites','Rosé & Bubbles']:[name]))];
+    room.categoryNames=[...new Set(room.categoryNames.flatMap(name=>name==='Wine'?['Red Wines','White Wines','Rosé & Bubbles']:[name]))];
     changed=true;
   });
   const preferredOrder=Object.keys(DEFAULT_INVENTORY_CATEGORIES);
@@ -102,7 +103,9 @@ function openInventoryCategoryEditor(name=''){
   editingInventoryCategoryName=name;
   categoryEditorSubcategories=[...(SUBCATS[name]||[])];
   document.getElementById('category-editor-title').textContent=name?'Edit Category':'Add Category';
-  document.getElementById('category-editor-name').value=name;
+  const nameInput=document.getElementById('category-editor-name');
+  nameInput.value=name;
+  nameInput.dataset.originalName=name;
   const subcategoryInput=document.getElementById('category-editor-subcategory-input');
   if(subcategoryInput)subcategoryInput.value='';
   renderInventoryCategorySubcategoryEditor();
@@ -135,28 +138,32 @@ function removeInventoryCategorySubcategory(index){
   document.getElementById('category-editor-subcategory-input')?.focus();
 }
 
-function saveInventoryCategory(){
-  const name=(document.getElementById('category-editor-name')?.value||'').trim();
+async function saveInventoryCategory(){
+  const nameInput=document.getElementById('category-editor-name');
+  const name=(nameInput?.value||'').trim();
   if((document.getElementById('category-editor-subcategory-input')?.value||'').trim())addInventoryCategorySubcategory(false);
   const subcategories=[...categoryEditorSubcategories];
   if(!name){toast('Enter a category name.',true);return;}
-  const duplicate=inventoryCategoryNames().some(existing=>existing!==editingInventoryCategoryName&&existing.toLowerCase()===name.toLowerCase());
+  const previous=(nameInput?.dataset.originalName||editingInventoryCategoryName||'').trim();
+  const duplicate=inventoryCategoryNames().some(existing=>existing!==previous&&existing.toLowerCase()===name.toLowerCase());
   if(duplicate){toast('That category already exists.',true);return;}
-  const previous=editingInventoryCategoryName;
-  if(previous&&previous!==name){
-    delete state.inventoryCategories[previous];
-    (state.products||[]).forEach(product=>{if(product.category===previous)product.category=name;});
-    (state.importBacklog||[]).forEach(item=>{if(item.category===previous)item.category=name;});
-    (state.rooms||[]).forEach(room=>{if(Array.isArray(room.categoryNames))room.categoryNames=room.categoryNames.map(category=>category===previous?name:category);});
+  const saveButton=document.getElementById('category-editor-save');
+  categorySaveInProgress=true;saveButton.disabled=true;saveButton.textContent='Saving…';
+  const sharedState=await cloudSaveInventoryCategory(previous,name,subcategories);
+  if(!sharedState){
+    categorySaveInProgress=false;saveButton.disabled=false;saveButton.textContent='Save Category';
+    toast('Could not save the category to the shared workspace. Try again.',true);return;
   }
-  state.inventoryCategories[name]=subcategories;
+  state=sharedState;
   normalizeInventoryCategories();
-  save();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
   refreshCategorySelects();
   renderInventoryCategorySettings();
   renderFloorPlanRooms();
+  categorySaveInProgress=false;
   closeModal('modal-category-editor');
-  toast('Category saved.');
+  saveButton.disabled=false;saveButton.textContent='Save Category';
+  toast(!previous?'Category added for everyone.':previous===name?'Category saved for everyone.':'Category renamed for everyone.');
 }
 
 function deleteInventoryCategory(){

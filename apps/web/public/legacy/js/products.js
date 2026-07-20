@@ -453,6 +453,7 @@ function cancelProductUnitEditor(){
 }
 function beforeModalClose(id){
   if(id==='modal-product'&&productSaveInProgress){toast('Wait for the shared save to finish.',true);return false;}
+  if(id==='modal-category-editor'&&typeof categorySaveInProgress!=='undefined'&&categorySaveInProgress){toast('Wait for the shared save to finish.',true);return false;}
   if(id==='modal-product-units'&&!productUnitEditorSaving){
     restoreProductUnitEditorSnapshot();
   }
