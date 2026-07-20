@@ -9,6 +9,7 @@ let voiceChunks=[];
 let voiceStartedAt=0;
 let voicePendingTranscript='';
 let voiceReviewPending=false;
+let voicePreviousFocus=null;
 
 function voiceHints(){
   return{
@@ -39,8 +40,19 @@ function setVoiceModal(text){
   document.getElementById('voice-ctx-label').textContent=labels[voiceContext]||'Listening...';
   document.getElementById('voice-hint').textContent=hints[voiceContext]||'';
   document.getElementById('voice-live').textContent=text||'Listening...';
-  document.getElementById('voice-modal').classList.add('open');
+  const modal=document.getElementById('voice-modal');
+  const opening=!modal.classList.contains('open');
+  modal.classList.add('open');
+  setVoiceBlocking(true);
   if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
+  if(opening)setTimeout(()=>document.getElementById('voice-stop')?.focus(),0);
+}
+
+function setVoiceBlocking(active){
+  document.getElementById('voice-backdrop')?.classList.toggle('open',active);
+  document.body.classList.toggle('voice-ui-open',active);
+  document.querySelector('.app')?.toggleAttribute('inert',active);
+  document.querySelectorAll('.modal-overlay.open').forEach(overlay=>overlay.toggleAttribute('inert',active));
 }
 
 function setVoiceActionState(state){
@@ -121,6 +133,7 @@ async function startVoice(){
     voiceRecorder.onstop=transcribeVoiceRecording;
     voiceStartedAt=Date.now();
     voiceActive=true;
+    voicePreviousFocus=document.activeElement;
     setVoiceButtons(voiceContext);
     setVoiceModal('Listening... Click Stop & Review when finished.');
     setVoiceActionState('recording');
@@ -157,8 +170,12 @@ function resetVoiceState(){
   voiceRecorder=null;
   setVoiceButtons(null);
   document.getElementById('voice-modal').classList.remove('open');
+  setVoiceBlocking(false);
   if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
   setVoiceActionState('recording');
+  const previousFocus=voicePreviousFocus;
+  voicePreviousFocus=null;
+  setTimeout(()=>previousFocus?.focus?.(),0);
 }
 
 function cancelVoice(){

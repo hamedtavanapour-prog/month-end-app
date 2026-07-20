@@ -6,7 +6,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=settings-layout-1"/>
+<link rel="stylesheet" href="css/styles.css?v=voice-blocking-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -568,6 +568,8 @@
     </div>
     <div class="inv-room-manager">
       <div class="count-room-current"><span>Counting room</span><strong id="inv-room-current">Room</strong><small>This room is reserved for you until you save or exit.</small></div>
+      <button class="btn btn-secondary count-add-extra-trigger" type="button" onclick="openCountExtraProductPicker()"><span aria-hidden="true">＋</span> Add unlisted item</button>
+      <small class="count-add-extra-help">Adds an item to this room for this count only.</small>
     </div>
   </div>
   <div class="inv-modal-filters">
@@ -596,12 +598,27 @@
   </div>
   <div class="inv-modal-body" id="inv-rows"></div>
   <div class="inv-modal-footer">
-    <button class="voice-btn" id="voice-btn-inventory" onclick="toggleVoice('inventory')">Voice Count</button>
+    <button class="voice-btn" id="voice-btn-inventory" type="button" onclick="toggleVoice('inventory')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Voice Count</span></button>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
       <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
     </div>
   </div>
+</div>
+</div>
+
+<!-- TEMPORARY COUNT ITEM PICKER -->
+<div class="modal-overlay" id="modal-count-add-item">
+<div class="modal count-extra-product-modal" role="dialog" aria-modal="true" aria-labelledby="count-extra-product-title">
+  <button class="modal-close" type="button" aria-label="Close item picker" onclick="closeModal('modal-count-add-item')">&times;</button>
+  <h3 id="count-extra-product-title">Add Unlisted Item</h3>
+  <p class="count-setup-intro" id="count-extra-product-room">Add a product to this room for this count only.</p>
+  <div class="form-group">
+    <label for="count-extra-product-search">Search all products</label>
+    <input type="search" id="count-extra-product-search" placeholder="Product, category, SKU…" autocomplete="off" oninput="renderCountExtraProductPicker()">
+  </div>
+  <div class="count-extra-product-list" id="count-extra-product-list" aria-live="polite"></div>
+  <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-add-item')">Cancel</button></div>
 </div>
 </div>
 
@@ -915,14 +932,15 @@
 </div>
 
 <!-- VOICE PANEL -->
-<div id="voice-modal">
+<div id="voice-backdrop" aria-hidden="true"></div>
+<div id="voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-ctx-label">
   <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-ctx-label">Listening…</span></div>
   <div id="voice-waveform"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
   <div id="voice-live">Listening…</div>
   <div id="voice-hint"></div>
   <div class="voice-actions">
-    <button class="btn btn-secondary" id="voice-cancel" onclick="cancelVoice()" style="display:none;">Cancel</button>
-    <button class="btn btn-danger" id="voice-stop" onclick="stopVoice()">Stop &amp; Review</button>
+    <button class="btn btn-secondary" id="voice-cancel" type="button" onclick="cancelVoice()" style="display:none;">Cancel</button>
+    <button class="btn btn-danger" id="voice-stop" type="button" onclick="stopVoice()">Stop &amp; Review</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -936,26 +954,26 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=shared-room-count-1"></script>
+<script src="js/supabase.js?v=temporary-count-items-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=shared-room-count-1"></script>
+<script src="js/state.js?v=temporary-count-items-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
 <script src="js/ui.js?v=settings-layout-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=shared-room-count-1"></script>
+<script src="js/inventory.js?v=temporary-count-items-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js"></script>
-<script src="js/voice.js"></script>
+<script src="js/voice.js?v=voice-blocking-1"></script>
 <script src="js/master-search.js"></script>
-<script src="js/routing.js?v=shared-room-count-1"></script>
+<script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=routing-foundation-1"></script>
 <script src="js/access.js?v=settings-layout-1"></script>
 </body>

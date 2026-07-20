@@ -43,10 +43,17 @@ export function saveCountRoomInWorkspace(
   countId: string,
   roomId: string,
   roomItems: JsonObject,
+  extraProductIds: string[],
   actor: JsonObject,
 ): JsonObject {
   const workspace = isCountJsonObject(data) ? data : {};
   const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
+  const activeProductIds = new Set(
+    (Array.isArray(workspace.products) ? workspace.products : [])
+      .filter((product) => isCountJsonObject(product) && product.archived !== true && typeof product.id === "string")
+      .map((product) => String((product as JsonObject).id)),
+  );
+  const safeExtraProductIds = [...new Set(extraProductIds)].filter((productId) => activeProductIds.has(productId));
   let foundCount = false;
   let foundRoom = false;
   const nextInventories = inventories.map((candidate) => {
@@ -56,7 +63,7 @@ export function saveCountRoomInWorkspace(
     const nextRooms = rooms.map((room) => {
       if (!isCountJsonObject(room) || room.id !== roomId) return room;
       foundRoom = true;
-      return { ...room, items: roomItems };
+      return { ...room, items: roomItems, extraProductIds: safeExtraProductIds };
     });
     const items = mergedRoomItems(nextRooms);
     return {
