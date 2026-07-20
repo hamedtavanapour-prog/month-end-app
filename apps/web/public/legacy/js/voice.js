@@ -21,9 +21,9 @@ function voiceHints(){
 
 function voiceLabels(){
   return{
-    products:'Updating Par Levels...',
-    inventory:'Filing Inventory Count...',
-    orders:'Creating Order Lines...'
+    products:'Record Par Levels',
+    inventory:'Record Inventory Count',
+    orders:'Record Order Quantities'
   };
 }
 
@@ -43,13 +43,12 @@ function setVoiceModal(text){
   const modal=document.getElementById('voice-modal');
   const opening=!modal.classList.contains('open');
   modal.classList.add('open');
+  modal.setAttribute('aria-hidden','false');
   setVoiceBlocking(true);
-  if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
   if(opening)setTimeout(()=>document.getElementById('voice-stop')?.focus(),0);
 }
 
 function setVoiceBlocking(active){
-  document.getElementById('voice-backdrop')?.classList.toggle('open',active);
   document.body.classList.toggle('voice-ui-open',active);
   document.querySelector('.app')?.toggleAttribute('inert',active);
   document.querySelectorAll('.modal-overlay.open').forEach(overlay=>overlay.toggleAttribute('inert',active));
@@ -58,22 +57,34 @@ function setVoiceBlocking(active){
 function setVoiceActionState(state){
   const stop=document.getElementById('voice-stop');
   const cancel=document.getElementById('voice-cancel');
+  const modal=document.getElementById('voice-modal');
+  const reviewField=document.getElementById('voice-review-field');
+  const status=document.getElementById('voice-status-label');
   if(!stop||!cancel)return;
+  modal.dataset.state=state;
+  if(reviewField)reviewField.hidden=state!=='review';
   if(state==='recording'){
     stop.textContent='Stop & Review';
     stop.className='btn btn-danger';
     stop.disabled=false;
-    cancel.style.display='none';
+    cancel.textContent='Cancel Voice';
+    cancel.style.display='inline-flex';
+    cancel.disabled=false;
+    if(status)status.textContent='Microphone active';
   }else if(state==='transcribing'){
     stop.textContent='Transcribing...';
     stop.className='btn btn-secondary';
     stop.disabled=true;
     cancel.style.display='none';
+    if(status)status.textContent='Preparing your review';
   }else if(state==='review'){
     stop.textContent='Apply Transcription';
     stop.className='btn btn-primary';
     stop.disabled=false;
+    cancel.textContent='Discard';
     cancel.style.display='inline-flex';
+    cancel.disabled=false;
+    if(status)status.textContent='Ready to review';
   }
 }
 
@@ -96,8 +107,10 @@ function reviewVoiceTranscript(transcript){
   setVoiceButtons(null);
   setVoiceModal(cleaned);
   document.getElementById('voice-ctx-label').textContent='Review Transcription';
-  document.getElementById('voice-hint').textContent='Check the text, then apply it or cancel.';
+  document.getElementById('voice-hint').textContent='Check or correct the text, then apply it or discard it.';
+  document.getElementById('voice-review-text').value=cleaned;
   setVoiceActionState('review');
+  setTimeout(()=>document.getElementById('voice-review-text')?.focus(),0);
 }
 
 async function toggleVoice(ctx){
@@ -163,15 +176,21 @@ function stopVoice(){
 
 function resetVoiceState(){
   voiceActive=false;
+  const recorder=voiceRecorder;
+  voiceRecorder=null;
+  if(recorder&&recorder.state!=='inactive'){
+    recorder.onstop=null;
+    try{recorder.stop();}catch(error){}
+  }
   if(voiceStream){
     voiceStream.getTracks().forEach(track=>track.stop());
     voiceStream=null;
   }
-  voiceRecorder=null;
   setVoiceButtons(null);
-  document.getElementById('voice-modal').classList.remove('open');
+  const modal=document.getElementById('voice-modal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden','true');
   setVoiceBlocking(false);
-  if(typeof syncMobileSheetBackdrop==='function')syncMobileSheetBackdrop();
   setVoiceActionState('recording');
   const previousFocus=voicePreviousFocus;
   voicePreviousFocus=null;
@@ -229,12 +248,28 @@ async function transcribeVoiceRecording(){
 }
 
 function applyPendingVoiceTranscript(){
-  const transcript=voicePendingTranscript;
+  const transcript=String(document.getElementById('voice-review-text')?.value||voicePendingTranscript).trim();
+  if(!transcript){toast('Enter or keep some transcription text before applying.',true);document.getElementById('voice-review-text')?.focus();return;}
   voicePendingTranscript='';
   voiceReviewPending=false;
   resetVoiceState();
   applyVoiceTranscript(transcript);
 }
+
+function blockClicksBehindVoice(event){
+  const modal=document.getElementById('voice-modal');
+  if(!modal?.classList.contains('open')||event.target?.closest?.('#voice-modal'))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+['pointerdown','touchstart','mousedown','click'].forEach(type=>document.addEventListener(type,blockClicksBehindVoice,true));
+document.addEventListener('keydown',event=>{
+  const modal=document.getElementById('voice-modal');
+  if(event.key!=='Escape'||!modal?.classList.contains('open'))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if(modal.dataset.state!=='transcribing')cancelVoice();
+},true);
 
 function applyVoiceTranscript(text){
   const t=String(text||'').trim();
