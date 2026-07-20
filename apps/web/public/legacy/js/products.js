@@ -454,6 +454,13 @@ function cancelProductUnitEditor(){
 function beforeModalClose(id){
   if(id==='modal-product'&&productSaveInProgress){toast('Wait for the shared save to finish.',true);return false;}
   if(id==='modal-category-editor'&&typeof categorySaveInProgress!=='undefined'&&categorySaveInProgress){toast('Wait for the shared save to finish.',true);return false;}
+  if(id==='modal-inventory'&&typeof currentCountRoomLock!=='undefined'&&currentCountRoomLock&&!inventoryRoomExitInProgress){toast('Use Save Room or Exit Room before leaving.',true);return false;}
+  if(id==='modal-inv-room-picker'){
+    clearInterval(countRoomPickerRefreshTimer);
+    countRoomPickerRefreshTimer=null;
+    countRoomPickerCountId=null;
+    countRoomPickerLocks=[];
+  }
   if(id==='modal-product-units'&&!productUnitEditorSaving){
     restoreProductUnitEditorSnapshot();
   }
@@ -538,7 +545,7 @@ function openProductQuickAction(action,id){
   closeModal('modal-product-view');
   if(action==='count'){
     showPage('inventory');
-    openInventoryModal();
+    openInventoryRoomSelect();
   }else if(action==='usage'){
     showPage('usage');
     toast('Upload or edit a usage log, then add this product there.');

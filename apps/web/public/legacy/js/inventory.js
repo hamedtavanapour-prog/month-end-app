@@ -376,30 +376,12 @@ function captureCurrentRoomCounts(){
   room.items=items;
 }
 function renderInventoryRooms(){
-  const wrap=document.getElementById('inv-room-tabs');
-  if(!wrap)return;
-  const ex=currentInvEdit?state.inventories.find(i=>i.id===currentInvEdit):null;
-  const rooms=ex?(normalizeInventoryRooms(ex),ex.rooms):currentInvRooms;
-  wrap.innerHTML=rooms.map(room=>{
-    const count=Object.keys(room.items||{}).length;
-    const active=room.id===currentInvRoomId?'active':'';
-    return`<button class="room-tab ${active}" type="button" onclick="switchInventoryRoom('${room.id}')"><span>${escapeHtml(room.name)}</span><strong>${count}</strong></button>`;
-  }).join('');
-  const select=document.getElementById('inv-room-select');
-  if(select){
-    const mergedOption=currentInvEdit?`<option value="all" ${currentInvMergedView?'selected':''}>Merged Total</option>`:'';
-    select.innerHTML=mergedOption+rooms.map(room=>`<option value="${room.id}" ${!currentInvMergedView&&room.id===currentInvRoomId?'selected':''}>${escapeHtml(room.name)}</option>`).join('');
-    select.value=currentInvMergedView?'all':(currentInvRoomId||rooms[0]?.id||'');
-  }
+  const room=currentInventoryRoom();
+  const label=document.getElementById('inv-room-current');
+  if(label)label.textContent=room?.name||'Room';
 }
 function switchInventoryRoom(roomId){
-  if(roomId==='all'&&currentInvEdit){
-    captureCurrentRoomCounts();
-    const inv=state.inventories.find(item=>item.id===currentInvEdit);if(!inv)return;
-    currentInvMergedView=true;
-    liveInvCounts={...inv.items};
-    renderInventoryRooms();renderInvRows(true);return;
-  }
+  if(currentCountRoomLock&&roomId!==currentCountRoomLock.roomId){toast('Save or exit this room before choosing another one.',true);return;}
   captureCurrentRoomCounts();
   currentInvMergedView=false;
   currentInvRoomId=roomId;
@@ -787,12 +769,12 @@ function openLiveInventoryDetail(productId){
   openModal('modal-live-inv-detail');
 }
 
-function initLiveCounts(ex){
+function initLiveCounts(ex,selectedRoomId=null){
   liveInvCounts={};
   if(ex){
     normalizeInventoryRooms(ex);
     currentInvRooms=[];
-    const room=ex.rooms.find(item=>Object.keys(item.items||{}).length)||ex.rooms[0];
+    const room=ex.rooms.find(item=>item.id===selectedRoomId)||ex.rooms[0];
     currentInvRoomId=room.id;
     currentRoomProducts().forEach(p=>{liveInvCounts[p.id]=room.items[p.id]!==undefined?room.items[p.id]:'';});
     return;
@@ -916,19 +898,10 @@ async function continueMobileCountSetup(){
     const draft=await createCountDraft(date,label,rooms);
     if(!draft)return;
     closeModal('modal-inv-room-select');
-    openInventoryModal(draft.id);
-    const selectedRoom=draft.rooms.find(room=>room.roomId===rooms[0].id)||draft.rooms[0];
-    if(selectedRoom)switchInventoryRoom(selectedRoom.id);
+    await openCountRoomPicker(draft.id);
   }finally{
     setCountDraftSaving(false);
   }
-}
-function startRoomCount(roomId){
-  if(typeof profileCanAccessRoom==='function'&&!profileCanAccessRoom(currentProfile(),roomId)){toast('You do not have access to that room.',true);return;}
-  const date=document.getElementById('room-count-date').value||today();
-  const label=document.getElementById('room-count-label').value.trim();
-  closeModal('modal-inv-room-select');
-  openInventoryModal(null,roomId,date,label);
 }
 function draftRoomsFromFloorPlan(floorRooms=activeFloorPlanRooms()){
   return floorRooms.map(room=>({id:uid(),roomId:room.id,name:room.name,items:{}}));
@@ -938,7 +911,6 @@ async function createCountDraft(date,label,floorRooms=activeFloorPlanRooms()){
   if(existing){
     ensureInventoryHasFloorPlanRooms(existing);
     existing.items=mergeInventoryRoomItems(existing.rooms);
-    save();
     renderInventoryTable();
     toast(existing.draft?'Opening the existing draft.':'Opening the existing count.');
     return existing;
@@ -949,15 +921,124 @@ async function createCountDraft(date,label,floorRooms=activeFloorPlanRooms()){
   const actor=window.serverAccessContext?.user||{};
   const createdBy={id:actor.id||'',name:actor.name||'Team member',role:actor.jobTitle||actor.role||'Team member'};
   const draft={id,date,label,items:{},rooms,draft:true,createdBy,createdAt:new Date().toISOString()};
-  state.inventories.push(draft);
-  state.inventories.sort((a,b)=>a.date<b.date?1:-1);
-  save();
-  const pushed=typeof cloudPushNow==='function'?await cloudPushNow():true;
+  const shared=typeof cloudCreateCountDraft==='function'?await cloudCreateCountDraft(draft):null;
+  if(!shared){toast('Could not create the shared count. Try again.',true);return null;}
+  state=shared.state;
+  normalizeLoadedState();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
   renderInventoryTable();
   refreshLiveInventoryIfVisible();
-  window.recordServerEvent?.({action:'count.draft_created',entityType:'count',entityId:id,details:{label,date,rooms:rooms.length,actor:createdBy}});
-  toast(pushed?'Count draft created.':'Draft saved on this device; cloud saving is still pending.',!pushed);
-  return draft;
+  window.recordServerEvent?.({action:'count.draft_created',entityType:'count',entityId:shared.draft.id,details:{label,date,rooms:rooms.length,actor:createdBy}});
+  toast(shared.draft.id===id?'Count created. Choose a room.':'Opening the existing count.');
+  return shared.draft;
+}
+
+function countRoomLockFor(roomId){return countRoomPickerLocks.find(lock=>lock.roomId===roomId)||null;}
+function renderCountRoomPicker(){
+  const list=document.getElementById('count-room-picker-list');
+  const context=document.getElementById('count-room-picker-context');
+  const inv=state.inventories.find(item=>item.id===countRoomPickerCountId);
+  if(!list||!inv)return;
+  normalizeInventoryRooms(inv);
+  if(context)context.textContent=`${inv.label||'Inventory Count'} · ${fmtDate(inv.date)} — select one room. Other team members can count different rooms at the same time.`;
+  const accessible=inv.rooms.filter(room=>typeof profileCanAccessRoom!=='function'||profileCanAccessRoom(currentProfile(),room.roomId));
+  list.innerHTML=accessible.map(room=>{
+    const lock=countRoomLockFor(room.id);
+    const unavailable=lock&&!lock.mine;
+    const counted=Object.keys(room.items||{}).length;
+    const detail=unavailable?`${lock.holderName||'A team member'} is counting this room right now.`:lock?.mine?'Reserved by you. Select to continue.':`${counted} item${counted===1?'':'s'} saved · Available to count`;
+    return`<button class="count-room-picker-card ${unavailable?'is-locked':''}" type="button" ${unavailable?'disabled aria-disabled="true"':''} onclick="enterCountRoom('${room.id}')"><span class="count-room-picker-copy"><strong>${escapeHtml(room.name)}</strong><span>${escapeHtml(detail)}</span></span><em class="count-room-picker-status">${unavailable?'In use':lock?.mine?'Continue':'Open'}</em></button>`;
+  }).join('')||'<div class="count-room-picker-loading">No rooms are available for your account.</div>';
+}
+async function refreshCountRoomPicker(){
+  if(!countRoomPickerCountId)return;
+  const locks=typeof cloudLoadCountRoomLocks==='function'?await cloudLoadCountRoomLocks(countRoomPickerCountId):[];
+  if(locks===null){
+    const list=document.getElementById('count-room-picker-list');
+    if(list)list.innerHTML='<div class="count-room-picker-loading">Room availability could not be loaded. Try again.</div>';
+    return;
+  }
+  countRoomPickerLocks=locks;
+  renderCountRoomPicker();
+}
+async function openCountRoomPicker(countId,preferredRoomId=null){
+  const inv=state.inventories.find(item=>item.id===countId);
+  if(!inv){toast('Count not found.',true);return;}
+  countRoomPickerCountId=countId;
+  countRoomPickerLocks=[];
+  const list=document.getElementById('count-room-picker-list');
+  if(list)list.innerHTML='<div class="count-room-picker-loading">Checking room availability…</div>';
+  openModal('modal-inv-room-picker');
+  await refreshCountRoomPicker();
+  clearInterval(countRoomPickerRefreshTimer);
+  countRoomPickerRefreshTimer=setInterval(refreshCountRoomPicker,10000);
+  const preferredLock=preferredRoomId?countRoomLockFor(preferredRoomId):null;
+  if(preferredRoomId&&(!preferredLock||preferredLock.mine))await enterCountRoom(preferredRoomId);
+}
+function closeCountRoomPicker(){
+  clearInterval(countRoomPickerRefreshTimer);
+  countRoomPickerRefreshTimer=null;
+  countRoomPickerCountId=null;
+  countRoomPickerLocks=[];
+  closeModal('modal-inv-room-picker');
+}
+async function enterCountRoom(roomId){
+  if(!countRoomPickerCountId)return;
+  const inv=state.inventories.find(item=>item.id===countRoomPickerCountId);
+  const room=inv?.rooms?.find(item=>item.id===roomId);
+  if(!room)return;
+  if(typeof profileCanAccessRoom==='function'&&!profileCanAccessRoom(currentProfile(),room.roomId)){toast('You do not have access to that room.',true);return;}
+  const result=typeof cloudAcquireCountRoom==='function'?await cloudAcquireCountRoom(countRoomPickerCountId,roomId):null;
+  if(!result){toast('Could not reserve this room. Try again.',true);return;}
+  if(!result.acquired){
+    countRoomPickerLocks=countRoomPickerLocks.filter(lock=>lock.roomId!==roomId).concat(result.lock?[result.lock]:[]);
+    renderCountRoomPicker();
+    toast(`${result.lock?.holderName||'Another team member'} is counting this room right now.`,true);
+    return;
+  }
+  currentCountRoomLock={countId:countRoomPickerCountId,roomId};
+  clearInterval(countRoomPickerRefreshTimer);
+  countRoomPickerRefreshTimer=null;
+  countRoomPickerCountId=null;
+  countRoomPickerLocks=[];
+  closeModal('modal-inv-room-picker');
+  startCountRoomHeartbeat();
+  openInventoryModal(currentCountRoomLock.countId,currentCountRoomLock.roomId);
+}
+function startCountRoomHeartbeat(){
+  clearInterval(countRoomLockHeartbeatTimer);
+  countRoomLockHeartbeatTimer=setInterval(async()=>{
+    if(!currentCountRoomLock)return;
+    const lock={...currentCountRoomLock};
+    const result=await cloudAcquireCountRoom(lock.countId,lock.roomId);
+    if(result?.acquired)return;
+    if(result===null){toast('The room reservation could not be renewed. Check your connection.',true);return;}
+    toast(`${result?.lock?.holderName||'Another team member'} now has this room. Your unsaved entries were not saved.`,true);
+    await exitInventoryRoom(true);
+  },45000);
+}
+function inventoryRoomHasUnsavedChanges(){
+  const room=currentInventoryRoom();
+  if(!room)return false;
+  const visible={};
+  currentRoomProducts().forEach(product=>{
+    const value=liveInvCounts[product.id];
+    if(value!==''&&value!==null&&value!==undefined&&!isNaN(value))visible[product.id]=parseFloat(value);
+  });
+  return!inventoryRoomItemsEqual(room.items,visible);
+}
+async function exitInventoryRoom(force=false){
+  if(inventoryRoomExitInProgress||inventoryCountSaving)return;
+  if(!force&&inventoryRoomHasUnsavedChanges()&&!confirm('Exit this room without saving your changes?'))return;
+  inventoryRoomExitInProgress=true;
+  const lock=currentCountRoomLock?{...currentCountRoomLock}:null;
+  clearInterval(countRoomLockHeartbeatTimer);
+  countRoomLockHeartbeatTimer=null;
+  if(lock&&typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
+  currentCountRoomLock=null;
+  closeModal('modal-inventory');
+  inventoryRoomExitInProgress=false;
+  if(lock)await openCountRoomPicker(lock.countId);
 }
 function sameInventorySession(inv,date,label){
   return String(inv.date||'')===String(date||'')&&String(inv.label||'').trim().toLowerCase()===String(label||'').trim().toLowerCase();
@@ -1003,28 +1084,27 @@ async function inventorySavedInCloud(id,date,label,rooms){
     String(saved.label||'')===String(label||'')&&
     inventoryRoomsEqual(rooms,saved.rooms);
 }
-function openInventoryModal(existingId=null,selectedFloorRoomId=null,presetDate='',presetLabel=''){
+function openInventoryModal(existingId=null,selectedRoomId=null){
+  const ex=existingId?state.inventories.find(i=>i.id===existingId):null;
+  if(!ex||!selectedRoomId){
+    if(existingId)openCountRoomPicker(existingId);
+    else openInventoryRoomSelect();
+    return;
+  }
   dirtyInventoryRoomIds=new Set();
   deletedInventoryRoomIds=new Set();
   expandedInventorySections=new Set();
   hideInventoryFinishMessage();
   setInventoryFinishSaving(false);
-  currentInvEdit=existingId;const ex=existingId?state.inventories.find(i=>i.id===existingId):null;
-  if(ex)ensureInventoryHasFloorPlanRooms(ex);
-  document.getElementById('inv-date').value=ex?ex.date:(presetDate||today());document.getElementById('inv-label').value=ex?ex.label||'':presetLabel;
-  initLiveCounts(ex);
-  currentInvMergedView=!!ex;
-  if(currentInvMergedView)liveInvCounts={...ex.items};
+  currentInvEdit=existingId;
+  ensureInventoryHasFloorPlanRooms(ex);
+  if(!ex.rooms.some(room=>room.id===selectedRoomId)){toast('That room is no longer part of this count.',true);return;}
+  document.getElementById('inv-date').value=ex.date;document.getElementById('inv-label').value=ex.label||'';
+  initLiveCounts(ex,selectedRoomId);
+  currentInvMergedView=false;
   document.getElementById('inv-search').value='';document.getElementById('inv-cat-f').value='';
-  if(!ex&&selectedFloorRoomId){
-    const selected=currentInvRooms.find(room=>room.roomId===selectedFloorRoomId);
-    if(selected){
-      currentInvRoomId=selected.id;
-      liveInvCounts={};
-      currentRoomProducts().forEach(p=>{liveInvCounts[p.id]=selected.items[p.id]!==undefined?selected.items[p.id]:'';});
-    }
-  }
   document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';document.getElementById('inv-show-f').value='all';document.getElementById('inv-sort-f').value='category';
+  document.getElementById('inventory-count-title').textContent=`Count ${currentInventoryRoom()?.name||'Room'}`;
   document.getElementById('mobile-count-label').textContent=document.getElementById('inv-label').value||'Inventory Count';
   document.getElementById('mobile-count-date').textContent=fmtDate(document.getElementById('inv-date').value);
   closeInventoryFilterSheet();
@@ -1065,9 +1145,7 @@ function showInventoryFinishMessage(text){
 }
 function inventoryCountHasEntries(){
   const liveHasEntries=Object.values(liveInvCounts||{}).some(value=>value!==''&&value!==null&&value!==undefined&&!isNaN(value));
-  if(liveHasEntries)return true;
-  const rooms=currentInvEdit?(state.inventories.find(inv=>inv.id===currentInvEdit)?.rooms||[]):currentInvRooms;
-  return(rooms||[]).some(room=>Object.keys(room.items||{}).length>0);
+  return liveHasEntries;
 }
 function focusFirstInventoryQuantity(){
   const firstSection=document.querySelector('#inv-rows .inv-count-section');
@@ -1086,8 +1164,9 @@ function setInventoryFinishSaving(saving){
   button.setAttribute('aria-busy',String(saving));
   const desktopLabel=button.querySelector('.desktop-only');
   const mobileLabel=button.querySelector('.mobile-only');
-  if(desktopLabel)desktopLabel.textContent=saving?'Saving…':'Finish Count';
-  if(mobileLabel)mobileLabel.textContent=saving?'Saving…':'Finish & View Report';
+  if(desktopLabel)desktopLabel.textContent=saving?'Saving…':'Save Room';
+  if(mobileLabel)mobileLabel.textContent=saving?'Saving…':'Save Room';
+  if(!desktopLabel&&!mobileLabel)button.textContent=saving?'Saving…':'Save Room';
 }
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentCountProducts();
@@ -1128,7 +1207,7 @@ function toggleInventorySection(sectionToken){
 }
 async function saveInventory(){
   if(inventoryCountSaving)return;
-  const date=document.getElementById('inv-date').value;if(!date){toast('Select a date.',true);return;}
+  if(!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==currentInvRoomId){toast('This room is not reserved for you. Return to room selection.',true);return;}
   if(!inventoryCountHasEntries()){
     const message='Enter at least one quantity before finishing. Use 0 when an item was counted but is empty.';
     showInventoryFinishMessage(message);
@@ -1139,69 +1218,38 @@ async function saveInventory(){
   hideInventoryFinishMessage();
   setInventoryFinishSaving(true);
   try{
-  const label=document.getElementById('inv-label').value.trim();
-  const wasEditing=Boolean(currentInvEdit);
-  const auditActor=window.serverAccessContext?.user||{};
-  const auditStamp={id:auditActor.id||'',name:auditActor.name||'Team member',role:auditActor.jobTitle||auditActor.role||'Team member'};
-  let rooms;
-  let activeRoom=null;
-  let savedId=currentInvEdit;
-  if(currentInvEdit){
-    const inv=state.inventories.find(x=>x.id===currentInvEdit);
-    normalizeInventoryRooms(inv);
-    captureCurrentRoomCounts();
-    rooms=inv.rooms;
-    activeRoom=rooms.find(room=>room.id===currentInvRoomId)||rooms[0];
-    const editedRooms=rooms.filter(room=>dirtyInventoryRoomIds.has(room.id)).map(cloneInventoryRoom);
-    const deletedIds=new Set(deletedInventoryRoomIds);
-    const latest=cloudReady&&typeof cloudLoad==='function'?await cloudLoad():undefined;
-    if(latest&&Array.isArray(latest.inventories)){
-      state=latest;
-      normalizeLoadedState();
-      let cloudInv=state.inventories.find(x=>x.id===currentInvEdit);
-      if(cloudInv){
-        normalizeInventoryRooms(cloudInv);
-        cloudInv.rooms=mergeEditedInventoryRooms(cloudInv.rooms,editedRooms,deletedIds);
-        cloudInv.date=date;
-        cloudInv.label=label;
-        cloudInv.items=mergeInventoryRoomItems(cloudInv.rooms);
-        rooms=cloudInv.rooms;
-        savedId=cloudInv.id;
-      }
+    const lock={...currentCountRoomLock};
+    const inv=state.inventories.find(item=>item.id===lock.countId);
+    const room=inv?.rooms?.find(item=>item.id===lock.roomId);
+    if(!inv||!room)throw new Error('Count room not found');
+    if(typeof _pushTimer!=='undefined'&&_pushTimer&&typeof cloudPushNow==='function'&&!await cloudPushNow()){
+      showInventoryFinishMessage('Another workspace change is still waiting to save. Please try again.');
+      return;
     }
-  }else{
     captureCurrentRoomCounts();
-    activeRoom=currentInvRooms.find(room=>room.id===currentInvRoomId)||currentInvRooms[0];
-    const latest=cloudReady&&typeof cloudLoad==='function'?await cloudLoad():undefined;
-    if(latest&&Array.isArray(latest.inventories)){
-      state=latest;
-      normalizeLoadedState();
+    const items={...room.items};
+    const shared=typeof cloudSaveCountRoom==='function'?await cloudSaveCountRoom(lock.countId,lock.roomId,items):null;
+    if(!shared){
+      showInventoryFinishMessage('The room could not be saved to the shared count. Please try again.');
+      toast('The room could not be saved. Please try again.',true);
+      return;
     }
-    const session=findInventorySession(date,label);
-    if(session){
-      replaceInventoryRoom(session,activeRoom);
-      rooms=session.rooms;
-      savedId=session.id;
-    }else rooms=currentInvRooms;
-  }
-  const items=mergeInventoryRoomItems(rooms);
-  if(!Object.keys(items).length){toast('No quantities entered.',true);return;}
-  if(currentInvEdit){const i=state.inventories.findIndex(x=>x.id===currentInvEdit);state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false,updatedBy:auditStamp,updatedAt:new Date().toISOString()};savedId=state.inventories[i].id;}
-  else if(!savedId){savedId=uid();state.inventories.push({id:savedId,date,label,items,rooms,createdBy:auditStamp,createdAt:new Date().toISOString()});}
-  else{const i=state.inventories.findIndex(x=>x.id===savedId);if(i>=0)state.inventories[i]={...state.inventories[i],date,label,items,rooms,draft:false,createdBy:state.inventories[i].createdBy||auditStamp,createdAt:state.inventories[i].createdAt||new Date().toISOString(),updatedBy:auditStamp,updatedAt:new Date().toISOString()};}
-  state.inventories.sort((a,b)=>a.date<b.date?1:-1);
-  save();
-  const pushed=typeof cloudPushNow==='function'?await cloudPushNow():true;
-  const confirmed=pushed&&await inventorySavedInCloud(savedId,date,label,rooms);
-  if(!confirmed){
-    toast('Saved on this device, but cloud saving failed. Keep this window open and try again.',true);
-    return;
-  }
-  window.recordServerEvent?.({action:wasEditing?'count.updated':'count.created',entityType:'count',entityId:savedId,details:{label,date,rooms:rooms.length,items:Object.keys(items).length,actor:auditStamp}});
-  closeModal('modal-inventory');renderInventoryTable();refreshLiveInventoryIfVisible();toast(`Saved — ${Object.keys(items).length} items.`);
-  dirtyInventoryRoomIds=new Set();
-  deletedInventoryRoomIds=new Set();
-  viewInventory(savedId);
+    state=shared;
+    normalizeLoadedState();
+    try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+    clearInterval(countRoomLockHeartbeatTimer);
+    countRoomLockHeartbeatTimer=null;
+    if(typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
+    currentCountRoomLock=null;
+    inventoryRoomExitInProgress=true;
+    closeModal('modal-inventory');
+    inventoryRoomExitInProgress=false;
+    renderInventoryTable();refreshLiveInventoryIfVisible();
+    window.recordServerEvent?.({action:'count.room_saved',entityType:'count',entityId:lock.countId,details:{roomId:lock.roomId,roomName:room.name,items:Object.keys(items).length}});
+    toast(`${room.name} saved — choose another room or select Done.`);
+    dirtyInventoryRoomIds=new Set();
+    deletedInventoryRoomIds=new Set();
+    await openCountRoomPicker(lock.countId);
   }catch(error){
     console.error('Inventory save failed:',error);
     showInventoryFinishMessage('The count could not be saved. Please try again.');
@@ -1270,7 +1318,7 @@ function inventoryMenuHtml(inv,menuId){
   return`<div class="drop-wrap inventory-actions">
     <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Count actions" aria-label="Count actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
     <div class="drop-menu" id="${menuId}">
-      <button onclick="event.stopPropagation();closeAllMenus();openInventoryModal('${inv.id}')">Edit</button>
+      <button onclick="event.stopPropagation();closeAllMenus();openCountRoomPicker('${inv.id}')">Edit</button>
       <button onclick="event.stopPropagation();archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore':'Archive'}</button>
       <div class="drop-divider"></div>
       <button onclick="event.stopPropagation();deleteInventory('${inv.id}')">Delete</button>
@@ -1303,7 +1351,7 @@ function renderViewInventoryActions(inv){
   const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
   menu.innerHTML=`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="exportViewedInventoryExcel()">Export Excel / CSV</button><button onclick="printViewedInventory()">Print / PDF</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button><button onclick="deleteInventory('${inv.id}')">Delete count</button>`;
 }
-function editViewedInventory(){const id=viewInvId;if(!id)return;const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openInventoryModal(id);if(selectedRoom)switchInventoryRoom(selectedRoom);}
+function editViewedInventory(){const id=viewInvId;if(!id)return;const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openCountRoomPicker(id,selectedRoom);}
 function renderViewInvTabs(inv){
   const select=document.getElementById('view-inv-select');
   select.innerHTML=`<option value="all">Merged Total</option><option value="missing">Not Counted</option>${inv.rooms.map(room=>`<option value="${room.id}">${escapeHtml(room.name)}</option>`).join('')}`;
@@ -1423,12 +1471,12 @@ document.addEventListener('click',event=>{
   event.stopImmediatePropagation();
   closeInventoryFilterSheet();
 },true);
-document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>closeModal('modal-inventory'));
+document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>exitInventoryRoom());
 document.getElementById('inventory-count-finish')?.addEventListener('click',saveInventory);
 document.addEventListener('click',event=>{
   if(!document.getElementById('modal-inventory')?.classList.contains('open'))return;
   const actions=[
-    {button:document.getElementById('inventory-count-cancel'),run:()=>closeModal('modal-inventory')},
+    {button:document.getElementById('inventory-count-cancel'),run:()=>exitInventoryRoom()},
     {button:document.getElementById('inventory-count-finish'),run:saveInventory}
   ];
   const action=actions.find(item=>{
@@ -1441,3 +1489,6 @@ document.addEventListener('click',event=>{
   event.stopImmediatePropagation();
   action.run();
 },true);
+window.addEventListener('pagehide',()=>{
+  if(currentCountRoomLock&&typeof cloudReleaseCountRoom==='function')cloudReleaseCountRoom(currentCountRoomLock.countId,currentCountRoomLock.roomId,true);
+});

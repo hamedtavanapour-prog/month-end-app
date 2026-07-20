@@ -526,7 +526,7 @@
 <div class="modal-overlay" id="modal-inv-room-select">
 <div class="modal room-select-modal" role="dialog" aria-modal="true" aria-labelledby="room-count-title">
   <button class="modal-close" type="button" aria-label="Close new count" onclick="closeModal('modal-inv-room-select')">&times;</button>
-  <div class="count-setup-step">Step 1 of 2</div>
+  <div class="count-setup-step">Step 1 of 3</div>
   <h3 id="room-count-title"><span class="desktop-only">New Count</span><span class="mobile-only">Start New Count</span></h3>
   <p class="count-setup-intro">Name this count and confirm the date. You will choose the room on the next screen.</p>
   <div class="form-grid" style="margin-bottom:16px;">
@@ -540,21 +540,34 @@
 </div>
 </div>
 
+<!-- INV ROOM PICKER MODAL -->
+<div class="modal-overlay" id="modal-inv-room-picker">
+<div class="modal room-select-modal count-room-picker-modal" role="dialog" aria-modal="true" aria-labelledby="count-room-picker-title">
+  <button class="modal-close" type="button" aria-label="Close room selection" onclick="closeCountRoomPicker()">&times;</button>
+  <div class="count-setup-step">Step 2 of 3</div>
+  <h3 id="count-room-picker-title">Choose a Room</h3>
+  <p class="count-setup-intro" id="count-room-picker-context">Select a room to start counting. One person can work in each room at a time.</p>
+  <div class="count-room-picker-list" id="count-room-picker-list" aria-live="polite"></div>
+  <div class="modal-actions room-select-actions">
+    <button class="btn btn-secondary" type="button" onclick="closeCountRoomPicker()">Done</button>
+  </div>
+</div>
+</div>
+
 <!-- INV MODAL -->
 <div class="modal-overlay" id="modal-inventory">
 <div class="inv-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-count-title">
   <div class="inv-modal-header">
-    <button class="modal-close" type="button" aria-label="Close inventory count" onclick="closeModal('modal-inventory')" style="position:absolute;top:14px;right:14px;">&times;</button>
-    <div class="count-setup-step count-step-two">Step 2 of 2</div>
+    <button class="modal-close" type="button" aria-label="Exit room" onclick="exitInventoryRoom()" style="position:absolute;top:14px;right:14px;">&times;</button>
+    <div class="count-setup-step count-step-two">Step 3 of 3</div>
     <h3 id="inventory-count-title">Count Items</h3>
     <div class="mobile-count-context mobile-only"><strong id="mobile-count-label">Inventory Count</strong><span id="mobile-count-date"></span></div>
     <div class="form-grid" style="margin-bottom:12px;">
-      <div class="form-group"><label for="inv-date">Date</label><input type="date" id="inv-date"></div>
-      <div class="form-group"><label for="inv-label">Label</label><input type="text" id="inv-label" placeholder="e.g. Month End May"></div>
+      <div class="form-group"><label for="inv-date">Date</label><input type="date" id="inv-date" readonly></div>
+      <div class="form-group"><label for="inv-label">Label</label><input type="text" id="inv-label" placeholder="e.g. Month End May" readonly></div>
     </div>
     <div class="inv-room-manager">
-      <div class="inv-room-tabs" id="inv-room-tabs"></div>
-      <label class="inv-room-select-mobile" for="inv-room-select"><span>Room</span><select id="inv-room-select" onchange="switchInventoryRoom(this.value)"></select></label>
+      <div class="count-room-current"><span>Counting room</span><strong id="inv-room-current">Room</strong><small>This room is reserved for you until you save or exit.</small></div>
     </div>
   </div>
   <div class="inv-modal-filters">
@@ -564,7 +577,7 @@
       <div class="inv-filter-sheet" id="inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="inv-filter-title">
         <div class="inv-filter-sheet-head mobile-only"><div><span>Count options</span><h4 id="inv-filter-title">Sort & Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeInventoryFilterSheet()">&times;</button></div>
         <div class="inv-filter-sheet-fields">
-          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Red Wines</option><option>White Wines</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
           <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
@@ -585,8 +598,8 @@
   <div class="inv-modal-footer">
     <button class="voice-btn" id="voice-btn-inventory" onclick="toggleVoice('inventory')">Voice Count</button>
     <div style="display:flex;gap:10px;">
-      <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Cancel</button>
-      <button class="btn btn-primary" id="inventory-count-finish" type="button"><span class="desktop-only">Finish Count</span><span class="mobile-only">Finish & View Report</span></button>
+      <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
+      <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
     </div>
   </div>
 </div>
@@ -923,18 +936,18 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js"></script>
+<script src="js/supabase.js?v=shared-room-count-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js"></script>
+<script src="js/state.js?v=shared-room-count-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
 <script src="js/ui.js?v=settings-layout-1"></script>
-<script src="js/products.js"></script>
-<script src="js/inventory.js?v=mobile-count-5"></script>
+<script src="js/products.js?v=shared-room-count-1"></script>
+<script src="js/inventory.js?v=shared-room-count-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>
@@ -942,7 +955,7 @@
 <script src="js/export-tools.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/master-search.js"></script>
-<script src="js/routing.js?v=routing-foundation-1"></script>
+<script src="js/routing.js?v=shared-room-count-1"></script>
 <script src="js/main.js?v=routing-foundation-1"></script>
 <script src="js/access.js?v=settings-layout-1"></script>
 </body>

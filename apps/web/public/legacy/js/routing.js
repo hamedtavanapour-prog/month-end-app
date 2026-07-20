@@ -30,7 +30,7 @@
   };
   const BASE_ROUTE_BY_MODAL={
     'modal-product':'products','modal-product-view':'products','modal-product-units':'products',
-    'modal-inv-room-select':'inventory','modal-inventory':'inventory','modal-view-inv':'inventory',
+    'modal-inv-room-select':'inventory','modal-inv-room-picker':'inventory','modal-inventory':'inventory','modal-view-inv':'inventory',
     'modal-order':'orders','modal-order-detail':'orders','modal-scan':'orders','modal-view-scan':'orders',
     'modal-usage-upload':'usage','modal-usage-log-detail':'usage','modal-inventory-template-upload':'usage',
     'modal-supplier':'suppliers','modal-supplier-view':'suppliers',
@@ -138,7 +138,7 @@
     if(target.action==='import'){openModal('modal-usage-upload');return;}
     if(kind==='product')target.action==='edit'?openProductModal(id):openProductView(id);
     else if(kind==='menu-item')openDrinkView(id);
-    else if(kind==='count')target.action==='edit'?openInventoryModal(id):viewInventory(id);
+    else if(kind==='count')target.action==='edit'?openCountRoomPicker(id):viewInventory(id);
     else if(kind==='usage')openUsageLogView(id,target.action==='edit');
     else if(kind==='order')target.action==='edit'?openOrderModal(id):viewOrderDetail(id);
     else if(kind==='supplier')target.action==='edit'?openSupplierModal(id):openSupplierView(id);

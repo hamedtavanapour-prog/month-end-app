@@ -72,6 +72,84 @@ async function cloudSaveInventoryCategory(previousName,name,subcategories){
   }
 }
 
+async function cloudCreateCountDraft(draft){
+  try{
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countDraft:draft})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const inventories=Array.isArray(payload.data?.inventories)?payload.data.inventories:[];
+    const saved=inventories.find(item=>item?.id===draft.id)||inventories.find(item=>String(item?.date||'')===String(draft.date||'')&&String(item?.label||'').trim().toLowerCase()===String(draft.label||'').trim().toLowerCase());
+    if(!saved)throw new Error('The shared workspace did not return the count draft.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return{state:payload.data,draft:saved};
+  }catch(error){
+    console.error('Shared count draft save failed:',error);
+    return null;
+  }
+}
+
+async function cloudSaveCountRoom(countId,roomId,items){
+  try{
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countRoomSave:{countId,roomId,items}})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const saved=Array.isArray(payload.data?.inventories)?payload.data.inventories.find(item=>item?.id===countId):null;
+    if(!saved)throw new Error('The shared workspace did not return the saved count.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared count room save failed:',error);
+    return null;
+  }
+}
+
+async function cloudLoadCountRoomLocks(countId){
+  try{
+    const response=await fetch(`/api/count-room-locks?countId=${encodeURIComponent(countId)}`,{credentials:'same-origin',cache:'no-store'});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    return Array.isArray(payload.locks)?payload.locks:[];
+  }catch(error){
+    console.error('Count room availability load failed:',error);
+    return null;
+  }
+}
+
+async function cloudAcquireCountRoom(countId,roomId){
+  try{
+    const response=await fetch('/api/count-room-locks',{
+      method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countId,roomId})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(response.status===409)return{acquired:false,lock:payload.lock||null};
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    return{acquired:!!payload.acquired,lock:payload.lock||null};
+  }catch(error){
+    console.error('Count room reservation failed:',error);
+    return null;
+  }
+}
+
+async function cloudReleaseCountRoom(countId,roomId,keepalive=false){
+  try{
+    const response=await fetch('/api/count-room-locks',{
+      method:'DELETE',credentials:'same-origin',keepalive,headers:{'Content-Type':'application/json'},body:JSON.stringify({countId,roomId})
+    });
+    return response.ok;
+  }catch(error){
+    console.error('Count room release failed:',error);
+    return false;
+  }
+}
+
 function cloudCanApplyRefresh(){
   const modalOpen=document.querySelector('.modal-overlay.open');
   const inlineEdits=typeof pendingEdits==='object'&&Object.keys(pendingEdits).length>0;
