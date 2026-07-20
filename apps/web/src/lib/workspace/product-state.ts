@@ -6,7 +6,11 @@ export function isJsonObject(value: Json | undefined): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export function mergeProductIntoWorkspace(data: Json, incomingProduct: JsonObject): JsonObject {
+export function mergeProductIntoWorkspace(
+  data: Json,
+  incomingProduct: JsonObject,
+  productCatalogVersion?: string,
+): JsonObject {
   const workspace = isJsonObject(data) ? data : {};
   const productId = String(incomingProduct.id ?? "");
   const products = Array.isArray(workspace.products) ? workspace.products : [];
@@ -34,5 +38,10 @@ export function mergeProductIntoWorkspace(data: Json, incomingProduct: JsonObjec
     return { ...candidate, products: productIds };
   });
 
-  return { ...workspace, products: nextProducts, suppliers: nextSuppliers };
+  return {
+    ...workspace,
+    products: nextProducts,
+    suppliers: nextSuppliers,
+    ...(productCatalogVersion ? { productCatalogVersion } : {}),
+  };
 }

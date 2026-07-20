@@ -39,10 +39,13 @@ async function cloudSaveProduct(product){
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
-      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({product})
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({product,productCatalogVersion:state.productCatalogVersion||DEFAULT_PRODUCT_CATALOG_VERSION})
     });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const savedProduct=Array.isArray(payload.data?.products)?payload.data.products.find(candidate=>candidate?.id===product.id):null;
+    const productMatches=savedProduct&&Object.keys(product).every(key=>JSON.stringify(savedProduct[key])===JSON.stringify(product[key]));
+    if(!productMatches)throw new Error('The shared workspace did not return the saved product changes.');
     cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
     return payload.data||null;
   }catch(error){
