@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
+import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -143,14 +144,75 @@ export async function PUT(request: Request) {
   if (!isAllowed(context, WRITE_PERMISSIONS)) {
     return jsonResponse({ error: "You do not have permission to change this workspace" }, 403);
   }
-  const { error } = await supabase.from("workspace_states").upsert({
-    organization_id: context.organizationId,
-    data,
-    updated_by: context.userId,
-    updated_at: new Date().toISOString(),
-  });
+  const updatedAt = new Date().toISOString();
+  const expectedVersion = request.headers.get("x-workspace-version");
+  const mutation = expectedVersion
+    ? supabase.from("workspace_states")
+      .update({ data, updated_by: context.userId, updated_at: updatedAt })
+      .eq("organization_id", context.organizationId)
+      .eq("updated_at", expectedVersion)
+    : supabase.from("workspace_states").upsert({
+      organization_id: context.organizationId,
+      data,
+      updated_by: context.userId,
+      updated_at: updatedAt,
+    });
+  const { data: saved, error } = await mutation.select("updated_at").maybeSingle();
 
   if (error) return jsonResponse({ error: "Could not save workspace" }, 500);
+  if (!saved) return jsonResponse({ error: "The workspace changed in another account. Refresh before saving again." }, 409);
   await supabase.rpc("record_workspace_save", { p_organization_id: context.organizationId });
-  return jsonResponse({ saved: true });
+  return jsonResponse({ saved: true, updatedAt: saved.updated_at });
+}
+
+export async function PATCH(request: Request) {
+  const result = await getMembershipContext();
+  if ("error" in result) return result.error;
+
+  const { context, supabase } = result;
+  if (!isAllowed(context, new Set(["products.manage"]))) {
+    return jsonResponse({ error: "You do not have permission to manage products" }, 403);
+  }
+
+  let body: Json;
+  try {
+    body = await request.json() as Json;
+  } catch {
+    return jsonResponse({ error: "Invalid product update" }, 400);
+  }
+  if (!isJsonObject(body) || !isJsonObject(body.product)) {
+    return jsonResponse({ error: "A product update is required" }, 400);
+  }
+  const product = body.product;
+  if (typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
+    return jsonResponse({ error: "Product ID and name are required" }, 400);
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: current, error: readError } = await supabase
+      .from("workspace_states")
+      .select("data, updated_at")
+      .eq("organization_id", context.organizationId)
+      .maybeSingle();
+    if (readError) return jsonResponse({ error: "Could not load the shared workspace" }, 500);
+    if (!current) return jsonResponse({ error: "Shared workspace is not initialized" }, 409);
+
+    const nextData = mergeProductIntoWorkspace(current.data, product);
+    const currentTimestamp = new Date(current.updated_at).getTime();
+    const nextUpdatedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
+    const { data: saved, error: saveError } = await supabase
+      .from("workspace_states")
+      .update({ data: nextData, updated_by: context.userId, updated_at: nextUpdatedAt })
+      .eq("organization_id", context.organizationId)
+      .eq("updated_at", current.updated_at)
+      .select("data, updated_at")
+      .maybeSingle();
+    if (saveError) return jsonResponse({ error: "Could not save the shared product" }, 500);
+    if (!saved) continue;
+
+    await supabase.rpc("record_workspace_save", { p_organization_id: context.organizationId });
+    return jsonResponse({ saved: true, data: saved.data, updatedAt: saved.updated_at });
+  }
+
+  return jsonResponse({ error: "The workspace changed while this product was saving. Try again." }, 409);
 }

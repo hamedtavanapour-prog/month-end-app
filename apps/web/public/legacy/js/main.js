@@ -31,5 +31,6 @@ async function init(){
   buildColPicker('sup-col-checks',SUP_COLS,'renderSuppliers');
   if(typeof renderProfileMenu==='function')renderProfileMenu();
   if(typeof renderAccessControlledNav==='function')renderAccessControlledNav();
+  if(typeof startCloudRefresh==='function')startCloudRefresh();
 }
 init().finally(()=>window.legacyRoutingReady?.());
