@@ -2,7 +2,7 @@
 // The legacy interface remains unchanged while persistence is handled by the
 // new organization-scoped Next.js + Supabase foundation.
 
-let cloudReady=false, _pushTimer=null;
+let cloudReady=false, cloudUpdatedAt='', _pushTimer=null, _pushPromise=Promise.resolve(true), _cloudRefreshTimer=null, _cloudRefreshRunning=false;
 // Pull the saved state from Supabase. Returns the data object, null if the
 // row is empty, or undefined if the request failed (offline / error).
 async function cloudLoad(){
@@ -10,22 +10,80 @@ async function cloudLoad(){
     const r=await fetch(WORKSPACE_STATE_ENDPOINT,{credentials:'same-origin',cache:'no-store'});
     if(!r.ok)throw new Error('HTTP '+r.status);
     const payload=await r.json();
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
     return payload.data||null;
   }catch(e){console.error('Cloud load failed:',e);return undefined;}
 }
 // Upsert the full state to Supabase (keyed on the single 'main' row).
 async function cloudPush(){
+  const push=async()=>{
+    try{
+      const data=typeof compactStateForStorage==='function'?compactStateForStorage():state;
+      const headers={'Content-Type':'application/json'};
+      if(cloudUpdatedAt)headers['x-workspace-version']=cloudUpdatedAt;
+      const r=await fetch(WORKSPACE_STATE_ENDPOINT,{
+        method:'PUT',credentials:'same-origin',headers,body:JSON.stringify(data)
+      });
+      const payload=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(payload.error||`HTTP ${r.status}`);
+      cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+      return true;
+    }catch(e){console.error('Cloud push failed:',e);toast(e.message||'Could not save the shared workspace.',true);return false;}
+  };
+  _pushPromise=_pushPromise.then(push,push);
+  return _pushPromise;
+}
+
+async function cloudSaveProduct(product){
   try{
-    const data=typeof compactStateForStorage==='function'?compactStateForStorage():state;
-    const r=await fetch(WORKSPACE_STATE_ENDPOINT,{
-      method:'PUT',
-      credentials:'same-origin',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(data)
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({product})
     });
-    if(!r.ok)throw new Error('HTTP '+r.status);
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared product save failed:',error);
+    return null;
+  }
+}
+
+function cloudCanApplyRefresh(){
+  const modalOpen=document.querySelector('.modal-overlay.open');
+  const inlineEdits=typeof pendingEdits==='object'&&Object.keys(pendingEdits).length>0;
+  return !document.hidden&&!modalOpen&&!inlineEdits&&!_pushTimer;
+}
+
+async function cloudRefreshLatest(){
+  if(!cloudReady||_cloudRefreshRunning||!cloudCanApplyRefresh())return false;
+  _cloudRefreshRunning=true;
+  try{
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok)return false;
+    const payload=await response.json();
+    if(!payload.data||!payload.updatedAt||!cloudUpdatedAt||Date.parse(payload.updatedAt)<=Date.parse(cloudUpdatedAt))return false;
+    state=payload.data;
+    if(typeof normalizeLoadedState==='function')normalizeLoadedState();
+    try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+    cloudUpdatedAt=payload.updatedAt;
+    const activePage=document.querySelector('.page.active')?.id?.replace('page-','')||'dashboard';
+    showPage(activePage);
+    toast('Workspace updated from another account.');
     return true;
-  }catch(e){console.error('Cloud push failed:',e);return false;}
+  }catch(error){
+    console.error('Shared workspace refresh failed:',error);
+    return false;
+  }finally{_cloudRefreshRunning=false;}
+}
+
+function startCloudRefresh(){
+  clearInterval(_cloudRefreshTimer);
+  _cloudRefreshTimer=setInterval(cloudRefreshLatest,10000);
+  window.addEventListener('focus',cloudRefreshLatest);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudRefreshLatest();});
 }
 // Debounced so rapid edits collapse into one network write.
 function cloudPushDebounced(){

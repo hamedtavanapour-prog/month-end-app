@@ -2,6 +2,7 @@
 
 let productUnitEditorSnapshot=null;
 let productUnitEditorSaving=false;
+let productSaveInProgress=false;
 let mobileExpandedProductId=null;
 
 const PRODUCT_MENU_DEFINITIONS={
@@ -451,6 +452,7 @@ function cancelProductUnitEditor(){
   productUnitEditorSaving=false;
 }
 function beforeModalClose(id){
+  if(id==='modal-product'&&productSaveInProgress){toast('Wait for the shared save to finish.',true);return false;}
   if(id==='modal-product-units'&&!productUnitEditorSaving){
     restoreProductUnitEditorSnapshot();
   }
@@ -493,7 +495,7 @@ function syncProductSupplierLinks(prod){
     else if(!linked&&idx!==-1)s.products.splice(idx,1);
   });
 }
-function saveProduct(){
+async function saveProduct(){
   const name=document.getElementById('pm-name').value.trim();
   if(!name){toast('Name required.',true);return;}
   let units=getProductUnitRows();
@@ -504,10 +506,20 @@ function saveProduct(){
   const {primary,orderedUnits}=orderUnitsByDefault(units);
   const existing=editingProductId?getProduct(editingProductId):null;
   const lastCountValue=document.getElementById('pm-last-count').value;
-  const prod={id:editingProductId||uid(),name,inventoryName:document.getElementById('pm-inventory-name').value.trim(),aliases:document.getElementById('pm-aliases').value.trim(),departments,unit:primary.unit,category:document.getElementById('pm-cat').value,subcategory:document.getElementById('pm-sub').value,cost:primary.cost||parseFloat(document.getElementById('pm-cost').value)||0,par:parseFloat(primary.par)||parseFloat(document.getElementById('pm-par').value)||0,sku:primary.sku||document.getElementById('pm-sku').value.trim(),notes:document.getElementById('pm-notes').value.trim(),suppliers:getProdSuppliers(),units:orderedUnits,lastCount:lastCountValue===''?null:parseFloat(lastCountValue)||0,archived:existing?.archived||false};
-  if(editingProductId){const i=state.products.findIndex(p=>p.id===editingProductId);state.products[i]=prod;}else state.products.push(prod);
-  syncProductSupplierLinks(prod);
-  save();closeModal('modal-product');renderProducts();toast(editingProductId?'Updated.':'Added.');
+  const prod={...existing,id:editingProductId||uid(),name,inventoryName:document.getElementById('pm-inventory-name').value.trim(),aliases:document.getElementById('pm-aliases').value.trim(),departments,unit:primary.unit,category:document.getElementById('pm-cat').value,subcategory:document.getElementById('pm-sub').value,cost:primary.cost||parseFloat(document.getElementById('pm-cost').value)||0,par:parseFloat(primary.par)||parseFloat(document.getElementById('pm-par').value)||0,sku:primary.sku||document.getElementById('pm-sku').value.trim(),notes:document.getElementById('pm-notes').value.trim(),suppliers:getProdSuppliers(),units:orderedUnits,lastCount:lastCountValue===''?null:parseFloat(lastCountValue)||0,archived:existing?.archived||false};
+  const wasEditing=Boolean(editingProductId);
+  const saveButton=document.getElementById('product-save-button');
+  productSaveInProgress=true;saveButton.disabled=true;saveButton.textContent='Saving…';
+  const sharedState=await cloudSaveProduct(prod);
+  if(!sharedState){
+    productSaveInProgress=false;saveButton.disabled=false;saveButton.textContent='Save Product';
+    toast('Could not save to the shared workspace. Try again.',true);return;
+  }
+  state=sharedState;
+  if(typeof normalizeLoadedState==='function')normalizeLoadedState();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+  productSaveInProgress=false;closeModal('modal-product');renderProducts();toast(wasEditing?'Saved for everyone.':'Added for everyone.');
+  saveButton.disabled=false;saveButton.textContent='Save Product';
 }
 function deleteProduct(id){closeAllMenus();if(!confirm('Delete this product?'))return;state.products=state.products.filter(p=>p.id!==id);state.suppliers.forEach(s=>{if(Array.isArray(s.products))s.products=s.products.filter(pid=>pid!==id);});save();closeModal('modal-product-view');renderProducts();toast('Deleted.');}
 function archiveProduct(id,archived=true){closeAllMenus();const p=getProduct(id);if(!p)return;p.archived=archived;save();closeModal('modal-product-view');renderProducts();toast(archived?'Archived.':'Restored.');}
