@@ -101,7 +101,7 @@ function buildMasterSearchIndex(){
     ['inventory','Start a new count','Create a saved count draft and choose rooms','new inventory account count','count',()=>openInventoryRoomSelect()],
     ['products','Add a product','Create a product in the catalog','new item bottle product','plus',()=>openProductModal()],
     ['orders','Create an order','Start a new purchase order','new invoice purchase','plus',()=>openOrderModal()],
-    ['usage','Upload a usage report','Import a PDF or spreadsheet for usage matching','pdf food trak ideal usage import','upload',()=>openModal('modal-usage-upload')],
+    ['usage','Upload a usage report','Import a PDF or spreadsheet for usage matching','pdf food trak ideal usage import','upload',()=>openUsageUploadModal('other')],
     ['suppliers','Add a supplier','Create a supplier and contact record','new vendor contact','plus',()=>openSupplierModal()],
     ['settings','Manage users and access','View profiles, roles, and permissions','staff manager administrator profile','people',()=>setSettingsSection('profiles')]
   ];

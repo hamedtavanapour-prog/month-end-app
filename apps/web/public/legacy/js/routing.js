@@ -135,7 +135,7 @@
       else if(target.page==='suppliers')openSupplierModal();
       return;
     }
-    if(target.action==='import'){openModal('modal-usage-upload');return;}
+    if(target.action==='import'){openUsageUploadModal('other');return;}
     if(kind==='product')target.action==='edit'?openProductModal(id):openProductView(id);
     else if(kind==='menu-item')openDrinkView(id);
     else if(kind==='count')target.action==='edit'?openCountRoomPicker(id):viewInventory(id);

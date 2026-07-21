@@ -269,6 +269,142 @@ function foodtrakUsageHeading(row){
   return null;
 }
 
+const FOODTRAK_USAGE_COLUMNS={
+  name:0,unit:3,actualUsage:5,actualPercentSales:6,idealUsage:7,idealPercentSales:9,
+  varianceUsage:10,variancePercentSales:11,estimatedCostVariance:12,begin:14,
+  purchases:16,transferIn:17,transferOut:20,production:22,end:25
+};
+const FOODTRAK_USAGE_NUMERIC_COLUMNS=Object.values(FOODTRAK_USAGE_COLUMNS).filter(index=>index!==FOODTRAK_USAGE_COLUMNS.name&&index!==FOODTRAK_USAGE_COLUMNS.unit);
+
+function foodtrakUsageText(value){
+  return String(value??'').replace(/\s+/g,' ').trim();
+}
+
+function foodtrakUsageRound(value,digits=2){
+  const number=usageNumber(value);
+  if(number==='')return'';
+  const rounded=Number(Number(number).toFixed(digits));
+  return Object.is(rounded,-0)?0:rounded;
+}
+
+function foodtrakUsagePercent(value){
+  const number=usageNumber(value);
+  if(number==='')return'';
+  const normalized=typeof value==='string'&&value.includes('%')?number/100:number;
+  return foodtrakUsageRound(normalized,4);
+}
+
+function foodtrakUsageStructureRow(row){
+  const name=foodtrakUsageText(row?.[FOODTRAK_USAGE_COLUMNS.name]);
+  const text=(row||[]).map(foodtrakUsageText).filter(Boolean).join(' ');
+  return !name||FOODTRAK_USAGE_MAIN_HEADINGS.has(name)||
+    /^(Item|Name|Profit Center:?|Values estimated using Last Cost\.?|Department Sales:?|Profit Center Sales:?|Page\s+\d+\s+of\s+\d+|Actual|Ideal|Variance|Activity)$/i.test(name)||
+    /FOOD-TRAK.*(?:System|Copyright|Registered Trademark)|All Rights Reserved/i.test(text);
+}
+
+function foodtrakUsageContinuationRow(row){
+  if(foodtrakUsageStructureRow(row)||foodtrakUsageText(row?.[FOODTRAK_USAGE_COLUMNS.unit]))return false;
+  return !FOODTRAK_USAGE_NUMERIC_COLUMNS.some(column=>usageNumber(row?.[column])!=='');
+}
+
+function joinFoodtrakUsageName(first,continuation){
+  if(!first)return continuation;
+  return first.endsWith('-')?`${first}${continuation}`:`${first} ${continuation}`;
+}
+
+function parseFoodtrakUsageRows(rows,fileName){
+  const parsed=[];
+  const headerIndex=findUsageHeaderRow(rows);
+  const inferredPeriod=inferUsagePeriod(rows,headerIndex);
+  let reportCategory='';
+  let reportSubcategory='';
+
+  for(let index=0;index<rows.length;index++){
+    const row=rows[index]||[];
+    const unitSize=foodtrakUsageText(row[FOODTRAK_USAGE_COLUMNS.unit]);
+    const actualUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.actualUsage]);
+    if(!unitSize||actualUnrounded===''){
+      const heading=foodtrakUsageHeading(row);
+      if(heading){
+        if(heading.level==='main'){
+          reportCategory=heading.name;
+          reportSubcategory='';
+        }else reportSubcategory=heading.name;
+      }
+      continue;
+    }
+
+    const sourceStart=index+1;
+    const firstPrintedLine=foodtrakUsageText(row[FOODTRAK_USAGE_COLUMNS.name]);
+    const continuationLines=[];
+    let fullName=firstPrintedLine;
+    let sourceEnd=sourceStart;
+    while(index+1<rows.length&&foodtrakUsageContinuationRow(rows[index+1])){
+      index++;
+      const continuation=foodtrakUsageText(rows[index]?.[FOODTRAK_USAGE_COLUMNS.name]);
+      fullName=joinFoodtrakUsageName(fullName,continuation);
+      continuationLines.push(continuation);
+      sourceEnd=index+1;
+    }
+
+    const beginUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.begin])||0;
+    const purchasesUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.purchases])||0;
+    const transferInUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.transferIn])||0;
+    const transferOutUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.transferOut])||0;
+    const productionUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.production])||0;
+    const endUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.end])||0;
+    const reconciledUsage=beginUnrounded+purchasesUnrounded+transferInUnrounded-transferOutUnrounded+productionUnrounded-endUnrounded;
+    const reconciliationDelta=actualUnrounded-reconciledUsage;
+    const tolerance=1e-7*Math.max(1,Math.abs(actualUnrounded),Math.abs(reconciledUsage));
+    const activityReconciles=Math.abs(reconciliationDelta)<=tolerance;
+    const match=matchUsageProduct({name:fullName,sku:'',size:unitSize});
+
+    parsed.push({
+      productId:match?match.product.id:null,
+      productName:fullName,
+      reportProductName:fullName,
+      sku:'',
+      unitSize:unitSize||match?.unit?.unitSize||match?.unit?.unit||match?.product?.unit||'',
+      qty:foodtrakUsageRound(actualUnrounded),
+      actualUsage:foodtrakUsageRound(actualUnrounded),
+      actualPercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.actualPercentSales]),
+      idealUsage:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.idealUsage]),
+      idealPercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.idealPercentSales]),
+      varianceUsage:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.varianceUsage]),
+      variancePercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.variancePercentSales]),
+      estimatedCostVariance:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.estimatedCostVariance]),
+      begin:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.begin]),
+      purch:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.purchases]),
+      transferIn:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.transferIn]),
+      transferOut:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.transferOut]),
+      production:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.production]),
+      end:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.end]),
+      periodStart:inferredPeriod.start,
+      periodEnd:inferredPeriod.end,
+      reportCategory,
+      reportSubcategory,
+      matched:!!match,
+      matchedName:match?match.product.name:null,
+      sizeMatched:match?match.sizeMatched:false,
+      sourceFile:fileName,
+      importedAt:new Date().toISOString(),
+      sourceOrder:sourceStart,
+      sourceLines:sourceEnd>sourceStart?`${sourceStart}–${sourceEnd}`:String(sourceStart),
+      sourceLineStart:sourceStart,
+      sourceLineEnd:sourceEnd,
+      firstPrintedLine,
+      continuationLines,
+      nameReconstructed:continuationLines.length>0,
+      blankNameRecovered:!firstPrintedLine&&continuationLines.length>0,
+      activityReconciles,
+      reconciliationDelta:foodtrakUsageRound(reconciliationDelta,8),
+      needsReview:!fullName||!activityReconciles,
+      reviewReason:!fullName?'No item name was available in the numeric row or following lines.':(!activityReconciles?'Activity values do not reconcile to Actual Usage.':'')
+    });
+  }
+  return parsed;
+}
+
 function parseUsageReportRows(rows,fileName){
   const headerIndex=findUsageHeaderRow(rows);
   const headers=rows[headerIndex]||[];
@@ -920,7 +1056,15 @@ function unmatchedUsageImportEntries(){
 function usageImportCounts(){
   const rows=pendingUsageImport?.rows||[];
   const unmatched=unmatchedUsageImportEntries();
-  return{rows:rows.length,matched:rows.length-unmatched.length,unmatched:unmatched.length};
+  return{
+    rows:rows.length,
+    matched:rows.length-unmatched.length,
+    unmatched:unmatched.length,
+    reconstructed:rows.filter(row=>row.nameReconstructed).length,
+    blankNameRecovered:rows.filter(row=>row.blankNameRecovered).length,
+    reconciliationFailures:rows.filter(row=>row.activityReconciles===false).length,
+    reviewRows:rows.filter(row=>row.needsReview).length
+  };
 }
 
 function renderUsageImportReview({preservePosition=false}={}){
@@ -937,19 +1081,37 @@ function renderUsageImportReview({preservePosition=false}={}){
   panel.hidden=!pending;
   if(!pending){summary.innerHTML='';wrap.innerHTML='';matchedWrap.innerHTML='';return;}
   const counts=usageImportCounts();
-  summary.innerHTML=`
+  const isFoodtrak=pending.rows.some(row=>row.sourceLines||row.nameReconstructed||row.blankNameRecovered);
+  summary.innerHTML=isFoodtrak?`
+    <div><strong>${counts.rows}</strong><span>item records</span></div>
+    <div><strong>${counts.reconstructed}</strong><span>reconstructed names</span></div>
+    <div><strong>${counts.blankNameRecovered}</strong><span>blank names recovered</span></div>
+    <div><strong>${counts.reconciliationFailures}</strong><span>activity failures</span></div>
+    <div><strong>${counts.matched}</strong><span>matched rows</span></div>
+    <div><strong>${counts.unmatched}</strong><span>unmatched rows</span></div>
+  `:`
     <div><strong>${counts.rows}</strong><span>rows extracted</span></div>
     <div><strong>${counts.matched}</strong><span>matched rows</span></div>
     <div><strong>${counts.unmatched}</strong><span>unmatched rows</span></div>
   `;
   const matchedEntries=pending.entries.filter(entry=>entry.row.matched&&entry.row.productId);
-  matchedWrap.innerHTML=`<details class="inventory-template-review-group usage-import-matched-group" ${matchedOpen?'open':''}>
+  const reconstructionAudit=pending.rows.filter(row=>row.nameReconstructed);
+  const auditMarkup=isFoodtrak?`<details class="inventory-template-review-group usage-import-audit-group">
+    <summary><span>Reconstructed name audit</span><strong>${reconstructionAudit.length} names</strong></summary>
+    <div class="inventory-template-review-list">${reconstructionAudit.map(row=>`
+      <div class="inventory-template-review-row usage-import-audit-row">
+        <span class="filled-pill">${escapeHtml(row.sourceLines||'—')}</span>
+        <span><strong>${escapeHtml(row.reportProductName||row.productName||'Unnamed product')}</strong><small>${row.blankNameRecovered?'Numeric row had a blank name · ':''}First: ${escapeHtml(row.firstPrintedLine||'(blank)')}</small></span>
+        <span class="usage-import-suggestion"><small>Continuation line${row.continuationLines?.length===1?'':'s'}</small><strong>${escapeHtml((row.continuationLines||[]).join(' / '))}</strong></span>
+      </div>`).join('')||'<div class="inventory-template-empty">No names required reconstruction.</div>'}</div>
+  </details>`:'';
+  matchedWrap.innerHTML=`${auditMarkup}<details class="inventory-template-review-group usage-import-matched-group" ${matchedOpen?'open':''}>
     <summary><span>Matched products</span><strong>${matchedEntries.length} matched</strong></summary>
     <div class="inventory-template-review-list">${matchedEntries.map(entry=>`
       <div class="inventory-template-review-row usage-import-matched-row">
-        <span class="filled-pill">${entry.suggestionAccepted?'Added':'Matched'}</span>
+        <span class="filled-pill">${entry.row.activityReconciles===false?'Review':(entry.suggestionAccepted?'Added':'Matched')}</span>
         <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
-        <span class="usage-import-suggestion"><small>Matched to</small><strong>${escapeHtml(entry.row.matchedName||entry.row.productName||'Existing product')}</strong></span>
+        <span class="usage-import-suggestion"><small>${entry.row.activityReconciles===false?escapeHtml(entry.row.reviewReason||'Activity review required'):'Matched to'}</small><strong>${escapeHtml(entry.row.matchedName||entry.row.productName||'Existing product')}</strong></span>
       </div>`).join('')||'<div class="inventory-template-empty">No matched products yet.</div>'}</div>
   </details>`;
   const byCategory=new Map();
@@ -1233,16 +1395,40 @@ async function readUsagePdfRows(arrayBuffer){
   throw new Error('No readable text was found in this PDF. If it is scanned, OCR support will be needed.');
 }
 
-function readUsageSpreadsheetRows(arrayBuffer){
+function readUsageSpreadsheetRows(arrayBuffer,{raw=false}={}){
   if(typeof XLSX==='undefined')throw new Error('Excel library did not load. Try again.');
   const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+  return XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw});
 }
 
-async function readUsageReportRows(file,arrayBuffer){
+async function readUsageReportRows(file,arrayBuffer,options={}){
   if(file.type==='application/pdf'||/\.pdf$/i.test(file.name))return readUsagePdfRows(arrayBuffer);
-  return readUsageSpreadsheetRows(arrayBuffer);
+  return readUsageSpreadsheetRows(arrayBuffer,options);
+}
+
+function openUsageUploadModal(mode='other'){
+  usageUploadMode=mode==='foodtrak'?'foodtrak':'other';
+  discardUsageImportReview();
+  const title=document.getElementById('usage-upload-title');
+  const description=document.getElementById('usage-upload-description');
+  const zone=document.getElementById('usage-zone');
+  const zoneCopy=document.getElementById('usage-upload-zone-copy');
+  const input=document.getElementById('usage-file');
+  if(usageUploadMode==='foodtrak'){
+    if(title)title.textContent='Upload Usage Report — From FoodTrak';
+    if(description)description.innerHTML='Upload the original FOOD-TRAK <strong>Item Usage</strong> workbook. Product names split across printed rows will be reconstructed, FOOD-TRAK’s displaced activity columns will be mapped explicitly, displayed values will be rounded permanently, and every activity row will be reconciled before review.';
+    if(zone)zone.setAttribute('aria-label','Upload a FOOD-TRAK Item Usage workbook');
+    if(zoneCopy)zoneCopy.innerHTML='<strong>Click or drag & drop</strong> the original .xls or .xlsx file';
+    if(input)input.accept='.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }else{
+    if(title)title.textContent='Upload Usage Report — Others';
+    if(description)description.innerHTML='Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Ideal Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.';
+    if(zone)zone.setAttribute('aria-label','Upload a usage report');
+    if(zoneCopy)zoneCopy.innerHTML='<strong>Click or drag & drop</strong> an Excel / CSV / PDF file';
+    if(input)input.accept='.xlsx,.xls,.csv,.pdf,application/pdf';
+  }
+  openModal('modal-usage-upload');
 }
 
 function handleUsageUpload(e){
@@ -1254,9 +1440,11 @@ function handleUsageUpload(e){
   const reader=new FileReader();
   reader.onload=async ev=>{
     try{
+      const isFoodtrak=usageUploadMode==='foodtrak';
+      if(isFoodtrak&&!/\.xlsx?$/i.test(file.name))throw new Error('From FoodTrak accepts the original .xls or .xlsx Item Usage workbook. Choose Others for CSV or PDF reports.');
       const sourceFile=usageSourceFileSnapshot(file,ev.target.result);
-      const rows=await readUsageReportRows(file,ev.target.result);
-      let matched=parseUsageReportRows(rows,file.name);
+      const rows=await readUsageReportRows(file,ev.target.result,{raw:isFoodtrak});
+      let matched=isFoodtrak?parseFoodtrakUsageRows(rows,file.name):parseUsageReportRows(rows,file.name);
       if((file.type==='application/pdf'||/\.pdf$/i.test(file.name))&&!matched.some(row=>row.matched)){
         matched=parseUsagePdfTextRows(rows,file.name);
       }
@@ -1266,11 +1454,13 @@ function handleUsageUpload(e){
       }
       prepareUsageImport(file.name,sourceFile,matched);
       const counts=usageImportCounts();
-      if(!counts.unmatched){
+      if(!counts.unmatched&&!isFoodtrak){
         finalizeUsageImport();
       }else{
         document.getElementById('usage-zone').hidden=true;
-        status.textContent=`Analyzed ${file.name}: ${counts.matched} matched rows and ${counts.unmatched} unmatched rows. Review the unmatched products below; no rows were merged.`;
+        status.textContent=isFoodtrak
+          ?`Validated ${file.name}: ${counts.rows} item records, ${counts.reconstructed} reconstructed names, ${counts.blankNameRecovered} blank-name rows recovered, and ${counts.reconciliationFailures} activity reconciliation failures. Review matches below; no rows were merged.`
+          :`Analyzed ${file.name}: ${counts.matched} matched rows and ${counts.unmatched} unmatched rows. Review the unmatched products below; no rows were merged.`;
         renderUsageImportReview();
       }
     }catch(err){

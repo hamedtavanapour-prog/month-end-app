@@ -11,10 +11,18 @@ function compactUsageRow(row){
     unitSize:row.unitSize||'',
     qty:row.qty??'',
     actualUsage:row.actualUsage??'',
+    actualPercentSales:row.actualPercentSales??'',
     idealUsage:row.idealUsage??'',
+    idealPercentSales:row.idealPercentSales??'',
+    varianceUsage:row.varianceUsage??'',
+    variancePercentSales:row.variancePercentSales??'',
+    estimatedCostVariance:row.estimatedCostVariance??'',
     begin:row.begin??'',
     end:row.end??'',
     purch:row.purch??'',
+    transferIn:row.transferIn??'',
+    transferOut:row.transferOut??'',
+    production:row.production??'',
     periodStart:row.periodStart||'',
     periodEnd:row.periodEnd||'',
     reportCategory:row.reportCategory||'',
@@ -24,7 +32,18 @@ function compactUsageRow(row){
     sizeMatched:row.sizeMatched!==false,
     sourceFile:row.sourceFile||'',
     importedAt:row.importedAt||'',
-    sourceOrder:Number.isFinite(row.sourceOrder)?row.sourceOrder:null
+    sourceOrder:Number.isFinite(row.sourceOrder)?row.sourceOrder:null,
+    sourceLines:row.sourceLines||'',
+    sourceLineStart:Number.isFinite(row.sourceLineStart)?row.sourceLineStart:null,
+    sourceLineEnd:Number.isFinite(row.sourceLineEnd)?row.sourceLineEnd:null,
+    firstPrintedLine:row.firstPrintedLine||'',
+    continuationLines:Array.isArray(row.continuationLines)?row.continuationLines:[],
+    nameReconstructed:!!row.nameReconstructed,
+    blankNameRecovered:!!row.blankNameRecovered,
+    activityReconciles:row.activityReconciles!==false,
+    reconciliationDelta:row.reconciliationDelta??'',
+    needsReview:!!row.needsReview,
+    reviewReason:row.reviewReason||''
   };
 }
 

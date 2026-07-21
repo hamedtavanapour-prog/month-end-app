@@ -49,6 +49,7 @@ let floorPlanManualSearchOpen=false;
 let editingInventoryCategoryName=null;
 let pendingInventoryEntryTemplate=null;
 let pendingUsageImport=null;
+let usageUploadMode='other';
 let draggedInventoryTemplateIndex=null;
 let productCatalogView='products';
 let productDepartmentView='bar';
