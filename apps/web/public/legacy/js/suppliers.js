@@ -255,6 +255,13 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
   supplierViewFocusProductIds=matches.map(match=>match.product.id);
   supplierViewPrimaryProductId=matchedProduct?.id||null;
   const products=(supplier.products||[]).map(pid=>getProduct(pid)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+  const minimum=[supplier.minSpend?fmt(supplier.minSpend):'',supplier.minQty?`${supplier.minQty} units`:''].filter(Boolean).join(' / ');
+  const detailFields=[
+    supplier.contact?`<div class="product-detail-field"><div class="label">Contact</div><div class="value">${escapeHtml(supplier.contact)}</div></div>`:'',
+    supplier.email?`<div class="product-detail-field"><div class="label">Email</div><div class="value"><a href="mailto:${escapeHtml(supplier.email)}" style="color:var(--accent);">${escapeHtml(supplier.email)}</a></div></div>`:'',
+    supplier.phone?`<div class="product-detail-field"><div class="label">Phone</div><div class="value">${escapeHtml(supplier.phone)}</div></div>`:'',
+    minimum?`<div class="product-detail-field"><div class="label">Minimum</div><div class="value">${minimum}</div></div>`:''
+  ].filter(Boolean).join('');
   document.getElementById('supplier-view-body').innerHTML=`
     <div class="product-view-head">
       <div>
@@ -263,14 +270,9 @@ function openSupplierView(id,focusProductId=null,searchHint=''){
       </div>
       <div class="detail-heading-actions"><button class="icon-btn" type="button" aria-label="Edit supplier" title="Edit supplier" onclick="openSupplierModal('${supplier.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><div class="drop-wrap"><button class="icon-btn overflow-menu-button" type="button" aria-label="Supplier actions" title="Supplier actions" onclick="event.stopPropagation();toggleMenu('supplier-view-actions-menu')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button><div class="drop-menu" id="supplier-view-actions-menu"><button onclick="closeAllMenus();archiveSupplier('${supplier.id}',${supplier.archived?'false':'true'})">${supplier.archived?'Restore':'Archive'}</button><button onclick="closeAllMenus();deleteSupplier('${supplier.id}')">Delete</button></div></div><button class="detail-close" type="button" aria-label="Close supplier detail" title="Close" onclick="closeModal('modal-supplier-view')">&times;</button></div>
     </div>
-    <div class="product-detail-grid">
-      <div class="product-detail-field"><div class="label">Contact</div><div class="value">${escapeHtml(supplier.contact||'—')}</div></div>
-      <div class="product-detail-field"><div class="label">Email</div><div class="value">${supplier.email?`<a href="mailto:${escapeHtml(supplier.email)}" style="color:var(--accent);">${escapeHtml(supplier.email)}</a>`:'—'}</div></div>
-      <div class="product-detail-field"><div class="label">Phone</div><div class="value">${escapeHtml(supplier.phone||'—')}</div></div>
-      <div class="product-detail-field"><div class="label">Minimum</div><div class="value">${supplier.minSpend?fmt(supplier.minSpend):'—'}${supplier.minQty?' / '+supplier.minQty+' units':''}</div></div>
-    </div>
-    <div class="product-view-section"><div class="label">Website</div><p>${supplier.website?`<a href="${escapeHtml(supplier.website)}" target="_blank" rel="noopener" style="color:var(--accent);">${escapeHtml(supplier.website)}</a>`:'—'}</p></div>
-    <div class="product-view-section"><div class="label">Notes</div><p>${escapeHtml(supplier.notes||'—')}</p></div>
+    ${detailFields?`<div class="product-detail-grid">${detailFields}</div>`:''}
+    ${supplier.website?`<div class="product-view-section"><div class="label">Website</div><p><a href="${escapeHtml(supplier.website)}" target="_blank" rel="noopener" style="color:var(--accent);">${escapeHtml(supplier.website)}</a></p></div>`:''}
+    ${supplier.notes?`<div class="product-view-section"><div class="label">Notes</div><p>${escapeHtml(supplier.notes)}</p></div>`:''}
     <div class="product-view-section"><div class="label">Linked Products</div>
       <div class="form-group supplier-view-search"><label>Search Products</label><input type="text" id="supplier-view-product-search" placeholder="Find a linked product…" oninput="renderSupplierViewProducts()"></div>
       <div class="table-wrap supplier-products-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Sub</th><th>Unit</th><th>Par</th></tr></thead><tbody id="supplier-view-products-tbody">${supplierViewProductRows(supplier)}</tbody></table></div>
@@ -314,12 +316,12 @@ function renderSuppliers(){
     return`<tr class="supplier-row ${s.archived?'archived-row':''}" onclick="openSupplierViewFromSearch('${s.id}')">
       ${visCols.map(c=>{switch(c.key){
         case 'name':return`<td><strong>${escapeHtml(s.name)}</strong>${s.archived?' <span class="sub-badge">Archived</span>':''}</td>`;
-        case 'contact':return`<td>${escapeHtml(s.contact||'—')}</td>`;
-        case 'email':return`<td>${s.email?`<a href="mailto:${escapeHtml(s.email)}" onclick="event.stopPropagation();" style="color:var(--accent);">${escapeHtml(s.email)}</a>`:'—'}</td>`;
-        case 'phone':return`<td>${escapeHtml(s.phone||'—')}</td>`;
-        case 'leadDays':return`<td>${s.leadDays?s.leadDays+'d':'—'}</td>`;
-        case 'minimum':return`<td>${s.minSpend?fmt(s.minSpend):'—'}${s.minQty?' / '+s.minQty+' units':''}</td>`;
-        case 'products':return`<td style="max-width:240px;">${supplierProductsSummaryHtml(s)}</td>`;
+        case 'contact':return`<td class="${s.contact?'':'supplier-empty-field'}">${escapeHtml(s.contact||'—')}</td>`;
+        case 'email':return`<td class="${s.email?'':'supplier-empty-field'}">${s.email?`<a href="mailto:${escapeHtml(s.email)}" onclick="event.stopPropagation();" style="color:var(--accent);">${escapeHtml(s.email)}</a>`:'—'}</td>`;
+        case 'phone':return`<td class="${s.phone?'':'supplier-empty-field'}">${escapeHtml(s.phone||'—')}</td>`;
+        case 'leadDays':return`<td class="${s.leadDays?'':'supplier-empty-field'}">${s.leadDays?s.leadDays+'d':'—'}</td>`;
+        case 'minimum':return`<td class="${s.minSpend||s.minQty?'':'supplier-empty-field'}">${s.minSpend?fmt(s.minSpend):''}${s.minSpend&&s.minQty?' / ':''}${s.minQty?s.minQty+' units':''}${s.minSpend||s.minQty?'':'—'}</td>`;
+        case 'products':return`<td class="${s.productCount?'':'supplier-empty-field'}" style="max-width:240px;">${supplierProductsSummaryHtml(s)}</td>`;
         case 'actions':return`<td onclick="event.stopPropagation();">${supplierMenuHtml(s,menuId)}</td>`;
         default:return`<td>—</td>`;
       }}).join('')}

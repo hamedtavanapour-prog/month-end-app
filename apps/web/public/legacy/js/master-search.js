@@ -98,7 +98,7 @@ function buildMasterSearchIndex(){
   pages.forEach(([page,title,subtitle,keywords],index)=>{if(can(page))add({id:`page:${page}`,group:'Pages',title,subtitle,keywords,icon:'page',page,priority:45,suggest:88-index,action:()=>showPage(page)});});
 
   const actions=[
-    ['inventory','Start a new count','Create a saved count draft and choose rooms','new inventory account count','count',()=>openInventoryRoomSelect()],
+    ['inventory','Add a new count','Create a saved count draft and choose rooms','new inventory account count','count',()=>openInventoryRoomSelect()],
     ['products','Add a product','Create a product in the catalog','new item bottle product','plus',()=>openProductModal()],
     ['orders','Create an order','Start a new purchase order','new invoice purchase','plus',()=>openOrderModal()],
     ['usage','Upload a usage report','Import a PDF or spreadsheet for usage matching','pdf food trak ideal usage import','upload',()=>openUsageUploadModal('other')],

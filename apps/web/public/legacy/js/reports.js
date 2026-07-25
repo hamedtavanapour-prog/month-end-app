@@ -58,15 +58,31 @@ function renderDashboardOnboarding(){
     </button>`;
   }).join('');
 }
+function openDashboardCount(id){
+  if(!id){showPage('inventory');return;}
+  showPage('inventory');
+  requestAnimationFrame(()=>viewInventory(id));
+}
+function openDashboardDestination(destination){
+  if(destination==='latest-count'){openDashboardCount(state.inventories[0]?.id);return;}
+  if(destination==='low-stock'){
+    showPage('live-inventory');
+    const status=document.getElementById('live-inv-status-f');
+    if(status)status.value='low';
+    renderLiveInventoryPage();
+    return;
+  }
+  showPage(destination);
+}
 function renderDashboard(){
   renderDashboardOnboarding();
   const lastInv=state.inventories[0];let totalVal=0;if(lastInv)Object.entries(lastInv.items).forEach(([id,qty])=>{const p=getProduct(id);if(p)totalVal+=p.cost*qty;});
   const low=lastInv?state.products.filter(p=>p.par>0&&(lastInv.items[p.id]??Infinity)<=p.par).length:0;
   const usage=computeUsage();let atRisk=0;if(lastInv){state.products.forEach(p=>{const u=usage[p.id];const stock=lastInv.items[p.id]??null;if(u&&u.days>0&&stock!==null){const avgD=u.total/u.days;const dL=avgD>0?stock/avgD:Infinity;if(dL<=7)atRisk++;}});}
-  document.getElementById('dash-stats').innerHTML=`<div class="stat-card"><div class="label">Products</div><div class="value">${state.products.length}</div></div><div class="stat-card"><div class="label">Last Count</div><div class="value" style="font-size:1rem;">${lastInv?fmtDate(lastInv.date):'—'}</div><div class="sub">${lastInv?lastInv.label||'':''}</div></div><div class="stat-card"><div class="label">Count Value</div><div class="value">${fmt(totalVal)}</div></div><div class="stat-card"><div class="label">Low / At Par</div><div class="value" style="color:${low>0?'var(--danger)':'var(--success)'}">${low}</div></div><div class="stat-card"><div class="label">Runout ≤7 Days</div><div class="value" style="color:${atRisk>0?'var(--danger)':'var(--success)'}">${atRisk}</div></div><div class="stat-card"><div class="label">Suppliers</div><div class="value">${state.suppliers.length}</div></div><div class="stat-card"><div class="label">Orders</div><div class="value">${state.orders.length}</div></div><div class="stat-card"><div class="label">Counts Filed</div><div class="value">${state.inventories.length}</div></div>`;
+  document.getElementById('dash-stats').innerHTML=`<button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('products')"><div class="label">Products</div><div class="value">${state.products.length}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('latest-count')"><div class="label">Last Count</div><div class="value" style="font-size:1rem;">${lastInv?fmtDate(lastInv.date):'—'}</div><div class="sub">${lastInv?lastInv.label||'':''}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('latest-count')"><div class="label">Count Value</div><div class="value">${fmt(totalVal)}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('low-stock')"><div class="label">Low / At Par</div><div class="value" style="color:${low>0?'var(--danger)':'var(--success)'}">${low}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('insights')"><div class="label">Runout ≤7 Days</div><div class="value" style="color:${atRisk>0?'var(--danger)':'var(--success)'}">${atRisk}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('suppliers')"><div class="label">Suppliers</div><div class="value">${state.suppliers.length}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('orders')"><div class="label">Orders</div><div class="value">${state.orders.length}</div></button><button class="stat-card dashboard-stat-card" type="button" onclick="openDashboardDestination('inventory')"><div class="label">Counts Filed</div><div class="value">${state.inventories.length}</div></button>`;
   const tbody=document.getElementById('dash-inv-tbody');const recent=state.inventories.slice(0,5);
   if(!recent.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No counts yet.</td></tr>`;return;}
-  tbody.innerHTML=recent.map(inv=>{const t=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);return`<tr><td>${fmtDate(inv.date)}</td><td>${inv.label||'—'}</td><td>${Object.keys(inv.items).length}</td><td>${fmt(t)}</td><td><button class="btn btn-secondary btn-sm" onclick="viewInventory('${inv.id}')">View</button></td></tr>`;}).join('');
+  tbody.innerHTML=recent.map(inv=>{const t=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);return`<tr><td>${fmtDate(inv.date)}</td><td>${inv.label||'—'}</td><td>${Object.keys(inv.items).length}</td><td>${fmt(t)}</td><td><button class="btn btn-secondary btn-sm" type="button" onclick="event.stopPropagation();openDashboardCount('${inv.id}')">View</button></td></tr>`;}).join('');
 }
 
 // EXCEL / CSV EXPORTS

@@ -34,6 +34,10 @@ function setTheme(theme,savePreference=true){
   try{localStorage.setItem(THEME_STORAGE_KEY,nextTheme);}catch(e){}
   updateThemeToggle(nextTheme);
   syncEmbeddedTheme(nextTheme);
+  requestAnimationFrame(()=>{
+    const background=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if(background)document.querySelector('meta[name="theme-color"]')?.setAttribute('content',background);
+  });
   if(savePreference&&window.serverAccessContext){fetch('/api/user-preferences',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:nextTheme})}).catch(()=>{});}
 }
 
@@ -169,7 +173,7 @@ function syncMobileSheetBackdrop(){
   // active page/modal and must remain directly touchable. A separate top-level
   // backdrop can sit above them on iOS and steal taps from native selects.
   // Only top-level panels use this shared dimming layer.
-  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.mobile-nav-popover.open,#voice-modal.open');
+  const hasOpenSheet=window.innerWidth<=820&&!!document.querySelector('.mobile-nav-popover.open,#voice-modal.open,.drop-menu.open,.col-menu.open');
   backdrop.classList.toggle('open',hasOpenSheet);
   backdrop.setAttribute('aria-hidden',String(!hasOpenSheet));
   syncBlockingUiState();
@@ -686,6 +690,18 @@ function toggleMobileNavMenu(group,event){
 function mobileNavigate(page){
   closeMobileNavMenus();
   showPage(page);
+  resetPageScroll();
+}
+
+function resetPageScroll(){
+  const root=document.documentElement;
+  const previousBehavior=root.style.scrollBehavior;
+  root.style.scrollBehavior='auto';
+  window.scrollTo(0,0);
+  document.body.scrollTop=0;
+  const main=document.querySelector('.main');
+  if(main)main.scrollTop=0;
+  requestAnimationFrame(()=>{root.style.scrollBehavior=previousBehavior;});
 }
 
 function mobileNavGroupForPage(page){
