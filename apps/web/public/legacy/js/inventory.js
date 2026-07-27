@@ -1410,7 +1410,7 @@ function renderViewedInventoryHistory(inv){const panel=document.getElementById('
 function toggleViewedInventoryHistory(){const inv=state.inventories.find(item=>item.id===viewInvId);const panel=document.getElementById('view-inv-history');const toggle=document.getElementById('view-inv-history-toggle');if(!inv||!panel)return;renderViewedInventoryHistory(inv);panel.hidden=!panel.hidden;toggle?.setAttribute('aria-expanded',String(!panel.hidden));}
 function renderViewInventoryActions(inv){
   const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
-  menu.innerHTML=`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="exportViewedInventoryExcel()">Export Excel / CSV</button><button onclick="printViewedInventory()">Print / PDF</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button><button onclick="deleteInventory('${inv.id}')">Delete count</button>`;
+  menu.innerHTML=`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="openCountReportExport('${inv.id}')">Export report</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button><button onclick="deleteInventory('${inv.id}')">Delete count</button>`;
 }
 function editViewedInventory(){const id=viewInvId;if(!id)return;const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openCountRoomPicker(id,selectedRoom);}
 function renderViewInvTabs(inv){
@@ -1487,28 +1487,156 @@ function renderViewInvTable(){
   document.getElementById('view-inv-total').textContent=viewInvTab!=='missing'?`Total: ${fmt(total)}`:'';
 }
 function deleteInventory(id){closeAllMenus();if(!confirm('Delete?'))return;const inv=state.inventories.find(i=>i.id===id);state.inventories=state.inventories.filter(i=>i.id!==id);save();window.recordServerEvent?.({action:'count.deleted',entityType:'count',entityId:id,details:{label:inv?.label||'',date:inv?.date||''}});closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}
-function openSingleInvExport(){closeAllMenus();const sel=document.getElementById('single-inv-sel');sel.innerHTML=state.inventories.map(inv=>`<option value="${inv.id}">${fmtDate(inv.date)}${inv.label?' — '+inv.label:''}</option>`).join('');openModal('modal-single-inv');}
-function exportInventoryExcel(id){
+const COUNT_REPORT_ORDER_LABELS={
+  usage:'Usage order — Inventory Entry Form',
+  category:'Category, subcategory, then product',
+  alpha:'Product name — A to Z',
+  'alpha-desc':'Product name — Z to A',
+  'qty-desc':'Quantity — highest first',
+  'qty-asc':'Quantity — lowest first',
+  'value-desc':'Inventory value — highest first',
+  'value-asc':'Inventory value — lowest first'
+};
+function inventoryEntryReportOrderMap(){
+  const map=new Map();
+  const items=state.inventoryEntryTemplate?.items;
+  if(!Array.isArray(items))return map;
+  [...items]
+    .filter(item=>item?.productId)
+    .sort((a,b)=>(Number.isFinite(a.sourceOrder)?a.sourceOrder:Number.MAX_SAFE_INTEGER)-(Number.isFinite(b.sourceOrder)?b.sourceOrder:Number.MAX_SAFE_INTEGER))
+    .forEach(item=>{if(!map.has(item.productId))map.set(item.productId,map.size);});
+  return map;
+}
+function countReportEntries(items={}){
+  return Object.entries(items).map(([productId,rawQty])=>{
+    const product=getProduct(productId);
+    if(!product)return null;
+    const qty=parseFloat(rawQty)||0;
+    return{product,qty,value:qty*(parseFloat(product.cost)||0)};
+  }).filter(Boolean);
+}
+function sortCountReportEntries(entries,order='category'){
+  const text=(value)=>String(value||'');
+  const categoryCompare=(a,b)=>
+    text(a.product.category).localeCompare(text(b.product.category))||
+    text(a.product.subcategory).localeCompare(text(b.product.subcategory))||
+    text(a.product.name).localeCompare(text(b.product.name));
+  if(order==='usage'){
+    const usageOrder=inventoryEntryReportOrderMap();
+    return[...entries].sort((a,b)=>{
+      const ai=usageOrder.has(a.product.id)?usageOrder.get(a.product.id):Number.MAX_SAFE_INTEGER;
+      const bi=usageOrder.has(b.product.id)?usageOrder.get(b.product.id):Number.MAX_SAFE_INTEGER;
+      return ai-bi||categoryCompare(a,b);
+    });
+  }
+  if(order==='alpha'||order==='alpha-desc'){
+    const direction=order==='alpha-desc'?-1:1;
+    return[...entries].sort((a,b)=>direction*text(a.product.name).localeCompare(text(b.product.name)));
+  }
+  if(order==='qty-desc'||order==='qty-asc'){
+    const direction=order==='qty-desc'?-1:1;
+    return[...entries].sort((a,b)=>direction*(a.qty-b.qty)||categoryCompare(a,b));
+  }
+  if(order==='value-desc'||order==='value-asc'){
+    const direction=order==='value-desc'?-1:1;
+    return[...entries].sort((a,b)=>direction*(a.value-b.value)||categoryCompare(a,b));
+  }
+  return[...entries].sort(categoryCompare);
+}
+function countReportRows(items,order){
+  const entries=sortCountReportEntries(countReportEntries(items),order);
+  const rows=[['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value']];
+  let total=0;
+  entries.forEach(({product,qty,value})=>{
+    total+=value;
+    rows.push([product.name,product.category,product.subcategory||'',qty,product.unit,product.par||0,product.cost||0,+value.toFixed(2)]);
+  });
+  rows.push(['','','','','','','TOTAL',+total.toFixed(2)]);
+  return{entries,rows,total};
+}
+function openCountReportExport(id=viewInvId){
+  closeAllMenus();
+  const inv=state.inventories.find(item=>item.id===id);
+  if(!inv){toast('Count not found.',true);return;}
+  normalizeInventoryRooms(inv);
+  countReportInventoryId=id;
+  const title=document.getElementById('count-report-export-title');
+  const summary=document.getElementById('count-report-export-summary');
+  const orderSelect=document.getElementById('count-report-order');
+  const usageOption=orderSelect?.querySelector('option[value="usage"]');
+  const hasInventoryEntryOrder=inventoryEntryReportOrderMap().size>0;
+  if(title)title.textContent=`Export report — ${inv.label||'Count'}`;
+  if(summary)summary.textContent=`${fmtDate(inv.date)} · ${inv.rooms.length} room${inv.rooms.length===1?'':'s'} · ${Object.keys(inv.items||{}).length} counted item${Object.keys(inv.items||{}).length===1?'':'s'}`;
+  if(usageOption){
+    usageOption.disabled=!hasInventoryEntryOrder;
+    usageOption.textContent=hasInventoryEntryOrder?'Usage order — Inventory Entry Form':'Usage order — Inventory Entry Form (not set)';
+  }
+  if(orderSelect)orderSelect.value=hasInventoryEntryOrder?'usage':'category';
+  const excel=document.querySelector('input[name="count-report-format"][value="xlsx"]');
+  if(excel)excel.checked=true;
+  updateCountReportExportPreview();
+  openModal('modal-count-report-export');
+}
+function updateCountReportExportPreview(){
+  const inv=state.inventories.find(item=>item.id===countReportInventoryId);
+  if(!inv)return;
+  const order=document.getElementById('count-report-order')?.value||'category';
+  const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
+  const report=countReportRows(inv.items,order);
+  const names=report.entries.slice(0,4).map(entry=>entry.product.name);
+  const remaining=Math.max(report.entries.length-names.length,0);
+  const previewTitle=document.getElementById('count-report-preview-title');
+  const previewItems=document.getElementById('count-report-preview-items');
+  const source=document.getElementById('count-report-order-source');
+  const button=document.getElementById('count-report-export-button');
+  if(previewTitle)previewTitle.textContent=`${report.entries.length} items · ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category}`;
+  if(previewItems)previewItems.textContent=names.length?`${names.join(' → ')}${remaining?` → ${remaining} more`:''}`:'This count has no reportable items.';
+  if(source){
+    const template=state.inventoryEntryTemplate;
+    source.textContent=order==='usage'
+      ?`Order source: ${template?.sourceFile||'Inventory Entry Form'}`
+      :format==='xlsx'
+        ?'The selected order will be applied to the merged total and every room worksheet.'
+        :'The selected order will be applied to the print-ready PDF report.';
+  }
+  if(button)button.textContent=format==='pdf'?'Open PDF report':'Download Excel report';
+}
+function exportConfiguredCountReport(){
+  const id=countReportInventoryId;
+  const order=document.getElementById('count-report-order')?.value||'category';
+  const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
+  if(!id){toast('Count not found.',true);return;}
+  closeModal('modal-count-report-export');
+  if(format==='pdf')printInventoryCount(id,order);
+  else exportInventoryExcel(id,order);
+}
+function exportInventoryExcel(id,order='category'){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
-  const rows=[['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value']];let tot=0;
-  Object.entries(inv.items).forEach(([pid,qty])=>{const p=getProduct(pid);if(!p)return;const val=+(p.cost*qty).toFixed(2);tot+=val;rows.push([p.name,p.category,p.subcategory||'',qty,p.unit,p.par||0,p.cost||0,val]);});
-  rows.push(['','','','','','','TOTAL',+tot.toFixed(2)]);
-  const sheets=[{name:(`Merged ${inv.date}`).slice(0,31),rows}];
+  const merged=countReportRows(inv.items,order);
+  const sheets=[{name:(`Merged ${inv.date}`).slice(0,31),rows:merged.rows}];
   inv.rooms.forEach(room=>{
-    const roomRows=[['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value']];let roomTotal=0;
-    Object.entries(room.items||{}).forEach(([pid,qty])=>{const p=getProduct(pid);if(!p)return;const val=+(p.cost*qty).toFixed(2);roomTotal+=val;roomRows.push([p.name,p.category,p.subcategory||'',qty,p.unit,p.par||0,p.cost||0,val]);});
-    roomRows.push(['','','','','','','TOTAL',+roomTotal.toFixed(2)]);
-    sheets.push({name:room.name.slice(0,31)||'Room',rows:roomRows});
+    const roomReport=countReportRows(room.items||{},order);
+    sheets.push({name:room.name.slice(0,31)||'Room',rows:roomReport.rows});
   });
   xlDown(sheets,`inventory_count_${inv.date}.xlsx`);
 }
-function printInventoryCount(id){const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}normalizeInventoryRooms(inv);closeAllMenus();let tot=0;const bodyRows=Object.entries(inv.items).map(([pid,qty])=>{const p=getProduct(pid);if(!p)return null;const val=p.cost*qty;tot+=val;return[p.name,p.category,p.subcategory||'',qty,p.unit,p.par||'—',p.cost>0?fmt(p.cost):'—',fmt(val)];}).filter(Boolean);printTable(`Count — ${inv.label||fmtDate(inv.date)}`,`Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Merged Total: ${fmt(tot)}`,['Product','Category','Sub','Qty','Unit','Par','Unit Cost','Value'],bodyRows);}
-function exportViewedInventoryExcel(){if(viewInvId)exportInventoryExcel(viewInvId);}
-function printViewedInventory(){if(viewInvId)printInventoryCount(viewInvId);}
-function singleInvExcel(){const id=document.getElementById('single-inv-sel').value;closeModal('modal-single-inv');exportInventoryExcel(id);}
-function singleInvPrint(){const id=document.getElementById('single-inv-sel').value;closeModal('modal-single-inv');printInventoryCount(id);}
+function printInventoryCount(id,order='category'){
+  const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
+  normalizeInventoryRooms(inv);
+  closeAllMenus();
+  const report=countReportRows(inv.items,order);
+  const bodyRows=report.entries.map(({product,qty,value})=>[
+    product.name,product.category,product.subcategory||'',qty,product.unit,product.par||'—',product.cost>0?fmt(product.cost):'—',fmt(value)
+  ]);
+  printTable(
+    `Count Report — ${inv.label||fmtDate(inv.date)}`,
+    `Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Order: ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category} · Merged Total: ${fmt(report.total)}`,
+    ['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value'],
+    bodyRows
+  );
+}
 
 document.getElementById('mobile-count-continue')?.addEventListener('click',continueMobileCountSetup);
 document.addEventListener('click',event=>{

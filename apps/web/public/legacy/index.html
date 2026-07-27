@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=voice-workspace-2"/>
+<link rel="stylesheet" href="css/styles.css?v=count-report-export-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -733,16 +733,52 @@
 </div>
 </div>
 
-<!-- SINGLE INV EXPORT MODAL -->
-<div class="modal-overlay" id="modal-single-inv">
-<div class="modal" style="max-width:440px;">
-  <button class="modal-close" onclick="closeModal('modal-single-inv')">&times;</button>
-  <h3>Export Single Count</h3>
-  <div class="form-group" style="margin-bottom:18px;"><label>Select Count</label><select id="single-inv-sel"></select></div>
+<!-- COUNT REPORT EXPORT MODAL -->
+<div class="modal-overlay" id="modal-count-report-export">
+<div class="modal count-report-export-modal" role="dialog" aria-modal="true" aria-labelledby="count-report-export-title">
+  <button class="modal-close" type="button" aria-label="Close report setup" onclick="closeModal('modal-count-report-export')">&times;</button>
+  <span class="count-report-eyebrow">Count report</span>
+  <h3 id="count-report-export-title">Export report</h3>
+  <p class="count-report-summary" id="count-report-export-summary"></p>
+
+  <fieldset class="count-report-fieldset">
+    <legend>File type</legend>
+    <div class="count-report-format-options">
+      <label class="count-report-format-option">
+        <input type="radio" name="count-report-format" value="xlsx" checked onchange="updateCountReportExportPreview()">
+        <span><strong>Excel</strong><small>Workbook with a merged-total sheet and one sheet per room</small></span>
+      </label>
+      <label class="count-report-format-option">
+        <input type="radio" name="count-report-format" value="pdf" onchange="updateCountReportExportPreview()">
+        <span><strong>PDF</strong><small>Print-ready merged count report</small></span>
+      </label>
+    </div>
+  </fieldset>
+
+  <label class="form-group count-report-order-field" for="count-report-order">
+    <span>Report order</span>
+    <select id="count-report-order" onchange="updateCountReportExportPreview()">
+      <option value="usage">Usage order — Inventory Entry Form</option>
+      <option value="category">Category, subcategory, then product</option>
+      <option value="alpha">Product name — A to Z</option>
+      <option value="alpha-desc">Product name — Z to A</option>
+      <option value="qty-desc">Quantity — highest first</option>
+      <option value="qty-asc">Quantity — lowest first</option>
+      <option value="value-desc">Inventory value — highest first</option>
+      <option value="value-asc">Inventory value — lowest first</option>
+    </select>
+  </label>
+
+  <div class="count-report-preview" aria-live="polite">
+    <span>Preview</span>
+    <strong id="count-report-preview-title">Merged count</strong>
+    <p id="count-report-preview-items"></p>
+    <small id="count-report-order-source"></small>
+  </div>
+
   <div class="modal-actions">
-    <button class="btn btn-secondary" onclick="closeModal('modal-single-inv')">Cancel</button>
-    <button class="btn btn-secondary" onclick="singleInvPrint()"> Print/PDF</button>
-    <button class="btn btn-primary" onclick="singleInvExcel()"> Excel / CSV</button>
+    <button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-report-export')">Cancel</button>
+    <button class="btn btn-primary" id="count-report-export-button" type="button" onclick="exportConfiguredCountReport()">Export report</button>
   </div>
 </div>
 </div>
@@ -981,18 +1017,18 @@
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=performance-recovery-1"></script>
+<script src="js/state.js?v=count-report-export-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=performance-recovery-3"></script>
 <script src="js/ui.js?v=performance-recovery-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=voice-mobile-guard-1"></script>
+<script src="js/inventory.js?v=count-report-export-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
-<script src="js/export-tools.js"></script>
+<script src="js/export-tools.js?v=count-report-export-1"></script>
 <script src="js/voice.js?v=voice-workspace-3"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
