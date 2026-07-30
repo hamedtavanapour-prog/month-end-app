@@ -24,3 +24,4 @@ Copy `apps/web/.env.example` to `apps/web/.env.local`, fill in the Supabase proj
 npm install
 npm run dev
 ```
+
