@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=count-report-export-1"/>
+<link rel="stylesheet" href="css/styles.css?v=transcribe-variances-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -223,6 +223,7 @@
         <button type="button" title="List view" onclick="setLiveInventoryViewMode('list')">List</button>
         <button type="button" title="Icon view" onclick="setLiveInventoryViewMode('icons')">▦</button>
         <button type="button" title="Box view" onclick="setLiveInventoryViewMode('boxes')">▥</button>
+        <button type="button" title="Variance view" onclick="setLiveInventoryViewMode('variances')">Variances</button>
       </div></div>
     </div>
   </div>
@@ -281,6 +282,11 @@
       <div class="drop-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('usage-exp')">Export</button><div class="drop-menu" id="usage-exp"><button onclick="printPage('Usage','page-usage')">Print / PDF</button><button onclick="xlUsage()">Excel / CSV</button></div></div>
     </div>
   </div>
+  <div class="tabs usage-view-tabs" id="usage-view-tabs">
+    <button class="tab active" type="button" data-usage-view="logs" onclick="switchUsageView('logs')">Usage Logs</button>
+    <button class="tab" type="button" data-usage-view="summary" onclick="switchUsageView('summary')">Weekly Summary</button>
+    <button class="tab" type="button" data-usage-view="variances" onclick="switchUsageView('variances')">Variances</button>
+  </div>
   <div class="card" id="usage-log-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
       <h3 style="font-size:0.95rem;">Usage Logs</h3>
@@ -300,6 +306,10 @@
       </div>
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Unit</th><th>Avg / Week</th><th>Avg / Month</th><th>Data Points</th><th>Trend</th></tr></thead><tbody id="usage-tbody"></tbody></table></div>
     </div>
+  </div>
+  <div class="card" id="usage-variances-card" hidden>
+    <div class="card-section-heading"><div><h3>Usage Variances</h3><p>Actual usage compared with ideal usage across active uploaded reports.</p></div></div>
+    <div class="table-wrap"><table><thead id="usage-variance-thead"></thead><tbody id="usage-variance-tbody"></tbody></table></div>
   </div>
 </div>
 
@@ -610,12 +620,24 @@
   </div>
   <div class="inv-modal-body" id="inv-rows"></div>
   <div class="inv-modal-footer">
-    <button class="voice-btn" id="voice-btn-inventory" type="button" onclick="toggleVoice('inventory')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Voice Count</span></button>
+    <div class="inventory-transcribe-actions">
+      <button class="voice-btn compact" id="voice-btn-inventory" type="button" onclick="toggleVoice('inventory')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Voice Count</span></button>
+      <button class="btn btn-secondary btn-sm" id="transcribe-history-button" type="button" onclick="openTranscribeHistory()">Transcribe History</button>
+    </div>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
       <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
     </div>
   </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-transcribe-history">
+<div class="modal transcribe-history-modal" role="dialog" aria-modal="true" aria-labelledby="transcribe-history-title">
+  <button class="modal-close" type="button" aria-label="Close transcribe history" onclick="closeModal('modal-transcribe-history')">&times;</button>
+  <h3 id="transcribe-history-title">Transcribe History</h3>
+  <p class="count-setup-intro">Temporary activity for this room. It is cleared when you leave or save the room.</p>
+  <div class="transcribe-history-list" id="transcribe-history-list"></div>
 </div>
 </div>
 
@@ -985,6 +1007,7 @@
     <header class="voice-workspace-head">
       <span class="voice-workspace-icon" aria-hidden="true">🎙︎</span>
       <div><span class="voice-workspace-kicker">Voice workspace</span><h2 id="voice-ctx-label">Listening…</h2></div>
+      <div class="voice-item-counter" id="voice-item-counter" hidden><span>No. Items</span><strong id="voice-item-count">0</strong></div>
     </header>
     <div class="voice-workspace-body">
       <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-status-label">Microphone active</span></div>
@@ -992,7 +1015,7 @@
       <div id="voice-live" role="status" aria-live="polite">Listening…</div>
       <div class="voice-review-field" id="voice-review-field" hidden>
         <label for="voice-review-text">Review transcription</label>
-        <textarea id="voice-review-text" rows="5" spellcheck="true"></textarea>
+        <textarea id="voice-review-text" rows="5" spellcheck="true" oninput="updateVoiceItemCount(this.value)"></textarea>
       </div>
       <div id="voice-hint"></div>
     </div>
@@ -1024,13 +1047,13 @@
 <script src="js/store.js?v=performance-recovery-3"></script>
 <script src="js/ui.js?v=performance-recovery-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=count-report-export-1"></script>
+<script src="js/inventory.js?v=transcribe-variances-1"></script>
 <script src="js/orders.js"></script>
-<script src="js/usage.js"></script>
+<script src="js/usage.js?v=transcribe-variances-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>
-<script src="js/voice.js?v=voice-workspace-3"></script>
+<script src="js/voice.js?v=transcribe-variances-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=performance-recovery-3"></script>

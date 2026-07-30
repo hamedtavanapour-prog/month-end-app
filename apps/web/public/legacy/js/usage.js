@@ -2118,11 +2118,68 @@ function toggleUsageSummary(){
   renderUsageSummaryShell();
 }
 
+let usageActiveView='logs';
+let usageVarianceSort={col:'variance',dir:'desc'};
+
+function switchUsageView(view){
+  usageActiveView=['logs','summary','variances'].includes(view)?view:'logs';
+  if(usageActiveView==='summary')usageSummaryExpanded=true;
+  renderUsagePage();
+}
+
+function usageVarianceRows(){
+  const byProduct=new Map();
+  ensureUsageLogs().filter(log=>!log.archived).forEach(log=>usageLogRows(log).forEach(row=>{
+    if(!row.matched||!row.productId)return;
+    const ideal=usageNumber(row.idealUsage);
+    if(ideal==='')return;
+    const actual=usageRowQty(row);
+    const supplied=usageNumber(row.varianceUsage);
+    const variance=supplied===''?actual-ideal:supplied;
+    const product=getProduct(row.productId);
+    if(!product)return;
+    const current=byProduct.get(product.id)||{product,name:product.name,category:product.category||'',actual:0,ideal:0,variance:0,reports:0};
+    current.actual+=actual;current.ideal+=ideal;current.variance+=variance;current.reports++;
+    byProduct.set(product.id,current);
+  }));
+  return[...byProduct.values()];
+}
+
+function sortUsageVariances(col){
+  usageVarianceSort.dir=usageVarianceSort.col===col&&usageVarianceSort.dir==='asc'?'desc':'asc';
+  usageVarianceSort.col=col;
+  renderUsageVariances();
+}
+
+function usageVarianceHeader(label,col){
+  const active=usageVarianceSort.col===col;
+  return`<th class="sortable ${active?`sort-${usageVarianceSort.dir}`:''}" aria-sort="${active?(usageVarianceSort.dir==='asc'?'ascending':'descending'):'none'}"><button class="table-sort-button" type="button" onclick="sortUsageVariances('${col}')">${label}</button></th>`;
+}
+
+function varianceClass(value){return value>0?'variance-positive':value<0?'variance-negative':'variance-neutral';}
+
+function renderUsageVariances(){
+  const thead=document.getElementById('usage-variance-thead');
+  const tbody=document.getElementById('usage-variance-tbody');
+  if(!thead||!tbody)return;
+  thead.innerHTML=`<tr>${usageVarianceHeader('Product','name')}${usageVarianceHeader('Category','category')}${usageVarianceHeader('Actual Usage','actual')}${usageVarianceHeader('Ideal Usage','ideal')}${usageVarianceHeader('Variance','variance')}${usageVarianceHeader('Reports','reports')}</tr>`;
+  const rows=sortArr(usageVarianceRows(),usageVarianceSort.col,usageVarianceSort.dir);
+  tbody.innerHTML=rows.length?rows.map(row=>`<tr><td><strong>${productNameLink(row.product)}</strong></td><td>${catBadge(row.category)}</td><td>${usageDisplayNumber(row.actual)}</td><td>${usageDisplayNumber(row.ideal)}</td><td class="${varianceClass(row.variance)}">${row.variance>0?'+':''}${usageDisplayNumber(row.variance)}</td><td>${row.reports}</td></tr>`).join(''):'<tr><td colspan="6" class="empty-cell">Upload usage with ideal usage values to see variances.</td></tr>';
+}
+
+function renderUsageView(){
+  document.querySelectorAll('#usage-view-tabs [data-usage-view]').forEach(button=>button.classList.toggle('active',button.dataset.usageView===usageActiveView));
+  const cards={logs:'usage-log-card',summary:'usage-summary-card',variances:'usage-variances-card'};
+  Object.entries(cards).forEach(([view,id])=>{const card=document.getElementById(id);if(card)card.hidden=view!==usageActiveView;});
+}
+
 function renderUsagePage(){
   ensureUsageLogs();
   renderUsageLogs();
   renderUsageSummaryShell();
   renderUsageSummaryOnly();
+  renderUsageVariances();
+  renderUsageView();
 }
 
 function renderInsights(){

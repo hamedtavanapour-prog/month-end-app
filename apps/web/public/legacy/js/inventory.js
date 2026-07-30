@@ -596,8 +596,24 @@ function liveStatusBadge(row){
 }
 
 function setLiveInventoryViewMode(mode){
-  liveInventoryViewMode=['list','icons','boxes'].includes(mode)?mode:'list';
+  liveInventoryViewMode=['list','icons','boxes','variances'].includes(mode)?mode:'list';
   renderLiveInventoryPage();
+}
+
+let liveVarianceSort={col:'variance',dir:'asc'};
+function sortLiveVariances(col){
+  liveVarianceSort.dir=liveVarianceSort.col===col&&liveVarianceSort.dir==='asc'?'desc':'asc';
+  liveVarianceSort.col=col;
+  renderLiveInventoryPage();
+}
+function liveVarianceHeader(label,col){
+  const active=liveVarianceSort.col===col;
+  return`<th class="sortable ${active?`sort-${liveVarianceSort.dir}`:''}" aria-sort="${active?(liveVarianceSort.dir==='asc'?'ascending':'descending'):'none'}"><button class="table-sort-button" type="button" onclick="sortLiveVariances('${col}')">${label}</button></th>`;
+}
+function liveInventoryVariances(rows){
+  const varianceRows=rows.map(row=>({...row,variance:row.live-row.par}));
+  const sorted=sortArr(varianceRows,liveVarianceSort.col,liveVarianceSort.dir);
+  return`<div class="table-wrap"><table><thead><tr>${liveVarianceHeader('Product','name')}${liveVarianceHeader('Count','base')}${liveVarianceHeader('Orders','ordered')}${liveVarianceHeader('Usage','used')}${liveVarianceHeader('Live','live')}${liveVarianceHeader('Par','par')}${liveVarianceHeader('Variance','variance')}</tr></thead><tbody>${sorted.map(row=>`<tr onclick="openLiveInventoryDetail('${row.product.id}')"><td><strong>${escapeHtml(row.name)}</strong></td><td>${liveQty(row.base)}</td><td>${liveQty(row.ordered)}</td><td>${liveQty(row.used)}</td><td>${liveQty(row.live)}</td><td>${liveQty(row.par)}</td><td class="${typeof varianceClass==='function'?varianceClass(row.variance):''}">${row.variance>0?'+':''}${liveQty(row.variance)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 let liveInventoryFilterHome=null;
@@ -743,7 +759,8 @@ function renderLiveInventoryPage(){
     results.innerHTML=liveInventoryEmpty('No live inventory rows match.');
     return;
   }
-  if(liveInventoryViewMode==='icons')results.innerHTML=liveInventoryIcons(rows);
+  if(liveInventoryViewMode==='variances')results.innerHTML=liveInventoryVariances(rows);
+  else if(liveInventoryViewMode==='icons')results.innerHTML=liveInventoryIcons(rows);
   else if(liveInventoryViewMode==='boxes')results.innerHTML=liveInventoryBoxes(rows);
   else results.innerHTML=liveInventoryList(rows);
 }
@@ -1007,6 +1024,7 @@ async function enterCountRoom(roomId){
   countRoomPickerCountId=null;
   countRoomPickerLocks=[];
   closeModal('modal-inv-room-picker');
+  if(typeof resetInventoryTranscribeHistory==='function')resetInventoryTranscribeHistory();
   startCountRoomHeartbeat();
   openInventoryModal(currentCountRoomLock.countId,currentCountRoomLock.roomId);
 }
@@ -1045,6 +1063,7 @@ async function exitInventoryRoom(force=false){
   closeModal('modal-count-add-item');
   if(lock&&typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
   currentCountRoomLock=null;
+  if(typeof resetInventoryTranscribeHistory==='function')resetInventoryTranscribeHistory();
   closeModal('modal-inventory');
   inventoryRoomExitInProgress=false;
   if(lock)await openCountRoomPicker(lock.countId);
@@ -1301,6 +1320,7 @@ async function saveInventory(){
     countRoomLockHeartbeatTimer=null;
     if(typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
     currentCountRoomLock=null;
+    if(typeof resetInventoryTranscribeHistory==='function')resetInventoryTranscribeHistory();
     currentInventoryRoomOriginalExtraProductIds=[];
     inventoryRoomExitInProgress=true;
     closeModal('modal-inventory');

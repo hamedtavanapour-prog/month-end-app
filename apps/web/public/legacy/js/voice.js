@@ -12,6 +12,7 @@ let voiceReviewPending=false;
 let voicePreviousFocus=null;
 let voiceRecordingTimer=null;
 let voiceTranscriptionController=null;
+let inventoryTranscribeHistory=[];
 const VOICE_MAX_RECORDING_MS=2*60*1000;
 const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 
@@ -44,6 +45,7 @@ function setVoiceModal(text){
   document.getElementById('voice-ctx-label').textContent=labels[voiceContext]||'Listening...';
   document.getElementById('voice-hint').textContent=hints[voiceContext]||'';
   document.getElementById('voice-live').textContent=text||'Listening...';
+  updateVoiceItemCount(text);
   const modal=document.getElementById('voice-modal');
   const opening=!modal.classList.contains('open');
   modal.classList.add('open');
@@ -51,6 +53,34 @@ function setVoiceModal(text){
   setVoiceBlocking(true);
   if(opening)setTimeout(()=>document.getElementById('voice-stop')?.focus(),0);
 }
+
+function voiceParsedItemCount(text){
+  return voiceContext==='inventory'?parseVoice(String(text||'')).length:0;
+}
+function updateVoiceItemCount(text=document.getElementById('voice-review-text')?.value||''){
+  const counter=document.getElementById('voice-item-counter');
+  const value=document.getElementById('voice-item-count');
+  if(!counter||!value)return;
+  counter.hidden=voiceContext!=='inventory';
+  value.textContent=String(voiceParsedItemCount(text));
+}
+function resetInventoryTranscribeHistory(){
+  inventoryTranscribeHistory=[];
+  renderTranscribeHistory();
+}
+function addInventoryTranscribeHistory(type,title,text){
+  if(voiceContext!=='inventory'&&!currentCountRoomLock)return;
+  inventoryTranscribeHistory.push({type,title,text:String(text||''),time:new Date()});
+  renderTranscribeHistory();
+}
+function renderTranscribeHistory(){
+  const list=document.getElementById('transcribe-history-list');
+  const button=document.getElementById('transcribe-history-button');
+  if(button)button.textContent=`Transcribe History${inventoryTranscribeHistory.length?` (${inventoryTranscribeHistory.length})`:''}`;
+  if(!list)return;
+  list.innerHTML=inventoryTranscribeHistory.length?inventoryTranscribeHistory.map(entry=>`<div class="transcribe-history-entry ${entry.type}"><strong>${escapeHtml(entry.title)}</strong><p>${escapeHtml(entry.text)}</p><time>${entry.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):'<div class="empty-cell">No transcription activity in this room yet.</div>';
+}
+function openTranscribeHistory(){renderTranscribeHistory();openModal('modal-transcribe-history');}
 
 function setVoiceBlocking(active){
   document.body.classList.toggle('voice-ui-open',active);
@@ -67,6 +97,7 @@ function setVoiceActionState(state){
   const status=document.getElementById('voice-status-label');
   if(!stop||!cancel)return;
   modal.dataset.state=state;
+  updateVoiceItemCount(state==='review'?document.getElementById('voice-review-text')?.value:'');
   if(reviewField)reviewField.hidden=state!=='review';
   if(state==='recording'){
     stop.textContent='Stop & Review';
@@ -101,6 +132,7 @@ function preferredAudioMime(){
 function reviewVoiceTranscript(transcript){
   const cleaned=String(transcript||'').trim();
   if(!cleaned){
+    if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
     resetVoiceState();
     toast('Nothing heard.',true);
     return;
@@ -114,6 +146,8 @@ function reviewVoiceTranscript(transcript){
   document.getElementById('voice-ctx-label').textContent='Review Transcription';
   document.getElementById('voice-hint').textContent='Check or correct the text, then apply it or discard it.';
   document.getElementById('voice-review-text').value=cleaned;
+  addInventoryTranscribeHistory('transcript','Transcription',cleaned);
+  updateVoiceItemCount(cleaned);
   setVoiceActionState('review');
   setTimeout(()=>document.getElementById('voice-review-text')?.focus(),0);
 }
@@ -217,6 +251,7 @@ function resetVoiceState(){
 }
 
 function cancelVoice(){
+  if(voiceContext==='inventory'&&voicePendingTranscript)addInventoryTranscribeHistory('unmatched','Transcription discarded',voicePendingTranscript);
   voicePendingTranscript='';
   voiceReviewPending=false;
   resetVoiceState();
@@ -265,12 +300,14 @@ async function transcribeVoiceRecording(){
     const transcript=String(data.text||'').trim();
     voiceFinal=transcript;
     if(!transcript){
+      if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
       resetVoiceState();
       toast('No speech detected.',true);
       return;
     }
     reviewVoiceTranscript(transcript);
   }catch(error){
+    if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Transcription failed',error?.name==='AbortError'?'The recording took too long to transcribe.':error.message||'Voice transcription failed.');
     resetVoiceState();
     toast(error?.name==='AbortError'?'Voice transcription took too long. Try a shorter recording.':error.message||'Voice transcription failed.',true);
   }
@@ -308,6 +345,7 @@ function applyVoiceTranscript(text){
   }
   const parsed=parseVoice(t);
   if(!parsed.length){
+    if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Transcription not applied',t);
     toast('Could not parse: '+t,true);
     return;
   }
@@ -418,5 +456,34 @@ function voiceProductMatch(query,products){
 }
 function fuzzyMatch(query,products){const q=normStr(query);if(!q)return null;for(const p of products){const aliases=(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean);if(aliases.includes(q))return{product:p,score:1};}for(const p of products){if(normStr(p.name)===q)return{product:p,score:1};}let best=null,bestScore=0;for(const p of products){const allNames=[normStr(p.name),...(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean)];for(const name of allNames){if(name.includes(q)||q.includes(name)){const score=Math.min(q.length,name.length)/Math.max(q.length,name.length);if(score>bestScore){bestScore=score;best=p;}}const qw=q.split(' ').filter(w=>w.length>1),nw=name.split(' ').filter(w=>w.length>1);let ov=0;for(const w of qw){if(nw.some(n=>n===w||n.startsWith(w)||w.startsWith(n)))ov++;}if(qw.length>0){const s2=ov/Math.max(qw.length,nw.length);if(s2>bestScore){bestScore=s2;best=p;}}}}return bestScore>=0.25?{product:best,score:bestScore}:null;}
 function applyVoiceProducts(parsed){let m=0;const updated=new Set(),um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r){r.product.par=qty;updated.add(r.product.id);m++;}else um.push(nameStr);});if(m){save();renderProducts();document.querySelectorAll('#prod-tbody tr[data-id]').forEach(row=>{if(updated.has(row.dataset.id)){row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});toast(`Voice: ${m} par level${m>1?'s':''} updated.`);}if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
-function applyVoiceInventory(parsed){let m=0;const um=[],amb=[],updated=[];const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;parsed.forEach(({nameStr,qty})=>{const r=voiceProductMatch(nameStr,products);if(r&&!r.ambiguous){liveInvCounts[r.product.id]=qty;updated.push(r.product.id);m++;}else if(r?.ambiguous)amb.push(`${nameStr} (${r.candidates.map(candidate=>candidate.product.name).join(' / ')})`);else um.push(nameStr);});if(m){renderInvRows(true);updated.forEach(productId=>{const row=document.getElementById('row-'+productId);if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});toast(`Voice: ${m} count${m>1?'s':''} filled.`);}else updateInvProgress();if(amb.length)setTimeout(()=>toast('Ambiguous: '+amb.join(', '),true),700);else if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
+function applyVoiceInventory(parsed){
+  let matched=0;
+  const unmatched=[],ambiguous=[],updated=[],applied=[];
+  const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
+  parsed.forEach(({nameStr,qty})=>{
+    const result=voiceProductMatch(nameStr,products);
+    if(result&&!result.ambiguous){
+      liveInvCounts[result.product.id]=qty;
+      updated.push(result.product.id);
+      applied.push(`${result.product.name}: ${qty}`);
+      matched++;
+    }else if(result?.ambiguous){
+      ambiguous.push(`${nameStr}: ${result.candidates.map(candidate=>candidate.product.name).join(' / ')}`);
+    }else unmatched.push(nameStr);
+  });
+  if(applied.length)addInventoryTranscribeHistory('applied',`${applied.length} item${applied.length===1?'':'s'} applied`,applied.join('\n'));
+  if(ambiguous.length)addInventoryTranscribeHistory('ambiguous',`${ambiguous.length} ambiguous item${ambiguous.length===1?'':'s'}`,ambiguous.join('\n'));
+  if(unmatched.length)addInventoryTranscribeHistory('unmatched',`${unmatched.length} item${unmatched.length===1?'':'s'} not applied`,unmatched.join('\n'));
+  if(matched){
+    renderInvRows(true);
+    updated.forEach(productId=>{
+      const row=document.getElementById('row-'+productId);
+      if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}
+    });
+    document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});
+    toast(`Voice: ${matched} count${matched>1?'s':''} filled.`);
+  }else updateInvProgress();
+  if(ambiguous.length)setTimeout(()=>toast('Ambiguous: '+ambiguous.join(', '),true),700);
+  else if(unmatched.length)setTimeout(()=>toast('No match: '+unmatched.join(', '),true),700);
+}
 function applyVoiceOrders(parsed){const lines=[];const um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r)lines.push({productId:r.product.id,productName:r.product.name,productNumber:r.product.sku||r.product.id,sku:r.product.sku||'',qty,unit:r.product.unit||'',unitSize:'',unitPrice:r.product.cost||0,deposit:0});else um.push(nameStr);});if(!lines.length){toast('No products matched.',true);return;}resetOrderModal();editingOrderId=null;document.getElementById('ord-modal-title').textContent='New Voice Invoice';document.getElementById('om-date').value=today();document.getElementById('om-invoice').value='Voice Invoice - '+new Date().toLocaleDateString('en-CA');document.getElementById('om-status').value='Draft';document.getElementById('om-notes').value=um.length?'Unmatched: '+um.join(', '):'';document.getElementById('order-lines').innerHTML='';lines.forEach(l=>addOrderLine(l));updateOrderTotal();openModal('modal-order');toast(`Voice: ${lines.length} line${lines.length>1?'s':''} added.`);if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),800);}
