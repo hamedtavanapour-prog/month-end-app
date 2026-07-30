@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { createCountDraftInWorkspace, isCountJsonObject, saveCountRoomInWorkspace } from "@/lib/workspace/count-state";
+import { createCountDraftInWorkspace, finaliseCountInWorkspace, isCountJsonObject, preserveFinalisedCounts, saveCountRoomInWorkspace } from "@/lib/workspace/count-state";
 import { renameCategoryInWorkspace } from "@/lib/workspace/category-state";
 import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
@@ -161,16 +161,23 @@ export async function PUT(request: Request) {
   if (!isAllowed(context, WRITE_PERMISSIONS)) {
     return jsonResponse({ error: "You do not have permission to change this workspace" }, 403);
   }
+  const { data: currentWorkspace, error: currentWorkspaceError } = await supabase
+    .from("workspace_states")
+    .select("data")
+    .eq("organization_id", context.organizationId)
+    .maybeSingle();
+  if (currentWorkspaceError) return jsonResponse({ error: "Could not verify finalised counts" }, 500);
+  const safeData = currentWorkspace ? preserveFinalisedCounts(currentWorkspace.data, data) : data;
   const updatedAt = new Date().toISOString();
   const expectedVersion = request.headers.get("x-workspace-version");
   const mutation = expectedVersion
     ? supabase.from("workspace_states")
-      .update({ data, updated_by: context.userId, updated_at: updatedAt })
+      .update({ data: safeData, updated_by: context.userId, updated_at: updatedAt })
       .eq("organization_id", context.organizationId)
       .eq("updated_at", expectedVersion)
     : supabase.from("workspace_states").upsert({
       organization_id: context.organizationId,
-      data,
+      data: safeData,
       updated_by: context.userId,
       updated_at: updatedAt,
     });
@@ -198,11 +205,12 @@ export async function PATCH(request: Request) {
   const categoryRename = isJsonObject(body.categoryRename) ? body.categoryRename : null;
   const countDraft = isJsonObject(body.countDraft) ? body.countDraft : null;
   const countRoomSave = isJsonObject(body.countRoomSave) ? body.countRoomSave : null;
+  const countFinalise = isJsonObject(body.countFinalise) ? body.countFinalise : null;
   const product = isJsonObject(body.product) ? body.product : null;
-  if (!categoryRename && !countDraft && !countRoomSave && !product) {
+  if (!categoryRename && !countDraft && !countRoomSave && !countFinalise && !product) {
     return jsonResponse({ error: "A supported workspace update is required" }, 400);
   }
-  const requiredPermission = countDraft || countRoomSave ? "counts.create" : "products.manage";
+  const requiredPermission = countFinalise ? "counts.finish" : countDraft || countRoomSave ? "counts.create" : "products.manage";
   if (!isAllowed(context, new Set([requiredPermission]))) {
     return jsonResponse({ error: "You do not have permission to make this change" }, 403);
   }
@@ -247,7 +255,26 @@ export async function PATCH(request: Request) {
       role: typeof countDraft.createdBy === "object" && countDraft.createdBy && !Array.isArray(countDraft.createdBy)
         && typeof countDraft.createdBy.role === "string" ? countDraft.createdBy.role.slice(0, 80) : "Team member",
     };
-    const safeDraft = { id, date, label, items: {}, rooms: safeRooms, draft: true, createdBy: actor, createdAt: new Date().toISOString() };
+    const selectedProductIds = Array.isArray(countDraft.selectedProductIds)
+      ? [...new Set(countDraft.selectedProductIds.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
+      : [];
+    const isRecount = countDraft.recordType === "recount";
+    const safeDraft = {
+      id,
+      date,
+      label,
+      items: {},
+      rooms: safeRooms,
+      draft: true,
+      status: "saved",
+      finalised: false,
+      recordType: isRecount ? "recount" : "count",
+      ...(isRecount && typeof countDraft.parentCountId === "string" ? { parentCountId: countDraft.parentCountId.slice(0, 100) } : {}),
+      ...(isRecount && typeof countDraft.recountNumber === "number" ? { recountNumber: Math.max(1, Math.floor(countDraft.recountNumber)) } : {}),
+      ...(isRecount ? { selectedProductIds: selectedProductIds.slice(0, 1000) } : {}),
+      createdBy: actor,
+      createdAt: new Date().toISOString(),
+    };
     buildNextData = (data) => createCountDraftInWorkspace(data, safeDraft);
     entityLabel = "count draft";
   } else if (countRoomSave) {
@@ -282,6 +309,12 @@ export async function PATCH(request: Request) {
     const actor = { userId: context.userId };
     buildNextData = (data) => saveCountRoomInWorkspace(data, countId, roomId, safeItems, [...new Set(extraProductIds)], actor);
     entityLabel = "count room";
+  } else if (countFinalise) {
+    const countId = typeof countFinalise.countId === "string" ? countFinalise.countId.trim() : "";
+    if (!countId || countId.length > 100) return jsonResponse({ error: "A valid count is required" }, 400);
+    const actor = { userId: context.userId };
+    buildNextData = (data) => finaliseCountInWorkspace(data, countId, actor);
+    entityLabel = "finalised count";
   } else {
     if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
       return jsonResponse({ error: "Product ID and name are required" }, 400);
@@ -308,6 +341,12 @@ export async function PATCH(request: Request) {
     } catch (error) {
       if (error instanceof Error && error.message === "count_room_not_found") {
         return jsonResponse({ error: "That count room no longer exists" }, 404);
+      }
+      if (error instanceof Error && error.message === "count_finalised") {
+        return jsonResponse({ error: "This count has already been finalised" }, 409);
+      }
+      if (error instanceof Error && error.message === "count_not_found") {
+        return jsonResponse({ error: "That count no longer exists" }, 404);
       }
       throw error;
     }

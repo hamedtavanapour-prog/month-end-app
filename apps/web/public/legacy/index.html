@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=transcribe-variances-1"/>
+<link rel="stylesheet" href="css/styles.css?v=recount-workflow-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -308,7 +308,7 @@
     </div>
   </div>
   <div class="card" id="usage-variances-card" hidden>
-    <div class="card-section-heading"><div><h3>Usage Variances</h3><p>Actual usage compared with ideal usage across active uploaded reports.</p></div></div>
+    <div class="card-section-heading"><div><h3>Usage Variances</h3><p>Actual usage compared with ideal usage across active uploaded reports.</p></div><button class="btn btn-primary btn-sm" id="usage-recount-selected" type="button" onclick="startUsageVarianceRecount()" disabled>Re-count selected</button></div>
     <div class="table-wrap"><table><thead id="usage-variance-thead"></thead><tbody id="usage-variance-tbody"></tbody></table></div>
   </div>
 </div>
@@ -626,7 +626,8 @@
     </div>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
-      <button class="btn btn-primary" id="inventory-count-finish" type="button">Save Room</button>
+      <button class="btn btn-secondary" id="inventory-count-finish" type="button">Save</button>
+      <button class="btn btn-primary" id="inventory-count-finalise" type="button">Finalise</button>
     </div>
   </div>
 </div>
@@ -638,6 +639,21 @@
   <h3 id="transcribe-history-title">Transcribe History</h3>
   <p class="count-setup-intro">Temporary activity for this room. It is cleared when you leave or save the room.</p>
   <div class="transcribe-history-list" id="transcribe-history-list"></div>
+</div>
+</div>
+
+<!-- RE-COUNT ITEM PICKER -->
+<div class="modal-overlay" id="modal-recount-select">
+<div class="modal recount-select-modal" role="dialog" aria-modal="true" aria-labelledby="recount-select-title">
+  <button class="modal-close" type="button" aria-label="Close re-count item selector" onclick="closeModal('modal-recount-select')">&times;</button>
+  <h3 id="recount-select-title">Start a Re-count</h3>
+  <p class="count-setup-intro" id="recount-source-context"></p>
+  <div class="recount-select-toolbar">
+    <div class="form-group"><label for="recount-product-search">Search items</label><input type="search" id="recount-product-search" placeholder="Product or category…" autocomplete="off" oninput="renderRecountProductSelector()"></div>
+    <div class="recount-select-shortcuts"><button class="btn btn-secondary btn-sm" type="button" onclick="setAllRecountProducts(true)">Select all</button><button class="btn btn-secondary btn-sm" type="button" onclick="setAllRecountProducts(false)">Clear</button></div>
+  </div>
+  <div class="recount-product-list" id="recount-product-list"></div>
+  <div class="modal-actions recount-select-actions"><span id="recount-selected-count">0 selected</span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-recount-select')">Cancel</button><button class="btn btn-primary" id="recount-create-button" type="button" onclick="createRecount()">Create Re-count</button></div>
 </div>
 </div>
 
@@ -1036,7 +1052,7 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=performance-recovery-2"></script>
+<script src="js/supabase.js?v=recount-workflow-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
@@ -1047,9 +1063,9 @@
 <script src="js/store.js?v=performance-recovery-3"></script>
 <script src="js/ui.js?v=performance-recovery-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=transcribe-variances-1"></script>
+<script src="js/inventory.js?v=recount-workflow-1"></script>
 <script src="js/orders.js"></script>
-<script src="js/usage.js?v=transcribe-variances-1"></script>
+<script src="js/usage.js?v=recount-workflow-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>

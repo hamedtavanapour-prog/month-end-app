@@ -2120,6 +2120,7 @@ function toggleUsageSummary(){
 
 let usageActiveView='logs';
 let usageVarianceSort={col:'variance',dir:'desc'};
+let selectedUsageVarianceProductIds=new Set();
 
 function switchUsageView(view){
   usageActiveView=['logs','summary','variances'].includes(view)?view:'logs';
@@ -2158,13 +2159,26 @@ function usageVarianceHeader(label,col){
 
 function varianceClass(value){return value>0?'variance-positive':value<0?'variance-negative':'variance-neutral';}
 
+function toggleUsageVarianceProduct(productId,checked){
+  if(checked)selectedUsageVarianceProductIds.add(productId);else selectedUsageVarianceProductIds.delete(productId);
+  renderUsageVariances();
+}
+function startUsageVarianceRecount(){
+  if(!selectedUsageVarianceProductIds.size){toast('Select at least one variance item to re-count.',true);return;}
+  const source=[...state.inventories].filter(item=>item.recordType!=='recount'&&!item.archived&&inventoryIsFinalised(item)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
+  if(!source){toast('Finalise an inventory count before starting a re-count.',true);return;}
+  openRecountSelector(source.id,[...selectedUsageVarianceProductIds]);
+}
 function renderUsageVariances(){
   const thead=document.getElementById('usage-variance-thead');
   const tbody=document.getElementById('usage-variance-tbody');
   if(!thead||!tbody)return;
-  thead.innerHTML=`<tr>${usageVarianceHeader('Product','name')}${usageVarianceHeader('Category','category')}${usageVarianceHeader('Actual Usage','actual')}${usageVarianceHeader('Ideal Usage','ideal')}${usageVarianceHeader('Variance','variance')}${usageVarianceHeader('Reports','reports')}</tr>`;
+  thead.innerHTML=`<tr><th class="recount-select-column"><span class="sr-only">Select</span></th>${usageVarianceHeader('Product','name')}${usageVarianceHeader('Category','category')}${usageVarianceHeader('Actual Usage','actual')}${usageVarianceHeader('Ideal Usage','ideal')}${usageVarianceHeader('Variance','variance')}${usageVarianceHeader('Reports','reports')}</tr>`;
   const rows=sortArr(usageVarianceRows(),usageVarianceSort.col,usageVarianceSort.dir);
-  tbody.innerHTML=rows.length?rows.map(row=>`<tr><td><strong>${productNameLink(row.product)}</strong></td><td>${catBadge(row.category)}</td><td>${usageDisplayNumber(row.actual)}</td><td>${usageDisplayNumber(row.ideal)}</td><td class="${varianceClass(row.variance)}">${row.variance>0?'+':''}${usageDisplayNumber(row.variance)}</td><td>${row.reports}</td></tr>`).join(''):'<tr><td colspan="6" class="empty-cell">Upload usage with ideal usage values to see variances.</td></tr>';
+  const validIds=new Set(rows.map(row=>row.product.id));selectedUsageVarianceProductIds=new Set([...selectedUsageVarianceProductIds].filter(id=>validIds.has(id)));
+  tbody.innerHTML=rows.length?rows.map(row=>`<tr><td class="recount-select-column"><input type="checkbox" aria-label="Select ${escapeHtml(row.name)} for re-count" ${selectedUsageVarianceProductIds.has(row.product.id)?'checked':''} onchange="toggleUsageVarianceProduct('${row.product.id}',this.checked)"></td><td><strong>${productNameLink(row.product)}</strong></td><td>${catBadge(row.category)}</td><td>${usageDisplayNumber(row.actual)}</td><td>${usageDisplayNumber(row.ideal)}</td><td class="${varianceClass(row.variance)}">${row.variance>0?'+':''}${usageDisplayNumber(row.variance)}</td><td>${row.reports}</td></tr>`).join(''):'<tr><td colspan="7" class="empty-cell">Upload usage with ideal usage values to see variances.</td></tr>';
+  const button=document.getElementById('usage-recount-selected');
+  if(button){button.disabled=!selectedUsageVarianceProductIds.size;button.textContent=selectedUsageVarianceProductIds.size?`Re-count selected (${selectedUsageVarianceProductIds.size})`:'Re-count selected';}
 }
 
 function renderUsageView(){

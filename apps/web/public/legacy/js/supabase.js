@@ -128,6 +128,25 @@ async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
   }
 }
 
+async function cloudFinaliseCount(countId){
+  try{
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countFinalise:{countId}})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const saved=Array.isArray(payload.data?.inventories)?payload.data.inventories.find(item=>item?.id===countId):null;
+    if(!saved||saved.status!=='finalised')throw new Error('The shared workspace did not return the finalised count.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared count finalise failed:',error);
+    return null;
+  }
+}
+
 async function cloudLoadCountRoomLocks(countId){
   try{
     const response=await fetch(`/api/count-room-locks?countId=${encodeURIComponent(countId)}`,{credentials:'same-origin',cache:'no-store'});
