@@ -3,6 +3,7 @@
 async function init(){
   const pendingLocal=typeof pendingLocalWorkspaceState==='function'?pendingLocalWorkspaceState():null;
   const cloud=await cloudLoad();
+  if(cloud===undefined&&typeof enableLocalOnlyMode==='function'&&typeof isLocalDevelopmentHost==='function'&&isLocalDevelopmentHost())enableLocalOnlyMode();
   if(pendingLocal){
     // A previous session closed or lost its connection before the cloud save
     // completed. Keep that local snapshot authoritative until it is confirmed.
@@ -30,6 +31,7 @@ async function init(){
     load();
     cloudReady=true;
     if(cloud===null){await cloudPush();}            // cloud reachable but empty → seed it
+    else if(localOnlyMode){toast('Local-only mode — count changes stay in this browser.',false);}
     else{toast('Offline — changes save locally and sync when reconnected.',true);}
   }
   // normalizeLoadedState already normalizes categories. Repeating it here made

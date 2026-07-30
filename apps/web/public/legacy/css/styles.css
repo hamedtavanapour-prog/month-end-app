@@ -1069,6 +1069,7 @@ body.voice-ui-open{overflow:hidden;}
   .inv-modal-body{padding:8px 10px;scroll-padding-block:96px;}
   .inv-modal-footer{padding:10px 12px calc(14px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr;gap:8px;}
   .inv-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;}
+  .inv-modal-footer>.inventory-room-actions{grid-template-columns:repeat(3,minmax(0,1fr));}
   .inv-count-row{grid-template-columns:minmax(0,1fr) 86px 46px;gap:6px;}
   .inv-prod-name{font-size:0.8rem;}
   .inv-prod-meta{font-size:0.68rem;}

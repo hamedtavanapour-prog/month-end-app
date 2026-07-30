@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=recount-workflow-1"/>
+<link rel="stylesheet" href="css/styles.css?v=local-count-mode-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -572,6 +572,7 @@
   <div class="count-room-picker-list" id="count-room-picker-list" aria-live="polite"></div>
   <div class="modal-actions room-select-actions">
     <button class="btn btn-secondary" type="button" onclick="closeCountRoomPicker()">Done</button>
+    <button class="btn btn-primary" id="count-picker-finalise" type="button" onclick="finaliseCountFromPicker()">Finalise Count</button>
   </div>
 </div>
 </div>
@@ -624,10 +625,10 @@
       <button class="voice-btn compact" id="voice-btn-inventory" type="button" onclick="toggleVoice('inventory')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Voice Count</span></button>
       <button class="btn btn-secondary btn-sm" id="transcribe-history-button" type="button" onclick="openTranscribeHistory()">Transcribe History</button>
     </div>
-    <div style="display:flex;gap:10px;">
+    <div class="inventory-room-actions" style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
       <button class="btn btn-secondary" id="inventory-count-finish" type="button">Save</button>
-      <button class="btn btn-primary" id="inventory-count-finalise" type="button">Finalise</button>
+      <button class="btn btn-primary" id="inventory-count-done" type="button">Done</button>
     </div>
   </div>
 </div>
@@ -1052,7 +1053,7 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=recount-workflow-1"></script>
+<script src="js/supabase.js?v=local-count-mode-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
@@ -1061,9 +1062,9 @@
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=performance-recovery-3"></script>
-<script src="js/ui.js?v=performance-recovery-1"></script>
+<script src="js/ui.js?v=local-count-mode-1"></script>
 <script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=recount-workflow-1"></script>
+<script src="js/inventory.js?v=local-count-mode-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
 <script src="js/suppliers.js"></script>
@@ -1072,7 +1073,7 @@
 <script src="js/voice.js?v=transcribe-variances-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
-<script src="js/main.js?v=performance-recovery-3"></script>
-<script src="js/access.js?v=settings-layout-1"></script>
+<script src="js/main.js?v=local-count-mode-1"></script>
+<script src="js/access.js?v=local-count-mode-1"></script>
 </body>
 </html>

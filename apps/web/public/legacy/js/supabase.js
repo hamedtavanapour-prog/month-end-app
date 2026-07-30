@@ -3,8 +3,27 @@
 // new organization-scoped Next.js + Supabase foundation.
 
 const CLOUD_PENDING_KEY='keg_bar_v5_cloud_pending';
-let cloudReady=false, cloudUpdatedAt='', _pushTimer=null, _pushPromise=Promise.resolve(true), _pendingCloudPayload='', _cloudRefreshTimer=null, _cloudRefreshRunning=false, _cloudRefreshLastChecked=0;
+let cloudReady=false, localOnlyMode=false, cloudUpdatedAt='', _pushTimer=null, _pushPromise=Promise.resolve(true), _pendingCloudPayload='', _cloudRefreshTimer=null, _cloudRefreshRunning=false, _cloudRefreshLastChecked=0;
+function enableLocalOnlyMode(){
+  localOnlyMode=true;
+  _pendingCloudPayload='';
+  try{localStorage.removeItem(CLOUD_PENDING_KEY);}catch(error){}
+}
+function isLocalDevelopmentHost(){
+  return location.protocol==='file:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname==='::1';
+}
+function persistLocalOnlyState(){
+  try{
+    const snapshot=typeof compactStateForStorage==='function'?compactStateForStorage():state;
+    localStorage.setItem('keg_bar_v5',JSON.stringify(snapshot));
+    return true;
+  }catch(error){
+    console.error('Local count save failed:',error);
+    return false;
+  }
+}
 function queueCloudStatePayload(payload){
+  if(localOnlyMode)return;
   _pendingCloudPayload=String(payload||'');
   try{localStorage.setItem(CLOUD_PENDING_KEY,'1');}catch(error){}
 }
@@ -29,6 +48,7 @@ async function cloudLoad(){
 // Upsert the full state to Supabase (keyed on the single 'main' row).
 async function cloudPush(){
   const push=async()=>{
+    if(localOnlyMode)return persistLocalOnlyState();
     const queuedPayload=_pendingCloudPayload;
     try{
       const body=queuedPayload||JSON.stringify(typeof compactStateForStorage==='function'?compactStateForStorage():state);
@@ -91,6 +111,15 @@ async function cloudSaveInventoryCategory(previousName,name,subcategories){
 
 async function cloudCreateCountDraft(draft){
   try{
+    if(localOnlyMode){
+      const existing=(state.inventories||[]).find(item=>item.id===draft.id||(String(item.date||'')===String(draft.date||'')&&String(item.label||'').trim().toLowerCase()===String(draft.label||'').trim().toLowerCase()));
+      if(!existing){
+        state.inventories.push(draft);
+        state.inventories.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+      }
+      if(!persistLocalOnlyState())return null;
+      return{state,draft:existing||draft};
+    }
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
@@ -111,6 +140,21 @@ async function cloudCreateCountDraft(draft){
 
 async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
   try{
+    if(localOnlyMode){
+      const inv=(state.inventories||[]).find(item=>item.id===countId);
+      if(!inv||inventoryIsFinalised(inv))return null;
+      const room=(inv.rooms||[]).find(item=>item.id===roomId);
+      if(!room)return null;
+      room.items={...items};
+      room.extraProductIds=[...extraProductIds];
+      inv.items={};
+      (inv.rooms||[]).forEach(candidate=>Object.entries(candidate.items||{}).forEach(([productId,quantity])=>{if(typeof quantity==='number'&&isFinite(quantity))inv.items[productId]=(inv.items[productId]||0)+quantity;}));
+      inv.draft=!Object.keys(inv.items).length;
+      inv.status='saved';
+      inv.updatedAt=new Date().toISOString();
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
@@ -130,6 +174,13 @@ async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
 
 async function cloudFinaliseCount(countId){
   try{
+    if(localOnlyMode){
+      const inv=(state.inventories||[]).find(item=>item.id===countId);
+      if(!inv||!Object.keys(inv.items||{}).length)return null;
+      inv.draft=false;inv.status='finalised';inv.finalised=true;inv.finalisedAt=new Date().toISOString();inv.updatedAt=inv.finalisedAt;
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
@@ -149,6 +200,7 @@ async function cloudFinaliseCount(countId){
 
 async function cloudLoadCountRoomLocks(countId){
   try{
+    if(localOnlyMode)return[];
     const response=await fetch(`/api/count-room-locks?countId=${encodeURIComponent(countId)}`,{credentials:'same-origin',cache:'no-store'});
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
@@ -161,6 +213,7 @@ async function cloudLoadCountRoomLocks(countId){
 
 async function cloudAcquireCountRoom(countId,roomId){
   try{
+    if(localOnlyMode)return{acquired:true,lock:{countId,roomId,mine:true,holderName:'Local session'}};
     const response=await fetch('/api/count-room-locks',{
       method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countId,roomId})
     });
@@ -176,6 +229,7 @@ async function cloudAcquireCountRoom(countId,roomId){
 
 async function cloudReleaseCountRoom(countId,roomId,keepalive=false){
   try{
+    if(localOnlyMode)return true;
     const response=await fetch('/api/count-room-locks',{
       method:'DELETE',credentials:'same-origin',keepalive,headers:{'Content-Type':'application/json'},body:JSON.stringify({countId,roomId})
     });
@@ -193,7 +247,7 @@ function cloudCanApplyRefresh(){
 }
 
 async function cloudRefreshLatest(){
-  if(!cloudReady||_cloudRefreshRunning||!cloudCanApplyRefresh())return false;
+  if(localOnlyMode||!cloudReady||_cloudRefreshRunning||!cloudCanApplyRefresh())return false;
   const now=Date.now();
   if(now-_cloudRefreshLastChecked<5000)return false;
   _cloudRefreshLastChecked=now;

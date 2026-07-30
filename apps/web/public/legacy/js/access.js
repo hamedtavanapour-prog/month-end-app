@@ -93,7 +93,7 @@
     }catch(error){console.error('Could not load account access.',error);}
   }
 
-  window.recordServerEvent=(event)=>fetch('/api/audit-events',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(event)}).catch(()=>null);
+  window.recordServerEvent=(event)=>localOnlyMode?Promise.resolve():fetch('/api/audit-events',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(event)}).catch(()=>null);
 
   window.addEventListener('load',loadAccess);
 })();

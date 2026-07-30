@@ -975,7 +975,9 @@ function renderCountRoomPicker(){
   const inv=state.inventories.find(item=>item.id===countRoomPickerCountId);
   if(!list||!inv)return;
   normalizeInventoryRooms(inv);
-  if(context)context.textContent=`${inv.label||'Inventory Count'} · ${fmtDate(inv.date)} — select one room. Other team members can count different rooms at the same time.`;
+  if(context)context.textContent=`${inv.label||'Inventory Count'} · ${fmtDate(inv.date)} — select one room.${localOnlyMode?' Local-only mode: this count stays in this browser.':' Other team members can count different rooms at the same time.'}`;
+  const finaliseButton=document.getElementById('count-picker-finalise');
+  if(finaliseButton){finaliseButton.disabled=!Object.keys(inv.items||{}).length;finaliseButton.textContent=`Finalise ${inv.recordType==='recount'?'Re-count':'Count'}`;}
   const accessible=inv.rooms.filter(room=>typeof profileCanAccessRoom!=='function'||profileCanAccessRoom(currentProfile(),room.roomId));
   list.innerHTML=accessible.map(room=>{
     const lock=countRoomLockFor(room.id);
@@ -1252,9 +1254,9 @@ function focusFirstInventoryQuantity(){
 function setInventoryFinishSaving(saving){
   inventoryCountSaving=saving;
   const saveButton=document.getElementById('inventory-count-finish');
-  const finaliseButton=document.getElementById('inventory-count-finalise');
+  const doneButton=document.getElementById('inventory-count-done');
   if(saveButton){saveButton.disabled=saving;saveButton.setAttribute('aria-busy',String(saving));saveButton.textContent=saving?'Saving…':'Save';}
-  if(finaliseButton){finaliseButton.disabled=saving;finaliseButton.setAttribute('aria-busy',String(saving));finaliseButton.textContent=saving?'Finalising…':'Finalise';}
+  if(doneButton){doneButton.disabled=saving;doneButton.setAttribute('aria-busy',String(saving));doneButton.textContent=saving?'Saving…':'Done';}
 }
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentCountProducts();
@@ -1294,9 +1296,8 @@ function toggleInventorySection(sectionToken){
   else expandedInventorySections.add(sectionToken);
   renderInvRows();
 }
-async function saveInventory(finalise=false){
+async function saveInventory(done=false){
   if(inventoryCountSaving)return;
-  if(finalise&&!confirm('Finalise this count after saving this room? It will become read-only.'))return;
   if(!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==currentInvRoomId){toast('This room is not reserved for you. Return to room selection.',true);return;}
   if(!inventoryCountHasEntries()){
     const message='Enter at least one quantity before finishing. Use 0 when an item was counted but is empty.';
@@ -1328,18 +1329,16 @@ async function saveInventory(finalise=false){
     }
     state=shared;
     normalizeLoadedState();
-    if(finalise){
-      const finalisedState=typeof cloudFinaliseCount==='function'?await cloudFinaliseCount(lock.countId):null;
-      if(!finalisedState){
-        showInventoryFinishMessage('The room was saved, but the count could not be finalised. You can finalise it from the saved count.');
-        toast('Room saved, but finalising failed. Try again from the saved count.',true);
-        finalise=false;
-      }else{
-        state=finalisedState;
-        normalizeLoadedState();
-      }
-    }
     try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+    dirtyInventoryRoomIds=new Set();
+    deletedInventoryRoomIds=new Set();
+    currentInventoryRoomOriginalExtraProductIds=[...(currentInventoryRoom()?.extraProductIds||[])];
+    renderInventoryTable();refreshLiveInventoryIfVisible();
+    window.recordServerEvent?.({action:'count.room_saved',entityType:'count',entityId:lock.countId,details:{roomId:lock.roomId,roomName:room.name,items:Object.keys(items).length}});
+    if(!done){
+      toast(`${room.name} saved. Continue counting or press Done.`);
+      return;
+    }
     clearInterval(countRoomLockHeartbeatTimer);
     countRoomLockHeartbeatTimer=null;
     if(typeof cloudReleaseCountRoom==='function')await cloudReleaseCountRoom(lock.countId,lock.roomId);
@@ -1349,13 +1348,8 @@ async function saveInventory(finalise=false){
     inventoryRoomExitInProgress=true;
     closeModal('modal-inventory');
     inventoryRoomExitInProgress=false;
-    renderInventoryTable();refreshLiveInventoryIfVisible();
-    window.recordServerEvent?.({action:'count.room_saved',entityType:'count',entityId:lock.countId,details:{roomId:lock.roomId,roomName:room.name,items:Object.keys(items).length}});
-    toast(finalise?`${inv.recordType==='recount'?'Re-count':'Count'} finalised. It is now read-only.`:`${room.name} saved — choose another room or select Done.`);
-    dirtyInventoryRoomIds=new Set();
-    deletedInventoryRoomIds=new Set();
-    if(finalise)viewInventory(lock.countId);
-    else await openCountRoomPicker(lock.countId);
+    toast(`${room.name} saved — choose another room, press Done, or finalise the count.`);
+    await openCountRoomPicker(lock.countId);
   }catch(error){
     console.error('Inventory save failed:',error);
     showInventoryFinishMessage('The count could not be saved. Please try again.');
@@ -1439,6 +1433,7 @@ async function finaliseInventoryCount(id){
   if(inventoryIsFinalised(inv)){toast('This count is already finalised.');return true;}
   if(!Object.keys(inv.items||{}).length){toast('Save at least one counted item before finalising.',true);return false;}
   if(!confirm(`Finalise “${inv.label||'this count'}”? It will become read-only.`))return false;
+  const fromPicker=countRoomPickerCountId===id;
   const shared=typeof cloudFinaliseCount==='function'?await cloudFinaliseCount(id):null;
   if(!shared){toast('The count could not be finalised. Please try again.',true);return false;}
   state=shared;normalizeLoadedState();
@@ -1446,8 +1441,12 @@ async function finaliseInventoryCount(id){
   renderInventoryTable();refreshLiveInventoryIfVisible();
   window.recordServerEvent?.({action:'count.finalised',entityType:'count',entityId:id,details:{label:inv.label||'',recordType:inv.recordType||'count'}});
   toast(`${inv.recordType==='recount'?'Re-count':'Count'} finalised. It is now read-only.`);
-  if(viewInvId===id)viewInventory(id);
+  if(fromPicker){closeCountRoomPicker();viewInventory(id);}
+  else if(viewInvId===id)viewInventory(id);
   return true;
+}
+function finaliseCountFromPicker(){
+  if(countRoomPickerCountId)finaliseInventoryCount(countRoomPickerCountId);
 }
 function recountSourceInventory(inv){
   if(!inv)return null;
@@ -1806,7 +1805,7 @@ document.addEventListener('click',event=>{
 },true);
 document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>exitInventoryRoom());
 document.getElementById('inventory-count-finish')?.addEventListener('click',()=>saveInventory(false));
-document.getElementById('inventory-count-finalise')?.addEventListener('click',()=>saveInventory(true));
+document.getElementById('inventory-count-done')?.addEventListener('click',()=>saveInventory(true));
 document.addEventListener('click',event=>{
   // This coordinate fallback is registered before voice.js. Without an
   // explicit top-layer guard, a tap on Stop & Review can also activate the
@@ -1816,7 +1815,7 @@ document.addEventListener('click',event=>{
   const actions=[
     {button:document.getElementById('inventory-count-cancel'),run:()=>exitInventoryRoom()},
     {button:document.getElementById('inventory-count-finish'),run:()=>saveInventory(false)},
-    {button:document.getElementById('inventory-count-finalise'),run:()=>saveInventory(true)}
+    {button:document.getElementById('inventory-count-done'),run:()=>saveInventory(true)}
   ];
   const action=actions.find(item=>{
     if(!item.button)return false;

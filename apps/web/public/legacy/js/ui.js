@@ -621,7 +621,7 @@ function renderGeneralSettings(){
   setText('general-count-total',counts);
   setText('general-app-version',version);
   const status=document.getElementById('general-sync-status');
-  if(status)status.lastChild.textContent=cloudReady?'Cloud connected':'Local fallback';
+  if(status)status.lastChild.textContent=localOnlyMode?'Local-only mode':cloudReady?'Cloud connected':'Local fallback';
 }
 
 function renderAccessControlledNav(){
