@@ -576,6 +576,7 @@ function openProductView(id){
   const low=p.par>0&&lastCount!==null&&lastCount!==undefined&&lastCount<=p.par;
   const units=normalizeProductUnits(p);
   const isBar=productDepartmentView==='bar'&&productInDepartment(p,'bar');
+  const menuUses=productMenuUses(p.id);
   const departmentBadges=productDepartmentIds(p).map(id=>`<span class="sub-badge">${escapeHtml(departmentName(id))}</span>`).join(' ');
   const body=document.getElementById('product-view-body');
   body.innerHTML=`
@@ -600,6 +601,7 @@ function openProductView(id){
       <div class="product-detail-field"><div class="label">Suppliers</div><div class="value">${productSuppliersHtml(p)}</div></div>
     </div>
     <div class="product-view-section"><div class="label">Alternate / Voice Names</div>${aliasBadges(p.aliases)||'<span style="color:var(--text-muted);font-size:0.84rem;">—</span>'}</div>
+    <div class="product-view-section"><div class="label">Used In Menu</div>${menuUses.length?`<div class="product-menu-use-list">${menuUses.map(({menu,item})=>`<button type="button" onclick="closeModal('modal-product-view');showPage('settings');setSettingsSection('product-menus');setSettingsMenuDepartment('${menu.departmentId}');requestAnimationFrame(()=>selectSettingsMenu('${menu.id}'))"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(menu.name)}</span></button>`).join('')}</div>`:'<p>Not linked to a menu recipe yet.</p>'}</div>
     <div class="product-view-section"><div class="label">Notes</div><p>${p.notes||'—'}</p></div>
     <div class="product-view-section"><div class="label">${isBar?'Packaging Options':'Units'}</div>
       <div class="table-wrap"><table><thead><tr><th>Default</th><th>${isBar?'Packaging':'Unit'}</th><th>${isBar?'Package Size':'Size'}</th><th>SKU</th><th>${isBar?'Packaging Cost':'Cost'}</th><th>Par</th></tr></thead><tbody>
@@ -887,27 +889,57 @@ function refreshProductCatalogIfVisible(){
   if(document.getElementById('page-products')?.classList.contains('active'))renderProducts();
 }
 
+function menuRecipeSearchText(value){
+  return` ${String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim()} `;
+}
+
+function menuItemProductMatches(item,departmentId='bar'){
+  const recipe=menuRecipeSearchText(item?.recipe);
+  if(recipe.trim()==='')return[];
+  return(state.products||[]).filter(product=>!product.archived&&productInDepartment(product,departmentId)).filter(product=>{
+    const names=[product.name,product.inventoryName,...String(product.aliases||'').split(',')]
+      .map(menuRecipeSearchText).map(name=>name.trim()).filter(name=>name.length>1);
+    return names.some(name=>recipe.includes(` ${name} `));
+  });
+}
+
+function menuItemLinkedProducts(item){
+  const saved=new Set(Array.isArray(item?.linkedProductIds)?item.linkedProductIds:[]);
+  return(state.products||[]).filter(product=>saved.has(product.id));
+}
+
+function productMenuUses(productId){
+  ensureMenuLibrary();
+  return(state.menus||[]).flatMap(menu=>(menu.items||[])
+    .filter(item=>(item.linkedProductIds||[]).includes(productId))
+    .map(item=>({menu,item})));
+}
+
 function normalizeMenuLibraryItem(item,index=0){
   const ingredients=Array.isArray(item?.ingredients)?item.ingredients.join('\n'):'';
+  const recipe=String(item?.recipe||ingredients||item?.method||'').trim();
   return{
     id:item?.id||uid(),
     name:String(item?.name||item?.title||`Menu item ${index+1}`).trim()||`Menu item ${index+1}`,
     category:String(item?.category||item?.section||'').trim(),
     description:String(item?.description||item?.details||'').trim(),
-    recipe:String(item?.recipe||ingredients||item?.method||'').trim(),
+    recipe,
     price:String(item?.price??item?.cost??'').replace(/^\$/,'').trim(),
-    source:String(item?.source||'manual')
+    source:String(item?.source||'manual'),
+    linkedProductIds:[...new Set(Array.isArray(item?.linkedProductIds)?item.linkedProductIds:[])].filter(id=>getProduct(id))
   };
 }
 
 function starterMenuItemFromDrink(drink){
-  return normalizeMenuLibraryItem({
+  const item=normalizeMenuLibraryItem({
     id:uid(),
     name:drink.name,
     category:drink.family||'Drink',
     recipe:recipeFromCatalogDrink(drink),
     source:'starter-drink-catalog'
   });
+  item.linkedProductIds=menuItemProductMatches(item,'bar').map(product=>product.id);
+  return item;
 }
 
 function starterMenuLibrary(){
@@ -935,7 +967,11 @@ function ensureMenuLibrary(){
       archived:!!menu.archived,
       sourceFile:String(menu.sourceFile||''),
       importedAt:String(menu.importedAt||''),
-      items:(Array.isArray(menu.items)?menu.items:[]).map(normalizeMenuLibraryItem)
+      items:(Array.isArray(menu.items)?menu.items:[]).map((item,itemIndex)=>{
+        const normalizedItem=normalizeMenuLibraryItem(item,itemIndex);
+        if(libraryVersion<3)normalizedItem.linkedProductIds=menuItemProductMatches(normalizedItem,menu.departmentId).map(product=>product.id);
+        return normalizedItem;
+      })
     };
     seen.add(next.id);
     if(JSON.stringify(menu)!==JSON.stringify(next))changed=true;
@@ -943,7 +979,7 @@ function ensureMenuLibrary(){
   }).filter(Boolean);
   if(JSON.stringify(state.menus)!==JSON.stringify(normalized))changed=true;
   state.menus=libraryVersion<1&&!normalized.length?starterMenuLibrary():normalized;
-  if(libraryVersion<2){state.menuLibraryVersion=2;changed=true;}
+  if(libraryVersion<3){state.menuLibraryVersion=3;changed=true;}
   return changed;
 }
 
@@ -1150,14 +1186,16 @@ function addCatalogItemToSettingsMenu(){
   const [kind,id]=select.value.split(':');
   const source=kind==='drink'?(state.drinks||[]).find(item=>item.id===id):getProduct(id);
   if(!source)return;
-  menu.items.push(normalizeMenuLibraryItem({
+  const item=normalizeMenuLibraryItem({
     id:uid(),
     name:source.name,
     category:kind==='drink'?(source.family||'Drink'):(source.category||'Product'),
     description:kind==='drink'?'':(source.subcategory||''),
     recipe:kind==='drink'?recipeFromCatalogDrink(source):'',
     source:`catalog-${kind}`
-  },menu.items.length));
+  },menu.items.length);
+  item.linkedProductIds=menuItemProductMatches(item,menu.departmentId).map(product=>product.id);
+  menu.items.push(item);
   save();
   renderProductMenuSettings();
   toast(`${source.name} added as an independent menu item.`);
@@ -1174,9 +1212,11 @@ function addBlankSettingsMenuItem(){
 }
 
 function updateSettingsMenuItem(menuId,itemId,field,value){
-  const item=getSettingsMenu(menuId)?.items.find(entry=>entry.id===itemId);
+  const menu=getSettingsMenu(menuId);
+  const item=menu?.items.find(entry=>entry.id===itemId);
   if(!item||!['name','category','description','recipe','price'].includes(field))return;
   item[field]=String(value||'').trim();
+  if(field==='recipe')item.linkedProductIds=menuItemProductMatches(item,menu.departmentId).map(product=>product.id);
   save();
 }
 
@@ -1215,7 +1255,7 @@ function renderSettingsMenuEditor(menu){
         <button class="btn btn-secondary" type="button" onclick="setSettingsMenuEditMode(true)">Edit</button>
       </div>
       ${menu.description?`<p class="menu-view-description">${escapeHtml(menu.description)}</p>`:''}
-      <div class="menu-view-item-list">${menu.items.length?menu.items.map(item=>`<article class="menu-view-item"><div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.category||'Uncategorized')}${item.price?` · $${escapeHtml(item.price)}`:''}</span></div>${item.description?`<p>${escapeHtml(item.description)}</p>`:''}${item.recipe?`<pre>${escapeHtml(item.recipe)}</pre>`:''}</article>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Choose Edit to add the first item.</span></div>'}</div>`;
+      <div class="menu-view-item-list">${menu.items.length?menu.items.map(item=>{const linked=menuItemLinkedProducts(item);return`<article class="menu-view-item"><div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.category||'Uncategorized')}${item.price?` · $${escapeHtml(item.price)}`:''}</span></div>${item.description?`<p>${escapeHtml(item.description)}</p>`:''}${item.recipe?`<pre>${escapeHtml(item.recipe)}</pre>`:''}${linked.length?`<div class="menu-item-product-links"><span>Inventory:</span>${linked.map(product=>productNameLink(product)).join(' ')}</div>`:''}</article>`;}).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Choose Edit to add the first item.</span></div>'}</div>`;
     return;
   }
   editor.innerHTML=`
@@ -1262,9 +1302,9 @@ function renderProductMenuSettings(){
   if(tabs)tabs.innerHTML=activeDepartments().map(item=>`<button type="button" class="${item.id===settingsProductMenuWorkspace?'active':''}" data-menu-department="${escapeHtml(item.id)}" onclick="setSettingsMenuDepartment(this.dataset.menuDepartment)">${escapeHtml(item.name)}</button>`).join('');
   const selectedMenu=getSettingsMenu(selectedSettingsMenuId);
   if(selectedSettingsMenuId&&(selectedMenu?.departmentId!==settingsProductMenuWorkspace||selectedMenu.archived)){selectedSettingsMenuId=null;settingsMenuEditMode=false;settingsMenuEditSnapshot=null;}
-  list.innerHTML=departmentMenus.length?departmentMenus.map(menu=>`<div class="menu-overview-card ${menu.active?'':'is-inactive'}" data-menu-id="${escapeHtml(menu.id)}" draggable="true" ondragstart="beginSettingsMenuDrag(event,this.dataset.menuId)" ondragover="event.preventDefault()" ondrop="dropSettingsMenu(event,this.dataset.menuId)" ondragend="endSettingsMenuDrag(event)">
+  list.innerHTML=departmentMenus.length?departmentMenus.map(menu=>`<div class="menu-overview-card ${menu.active?'':'is-inactive'}" data-menu-id="${escapeHtml(menu.id)}" role="button" tabindex="0" draggable="true" onclick="if(!event.target.closest('.menu-setting-drag'))selectSettingsMenu(this.dataset.menuId)" onkeydown="if((event.key==='Enter'||event.key===' ')&&!event.target.closest('.menu-setting-drag')){event.preventDefault();selectSettingsMenu(this.dataset.menuId)}" ondragstart="beginSettingsMenuDrag(event,this.dataset.menuId)" ondragover="event.preventDefault()" ondrop="dropSettingsMenu(event,this.dataset.menuId)" ondragend="endSettingsMenuDrag(event)">
     <span class="menu-setting-drag" aria-label="Drag to reorder" title="Hold and drag to reorder" onpointerdown="beginSettingsMenuPointerDrag(event,this.closest('.menu-overview-card').dataset.menuId)">⋮⋮</span>
-    <button class="menu-setting-main" type="button" onclick="selectSettingsMenu(this.closest('.menu-overview-card').dataset.menuId)"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></button>
+    <span class="menu-setting-main"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.sourceFile?` · Imported from ${escapeHtml(menu.sourceFile)}`:''}</small></span>
     <span class="menu-status-badge ${menu.active?'':'inactive'}">${menu.active?'Active':'Inactive'}</span><span class="menu-card-arrow" aria-hidden="true">›</span>
   </div>`).join(''):`<div class="menu-empty-state"><strong>No ${escapeHtml(department?.name||'department')} menus yet</strong><span>Create a menu from scratch or import an existing menu file.</span></div>`;
   archivedList.hidden=!archivedMenus.length;
@@ -1433,7 +1473,10 @@ async function handleMenuImport(event){
   setMenuImportStatus(`Reading ${file.name}…`);
   try{
     const imported=await readMenuImportData(file);
-    const items=Array.isArray(imported.items)?imported.items.map(normalizeMenuLibraryItem):menuItemsFromRows(imported.rows);
+    const items=(Array.isArray(imported.items)?imported.items.map(normalizeMenuLibraryItem):menuItemsFromRows(imported.rows)).map(item=>{
+      item.linkedProductIds=menuItemProductMatches(item,settingsProductMenuWorkspace).map(product=>product.id);
+      return item;
+    });
     if(!items.length)throw new Error('No menu items could be identified in this file.');
     const menu={
       id:uid(),

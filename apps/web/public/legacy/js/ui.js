@@ -2,7 +2,7 @@
 // (Classic script sharing global scope; load order defined in index.html.)
 
 const THEME_STORAGE_KEY='keg_bar_theme_v2';
-const APP_THEMES=['slate','graphite','paper','hospitality','hospitality-light'];
+const APP_THEMES=['slate','slate-blue','graphite','paper','hospitality','hospitality-light'];
 const SIDEBAR_STORAGE_KEY='keg_bar_sidebar_collapsed';
 const PROFILE_STORAGE_KEY='keg_bar_current_profile';
 const APP_ACCESS_OPTIONS=[

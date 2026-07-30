@@ -1,6 +1,6 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
-const CURRENT_WORKSPACE_SCHEMA_VERSION=1;
+const CURRENT_WORKSPACE_SCHEMA_VERSION=2;
 
 function compactUsageRow(row){
   return{
