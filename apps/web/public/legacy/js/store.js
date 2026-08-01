@@ -1,6 +1,6 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
-const CURRENT_WORKSPACE_SCHEMA_VERSION=2;
+const CURRENT_WORKSPACE_SCHEMA_VERSION=3;
 
 function compactUsageRow(row){
   return{
@@ -105,6 +105,7 @@ function compactStateForStorage(){
     drinks:state.drinks||[],
     menus:state.menus||[],
     menuLibraryVersion:state.menuLibraryVersion||0,
+    prepItems:state.prepItems||[],
     inventories:state.inventories||[],
     orders:state.orders||[],
     suppliers:state.suppliers||[],
@@ -275,6 +276,7 @@ function normalizeLoadedState(){
   if(!state.products)state.products=[];
   if(!state.drinks)state.drinks=[];
   if(!state.menus)state.menus=[];
+  if(!Array.isArray(state.prepItems))state.prepItems=[];
   if(!state.inventories)state.inventories=[];
   if(!state.orders)state.orders=[];
   if(!state.suppliers)state.suppliers=[];
@@ -336,9 +338,10 @@ function normalizeLoadedState(){
   const drinksChanged=ensureDrinkCatalog();
   const productMenusChanged=typeof ensureProductMenuSettings==='function'?ensureProductMenuSettings():false;
   const menusChanged=typeof ensureMenuLibrary==='function'?ensureMenuLibrary():false;
+  const prepItemsChanged=typeof ensurePrepItems==='function'?ensurePrepItems():false;
   syncAllSupplierProductLinks();
   state.workspaceSchemaVersion=CURRENT_WORKSPACE_SCHEMA_VERSION;
-  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||productsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
+  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||prepItemsChanged||productsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
 }
 
 function load(){

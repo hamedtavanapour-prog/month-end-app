@@ -3,6 +3,7 @@ import type { AccessContext } from "@/lib/auth/context";
 export type LegacyPage =
   | "dashboard"
   | "products"
+  | "menu"
   | "live-inventory"
   | "inventory"
   | "orders"
@@ -16,7 +17,7 @@ export type LegacyDestination = {
   page: LegacyPage;
   section?: string;
   reportView?: "usage" | "value" | "rorders";
-  resourceKind?: "product" | "menu-item" | "count" | "usage" | "order" | "supplier" | "room" | "category" | "department" | "menu";
+  resourceKind?: "product" | "menu-item" | "prep-item" | "count" | "usage" | "order" | "supplier" | "room" | "category" | "department" | "menu";
   resourceId?: string;
   action?: "new" | "edit" | "import";
 };
@@ -32,6 +33,7 @@ export type WorkspaceRoute = {
 const pageRoutes: Record<string, WorkspaceRoute> = {
   dashboard: route("/app/dashboard", "Dashboard", { page: "dashboard" }, ["dashboard.view"]),
   "catalog/products": route("/app/catalog/products", "Products", { page: "products" }, ["products.view"]),
+  "catalog/menu": route("/app/catalog/menu", "Menu & Recipes", { page: "menu" }, ["products.view"]),
   "inventory/live": route("/app/inventory/live", "Live Inventory", { page: "live-inventory" }, ["inventory.view"]),
   "inventory/counts": route("/app/inventory/counts", "Counts", { page: "inventory" }, ["counts.view"]),
   "purchasing/orders": route("/app/purchasing/orders", "Orders", { page: "orders" }, ["orders.view"]),
@@ -45,7 +47,6 @@ const pageRoutes: Record<string, WorkspaceRoute> = {
   "settings/floor-plan": settingsRoute("/app/settings/floor-plan", "Floor Plan", "floor-plan", ["settings.rooms"]),
   "catalog/categories": settingsRoute("/app/catalog/categories", "Categories", "categories"),
   "settings/departments": settingsRoute("/app/settings/departments", "Departments", "departments", ["settings.departments"]),
-  "catalog/menus": settingsRoute("/app/catalog/menus", "Menus", "product-menus"),
   "settings/users": { ...settingsRoute("/app/settings/users", "Users & Access", "profiles", ["settings.users"]), managerAllowed: true },
   "settings/appearance": settingsRoute("/app/settings/appearance", "Appearance", "appearance"),
   "settings/system": settingsRoute("/app/settings/system", "System & Storage", "sync"),
@@ -65,7 +66,8 @@ const aliases: Record<string, string> = {
   "intelligence/reports": "/app/intelligence/reports/usage",
   settings: "/app/settings/general",
   "settings/categories": "/app/catalog/categories",
-  "settings/product-menus": "/app/catalog/menus",
+  "catalog/menus": "/app/catalog/menu",
+  "settings/product-menus": "/app/catalog/menu",
   "settings/sync": "/app/settings/system",
 };
 
@@ -94,7 +96,10 @@ function dynamicRoute(segments: string[]): WorkspaceRoute | null {
     return route(`/app/catalog/products/${encodeURIComponent(id)}${action === "edit" ? "/edit" : ""}`, action === "edit" ? "Edit Product" : "Product Details", { page: "products", resourceKind: "product", resourceId: id, action: action === "edit" ? "edit" : undefined }, [action === "edit" ? "products.manage" : "products.view"]);
   }
   if (area === "catalog" && subsection === "menu-items" && id) {
-    return route(`/app/catalog/menu-items/${encodeURIComponent(id)}`, "Menu Item", { page: "products", resourceKind: "menu-item", resourceId: id }, ["products.view"]);
+    return route(`/app/catalog/menu-items/${encodeURIComponent(id)}`, "Menu Item", { page: "menu", resourceKind: "menu-item", resourceId: id }, ["products.view"]);
+  }
+  if (area === "catalog" && subsection === "prep-items" && id) {
+    return route(`/app/catalog/prep-items/${encodeURIComponent(id)}`, "Prep Information", { page: "menu", resourceKind: "prep-item", resourceId: id }, ["products.view"]);
   }
   if (area === "inventory" && subsection === "counts" && id) {
     if (id === "new") return route("/app/inventory/counts/new", "New Count", { page: "inventory", action: "new" }, ["counts.create"]);
@@ -122,7 +127,7 @@ function dynamicRoute(segments: string[]): WorkspaceRoute | null {
     return route(`/app/settings/departments/${encodeURIComponent(id)}`, "Department Settings", { page: "settings", section: "departments", resourceKind: "department", resourceId: id }, ["settings.departments"]);
   }
   if (area === "catalog" && subsection === "menus" && id) {
-    return route(`/app/catalog/menus/${encodeURIComponent(id)}`, "Menu Settings", { page: "settings", section: "product-menus", resourceKind: "menu", resourceId: id }, ["settings.rooms", "settings.departments", "settings.users", "settings.permissions"]);
+    return route(`/app/catalog/menus/${encodeURIComponent(id)}`, "Edit Menu", { page: "menu", resourceKind: "menu", resourceId: id }, ["products.view"]);
   }
   return null;
 }

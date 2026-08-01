@@ -3,6 +3,7 @@
   const PAGE_ROUTES={
     dashboard:['/app/dashboard','Dashboard'],
     products:['/app/catalog/products','Products'],
+    menu:['/app/catalog/menu','Menu & Recipes'],
     'live-inventory':['/app/inventory/live','Live Inventory'],
     inventory:['/app/inventory/counts','Counts'],
     orders:['/app/purchasing/orders','Orders'],
@@ -17,7 +18,6 @@
     'floor-plan':['/app/settings/floor-plan','Floor Plan'],
     categories:['/app/catalog/categories','Categories'],
     departments:['/app/settings/departments','Departments'],
-    'product-menus':['/app/catalog/menus','Menus'],
     profiles:['/app/settings/users','Users & Access'],
     appearance:['/app/settings/appearance','Appearance'],
     sync:['/app/settings/system','System & Storage'],
@@ -30,6 +30,7 @@
   };
   const BASE_ROUTE_BY_MODAL={
     'modal-product':'products','modal-product-view':'products','modal-product-units':'products',
+    'modal-menu-item-view':'menu','modal-prep-item-view':'menu',
     'modal-inv-room-select':'inventory','modal-inv-room-picker':'inventory','modal-inventory':'inventory','modal-count-add-item':'inventory','modal-view-inv':'inventory',
     'modal-order':'orders','modal-order-detail':'orders','modal-scan':'orders','modal-view-scan':'orders',
     'modal-usage-upload':'usage','modal-usage-log-detail':'usage','modal-inventory-template-upload':'usage',
@@ -52,9 +53,11 @@
     if(!parts.length)return null;
     if(parts[0]==='dashboard')return{page:'dashboard'};
     if(parts[0]==='catalog'&&parts[1]==='products')return{page:'products',resourceKind:parts[2]&&parts[2]!=='new'?'product':'',resourceId:parts[2]&&parts[2]!=='new'?parts[2]:'',action:parts[2]==='new'?'new':parts[3]==='edit'?'edit':''};
-    if(parts[0]==='catalog'&&parts[1]==='menu-items'&&parts[2])return{page:'products',resourceKind:'menu-item',resourceId:parts[2]};
+    if(parts[0]==='catalog'&&parts[1]==='menu')return{page:'menu'};
+    if(parts[0]==='catalog'&&parts[1]==='menu-items'&&parts[2])return{page:'menu',resourceKind:'menu-item',resourceId:parts[2]};
+    if(parts[0]==='catalog'&&parts[1]==='prep-items'&&parts[2])return{page:'menu',resourceKind:'prep-item',resourceId:parts[2]};
     if(parts[0]==='catalog'&&parts[1]==='categories')return{page:'settings',section:'categories',resourceKind:parts[2]?'category':'',resourceId:parts[2]||''};
-    if(parts[0]==='catalog'&&parts[1]==='menus')return{page:'settings',section:'product-menus',resourceKind:parts[2]?'menu':'',resourceId:parts[2]||''};
+    if(parts[0]==='catalog'&&parts[1]==='menus')return{page:'menu',resourceKind:parts[2]?'menu':'',resourceId:parts[2]||''};
     if(parts[0]==='inventory'&&parts[1]==='live')return{page:'live-inventory'};
     if(parts[0]==='inventory'&&parts[1]==='counts')return{page:'inventory',resourceKind:parts[2]&&parts[2]!=='new'?'count':'',resourceId:parts[2]&&parts[2]!=='new'?parts[2]:'',action:parts[2]==='new'?'new':parts[3]==='edit'?'edit':''};
     if(parts[0]==='inventory'&&parts[1]==='usage')return{page:'usage',resourceKind:parts[2]&&parts[2]!=='import'?'usage':'',resourceId:parts[2]&&parts[2]!=='import'?parts[2]:'',action:parts[2]==='import'?'import':parts[3]==='edit'?'edit':''};
@@ -81,6 +84,7 @@
       const suffix=state.action==='edit'?'/edit':'';
       if(state.resourceKind==='product')return[`/app/catalog/products/${id}${suffix}`,state.action==='edit'?'Edit Product':'Product Details'];
       if(state.resourceKind==='menu-item')return[`/app/catalog/menu-items/${id}`,'Menu Item'];
+      if(state.resourceKind==='prep-item')return[`/app/catalog/prep-items/${id}`,'Prep Information'];
       if(state.resourceKind==='count')return[`/app/inventory/counts/${id}${suffix}`,state.action==='edit'?'Edit Count':'Count Details'];
       if(state.resourceKind==='usage')return[`/app/inventory/usage/${id}${suffix}`,state.action==='edit'?'Edit Usage':'Usage Details'];
       if(state.resourceKind==='order')return[`/app/purchasing/orders/${id}${suffix}`,state.action==='edit'?'Edit Order':'Order Details'];
@@ -115,7 +119,9 @@
 
   function recordExists(kind,id){
     if(!id||typeof state!=='object')return false;
-    const collections={product:'products','menu-item':'drinks',count:'inventories',usage:'usageLogs',order:'orders',supplier:'suppliers',room:'rooms',department:'departments',menu:'menus'};
+    if(kind==='menu-item')return Boolean(typeof getMenuItemRecord==='function'&&getMenuItemRecord(id));
+    if(kind==='prep-item')return Boolean(typeof getPrepItem==='function'&&getPrepItem(id));
+    const collections={product:'products',count:'inventories',usage:'usageLogs',order:'orders',supplier:'suppliers',room:'rooms',department:'departments',menu:'menus'};
     if(kind==='category')return Object.prototype.hasOwnProperty.call(state.inventoryCategories||{},id);
     return Boolean((state[collections[kind]]||[]).some(item=>item.id===id));
   }
@@ -137,7 +143,8 @@
     }
     if(target.action==='import'){openUsageUploadModal('other');return;}
     if(kind==='product')target.action==='edit'?openProductModal(id):openProductView(id);
-    else if(kind==='menu-item')openDrinkView(id);
+    else if(kind==='menu-item')openMenuItemView(id);
+    else if(kind==='prep-item')openPrepItemView(id);
     else if(kind==='count')target.action==='edit'?openCountRoomPicker(id):viewInventory(id);
     else if(kind==='usage')openUsageLogView(id,target.action==='edit');
     else if(kind==='order')target.action==='edit'?openOrderModal(id):viewOrderDetail(id);
@@ -145,11 +152,7 @@
     else if(kind==='room')openFloorPlanRoomEditor(id);
     else if(kind==='category')openInventoryCategoryEditor(id);
     else if(kind==='department'&&typeof selectDepartmentSettings==='function')selectDepartmentSettings(id);
-    else if(kind==='menu'){
-      const menu=(state.menus||[]).find(item=>item.id===id);
-      if(menu&&typeof setSettingsMenuDepartment==='function')setSettingsMenuDepartment(menu.departmentId);
-      if(typeof selectSettingsMenu==='function')selectSettingsMenu(id);
-    }
+    else if(kind==='menu')openPageMenuEditor(id);
   }
 
   function applyRoute(path){
@@ -181,7 +184,8 @@
     wrap('setSettingsSection',section=>{routeState.page='settings';routeState.section=section||'general';resetDetail();publishRoute();});
     wrap('switchRepTab',tab=>{routeState.page='reports';routeState.reportView=tab;resetDetail();publishRoute();});
     wrap('openProductView',id=>{routeState={...routeState,page:'products',resourceKind:'product',resourceId:id,action:''};publishRoute();});
-    wrap('openDrinkView',id=>{routeState={...routeState,page:'products',resourceKind:'menu-item',resourceId:id,action:''};publishRoute();});
+    wrap('openMenuItemView',id=>{routeState={...routeState,page:'menu',resourceKind:'menu-item',resourceId:id,action:''};publishRoute();});
+    wrap('openPrepItemView',id=>{routeState={...routeState,page:'menu',resourceKind:'prep-item',resourceId:id,action:''};publishRoute();});
     wrap('openProductModal',id=>{routeState={...routeState,page:'products',resourceKind:id?'product':'',resourceId:id||'',action:id?'edit':'new'};publishRoute();});
     wrap('viewInventory',id=>{routeState={...routeState,page:'inventory',resourceKind:'count',resourceId:id,action:''};publishRoute();});
     wrap('openInventoryRoomSelect',()=>{routeState={...routeState,page:'inventory',resourceKind:'',resourceId:'',action:'new'};publishRoute();});
@@ -194,7 +198,7 @@
     wrap('openFloorPlanRoomEditor',id=>{routeState={...routeState,page:'settings',section:'floor-plan',resourceKind:'room',resourceId:id,action:''};publishRoute();});
     wrap('openInventoryCategoryEditor',name=>{if(name){routeState={...routeState,page:'settings',section:'categories',resourceKind:'category',resourceId:name,action:''};publishRoute();}});
     wrap('selectDepartmentSettings',id=>{if(id){routeState={...routeState,page:'settings',section:'departments',resourceKind:'department',resourceId:id,action:''};publishRoute();}});
-    wrap('selectSettingsMenu',id=>{if(id){routeState={...routeState,page:'settings',section:'product-menus',resourceKind:'menu',resourceId:id,action:''};publishRoute();}});
+    wrap('openPageMenuEditor',id=>{if(id){routeState={...routeState,page:'menu',resourceKind:'menu',resourceId:id,action:''};publishRoute();}});
     wrap('openModal',id=>{if(id==='modal-usage-upload'){routeState={...routeState,page:'usage',resourceKind:'',resourceId:'',action:'import'};publishRoute();}});
     wrap('closeModal',id=>{if(BASE_ROUTE_BY_MODAL[id]){routeState.page=BASE_ROUTE_BY_MODAL[id];if(id==='modal-floor-plan-room')routeState.section='floor-plan';if(id==='modal-category-editor')routeState.section='categories';resetDetail();publishRoute();}});
   }

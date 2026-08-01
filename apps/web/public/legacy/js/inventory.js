@@ -1794,6 +1794,7 @@ function updateCountReportExportPreview(){
   const previewItems=document.getElementById('count-report-preview-items');
   const source=document.getElementById('count-report-order-source');
   const button=document.getElementById('count-report-export-button');
+  const printButton=document.getElementById('count-report-print-button');
   if(previewTitle)previewTitle.textContent=`${report.entries.length} items · ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category}`;
   if(previewItems)previewItems.textContent=names.length?`${names.join(' → ')}${remaining?` → ${remaining} more`:''}`:'This count has no reportable items.';
   if(source){
@@ -1802,9 +1803,10 @@ function updateCountReportExportPreview(){
       ?`Order source: ${template?.sourceFile||'Inventory Entry Form'}`
       :format==='xlsx'
         ?'The selected order will be applied to the merged total and every room worksheet.'
-        :'The selected order will be applied to the print-ready PDF report.';
+        :'Download saves a PDF file directly. Open / Print uses the browser print dialog.';
   }
-  if(button)button.textContent=format==='pdf'?'Open PDF report':'Download Excel report';
+  if(printButton)printButton.hidden=format!=='pdf';
+  if(button)button.textContent=format==='pdf'?'Download PDF':'Download Excel report';
 }
 function exportConfiguredCountReport(){
   const id=countReportInventoryId;
@@ -1812,8 +1814,15 @@ function exportConfiguredCountReport(){
   const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
   if(!id){toast('Count not found.',true);return;}
   closeModal('modal-count-report-export');
-  if(format==='pdf')printInventoryCount(id,order);
+  if(format==='pdf')downloadInventoryCountPdf(id,order);
   else exportInventoryExcel(id,order);
+}
+function printConfiguredCountReport(){
+  const id=countReportInventoryId;
+  const order=document.getElementById('count-report-order')?.value||'category';
+  if(!id){toast('Count not found.',true);return;}
+  closeModal('modal-count-report-export');
+  printInventoryCount(id,order);
 }
 function exportInventoryExcel(id,order='category'){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
@@ -1826,6 +1835,101 @@ function exportInventoryExcel(id,order='category'){
     sheets.push({name:room.name.slice(0,31)||'Room',rows:roomReport.rows});
   });
   xlDown(sheets,`inventory_count_${inv.date}.xlsx`);
+}
+function countReportPdfText(value){
+  return String(value??'')
+    .replace(/[–—]/g,'-')
+    .replace(/→/g,'>')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function countReportPdfFileName(inv){
+  const label=countReportPdfText(inv.label||'count')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-|-$/g,'')
+    .slice(0,48)||'count';
+  return`${label}_${inv.date||today()}_count_report.pdf`;
+}
+function buildInventoryCountPdf(id,order='category'){
+  const inv=state.inventories.find(item=>item.id===id);
+  if(!inv)throw new Error('Count not found.');
+  const PdfDocument=window.jspdf?.jsPDF;
+  if(!PdfDocument)throw new Error('The PDF download library did not load. Refresh and try again, or use Open / Print.');
+  normalizeInventoryRooms(inv);
+  const report=countReportRows(inv.items,order);
+  const doc=new PdfDocument({orientation:'landscape',unit:'pt',format:'letter'});
+  if(typeof doc.autoTable!=='function')throw new Error('The PDF table library did not load. Refresh and try again, or use Open / Print.');
+  const title=countReportPdfText(`Count Report - ${inv.label||fmtDate(inv.date)}`);
+  const roomNames=inv.rooms.map(room=>room.name).join(', ');
+  const details=countReportPdfText(`Date: ${fmtDate(inv.date)} | Rooms: ${roomNames} | Order: ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category} | Merged Total: ${fmt(report.total)}`);
+  const body=report.entries.map(({product,qty,value})=>[
+    countReportPdfText(product.name),
+    countReportPdfText(product.category),
+    countReportPdfText(product.subcategory||''),
+    liveQty(qty),
+    countReportPdfText(product.unit),
+    product.par||'-',
+    product.cost>0?fmt(product.cost):'-',
+    fmt(value)
+  ]);
+  const pageWidth=doc.internal.pageSize.getWidth();
+  const pageHeight=doc.internal.pageSize.getHeight();
+  doc.autoTable({
+    head:[['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value']],
+    body,
+    foot:[['','','','','','','Total',fmt(report.total)]],
+    startY:78,
+    margin:{top:78,right:30,bottom:34,left:30},
+    theme:'striped',
+    showHead:'everyPage',
+    showFoot:'lastPage',
+    styles:{font:'helvetica',fontSize:7.5,cellPadding:4,overflow:'ellipsize',textColor:[28,36,45],lineColor:[220,225,230],lineWidth:.25},
+    headStyles:{fillColor:[38,49,61],textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
+    footStyles:{fillColor:[232,236,240],textColor:[28,36,45],fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[246,247,248]},
+    columnStyles:{
+      0:{cellWidth:205},
+      1:{cellWidth:82},
+      2:{cellWidth:96},
+      3:{cellWidth:48,halign:'right'},
+      4:{cellWidth:58},
+      5:{cellWidth:46,halign:'right'},
+      6:{cellWidth:72,halign:'right'},
+      7:{cellWidth:72,halign:'right'}
+    },
+    didDrawPage:()=>{
+      const pageNumber=doc.internal.getNumberOfPages();
+      doc.setTextColor(23,32,42);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(16);
+      doc.text(title,30,31);
+      doc.setTextColor(86,98,110);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(7.5);
+      const detailLines=doc.splitTextToSize(details,pageWidth-60);
+      doc.text(detailLines,30,47);
+      doc.setFontSize(7);
+      doc.text(`Page ${pageNumber}`,pageWidth-30,pageHeight-17,{align:'right'});
+    }
+  });
+  doc.setProperties({
+    title,
+    subject:'Inventory count report',
+    author:'Month End',
+    creator:'Month End'
+  });
+  return{doc,fileName:countReportPdfFileName(inv),report};
+}
+function downloadInventoryCountPdf(id,order='category'){
+  try{
+    const output=buildInventoryCountPdf(id,order);
+    output.doc.save(output.fileName);
+    toast(`Downloaded: ${output.fileName}`);
+  }catch(error){
+    console.error('Count report PDF download failed:',error);
+    toast(error.message||'The PDF could not be downloaded.',true);
+  }
 }
 function printInventoryCount(id,order='category'){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}

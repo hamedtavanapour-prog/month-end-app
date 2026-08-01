@@ -85,7 +85,8 @@ function buildMasterSearchIndex(){
   const can=masterSearchCanAccess;
   const pages=[
     ['dashboard','Dashboard','Inventory overview, alerts, and recent activity','home overview metrics'],
-    ['products','Products','Product catalog and drink menu items','catalog bottles items'],
+    ['products','Products','Counted inventory product catalog','catalog bottles inventory items'],
+    ['menu','Menu & Recipes','Menu items, recipes, and prep information','drinks recipes ingredients prep'],
     ['live-inventory','Live Inventory','Current stock by room','on hand stock rooms'],
     ['inventory','Counts','Draft, file, and review inventory counts','account count inventory'],
     ['orders','Orders','Purchase orders, invoices, and deliveries','purchases invoice'],
@@ -109,7 +110,7 @@ function buildMasterSearchIndex(){
 
   if(can('settings')){
     const settings=[
-      ['general','General','Workspace and application information','workspace account'],['floor-plan','Floor Plan','Rooms and the items assigned to them','locations room'],['categories','Categories','Inventory categories and subcategories','taxonomy classifications'],['departments','Departments','Department workspaces and assignments','bar kitchen'],['product-menus','Menu','Department menus and menu items','drinks recipes'],['profiles','Users & Access','Profiles, roles, departments, and permissions','staff managers team'],['appearance','Appearance','Theme and display preferences','dark light colors'],['sync','Sync & Storage','Cloud sync and browser cache','backup database'],['exports','Exports','Spreadsheet and print preferences','xlsx csv pdf']
+      ['general','General','Workspace and application information','workspace account'],['floor-plan','Floor Plan','Rooms and the items assigned to them','locations room'],['categories','Categories','Inventory categories and subcategories','taxonomy classifications'],['departments','Departments','Department workspaces and assignments','bar kitchen'],['profiles','Users & Access','Profiles, roles, departments, and permissions','staff managers team'],['appearance','Appearance','Theme and display preferences','dark light colors'],['sync','Sync & Storage','Cloud sync and browser cache','backup database'],['exports','Exports','Spreadsheet and print preferences','xlsx csv pdf']
     ];
     settings.forEach(([key,title,subtitle,keywords],index)=>add({id:`settings:${key}`,group:'Settings',title,subtitle,keywords,icon:'settings',page:'settings',priority:38,suggest:index<5?55-index:0,action:()=>masterSearchAfterPage('settings',()=>setSettingsSection(key))}));
   }
@@ -119,7 +120,16 @@ function buildMasterSearchIndex(){
       const suppliers=(product.suppliers||[]).map(id=>(state.suppliers||[]).find(item=>item.id===id)?.name).filter(Boolean);
       add({id:`product:${product.id}`,group:'Products',title:product.name||product.inventoryName||'Unnamed product',subtitle:[product.category,product.subcategory,product.unit].filter(Boolean).join(' · '),keywords:[product.inventoryName,product.sku,product.productNumber,product.aliases,product.packaging,suppliers].flat().filter(Boolean).join(' '),icon:'product',page:'products',priority:24,action:()=>masterSearchAfterPage('products',()=>openProductView(product.id))});
     });
-    (state.drinks||[]).filter(item=>!item.archived).forEach(drink=>add({id:`drink:${drink.id}`,group:'Menu items',title:drink.name||'Unnamed menu item',subtitle:[drink.family||drink.category,drink.type].filter(Boolean).join(' · '),keywords:[drink.description,(drink.recipe||[]).map(item=>item.name||item.productName)].flat(2).filter(Boolean).join(' '),icon:'menu',page:'products',priority:18,action:()=>masterSearchAfterPage('products',()=>openDrinkView(drink.id))}));
+  }
+
+  if(can('menu')){
+    const seenMenuItems=new Set();
+    (state.menus||[]).filter(menu=>!menu.archived&&menu.active).forEach(menu=>(menu.items||[]).forEach(item=>{
+      const key=`${item.name}|${item.recipe}`.toLowerCase();if(seenMenuItems.has(key))return;seenMenuItems.add(key);
+      add({id:`menu-item:${item.id}`,group:'Menu items',title:item.name||'Unnamed menu item',subtitle:[menu.name,item.category].filter(Boolean).join(' · '),keywords:[item.description,item.recipe].filter(Boolean).join(' '),icon:'menu',page:'menu',priority:18,action:()=>masterSearchAfterPage('menu',()=>openMenuItemView(item.id))});
+    }));
+    (state.prepItems||[]).filter(item=>!item.archived).forEach(item=>add({id:`prep-item:${item.id}`,group:'Menu items',title:item.name,subtitle:'Prep / information item',keywords:[item.description,item.prepInstructions].filter(Boolean).join(' '),icon:'menu',page:'menu',priority:15,action:()=>masterSearchAfterPage('menu',()=>openPrepItemView(item.id))}));
+    (state.menus||[]).filter(item=>!item.archived).forEach(menu=>add({id:`menu:${menu.id}`,group:'Menus',title:menu.name||'Unnamed menu',subtitle:`${(menu.items||[]).length} menu items`,keywords:[menu.description,menu.sourceFile,(menu.items||[]).map(item=>item.name)].flat(2).filter(Boolean).join(' '),icon:'menu',page:'menu',priority:13,action:()=>masterSearchAfterPage('menu',()=>openPageMenuEditor(menu.id))}));
   }
 
   if(can('inventory'))(state.inventories||[]).filter(item=>!item.archived).forEach(inventory=>add({id:`count:${inventory.id}`,group:'Counts',title:inventory.label||`Count — ${inventory.date||'undated'}`,subtitle:[inventory.date,(inventory.rooms||[]).length?`${inventory.rooms.length} room${inventory.rooms.length===1?'':'s'}`:'',inventory.status].filter(Boolean).join(' · '),keywords:[inventory.createdBy?.name,inventory.updatedBy?.name,(inventory.rooms||[]).map(room=>room.name)].flat().filter(Boolean).join(' '),icon:'count',page:'inventory',priority:20,action:()=>masterSearchAfterPage('inventory',()=>viewInventory(inventory.id))}));
@@ -137,7 +147,6 @@ function buildMasterSearchIndex(){
     (state.rooms||[]).filter(item=>!item.archived).forEach(room=>add({id:`room:${room.id}`,group:'Rooms',title:room.name||'Unnamed room',subtitle:'Floor Plan room',keywords:[room.categoryNames,room.categories,(room.productIds||[]).map(id=>(state.products||[]).find(item=>item.id===id)?.name)].flat(2).filter(Boolean).join(' '),icon:'room',page:'settings',priority:16,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('floor-plan');requestAnimationFrame(()=>openFloorPlanRoomEditor(room.id));})}));
     Object.entries(state.inventoryCategories||{}).forEach(([name,subcategories])=>add({id:`category:${name}`,group:'Categories',title:name,subtitle:`${subcategories.length} subcategor${subcategories.length===1?'y':'ies'}`,keywords:subcategories.join(' '),icon:'category',page:'settings',priority:15,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('categories');requestAnimationFrame(()=>openInventoryCategoryEditor(name));})}));
     (state.departments||[]).filter(item=>!item.archived).forEach(department=>add({id:`department:${department.id}`,group:'Departments',title:department.name||'Unnamed department',subtitle:'Department settings',keywords:[department.description,department.type].filter(Boolean).join(' '),icon:'department',page:'settings',priority:13,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('departments');if(typeof selectDepartmentSettings==='function')requestAnimationFrame(()=>selectDepartmentSettings(department.id));})}));
-    (state.menus||[]).filter(item=>!item.archived).forEach(menu=>add({id:`menu:${menu.id}`,group:'Menus',title:menu.name||'Unnamed menu',subtitle:`${(menu.items||[]).length} menu items`,keywords:[menu.description,menu.sourceFile,(menu.items||[]).map(item=>item.name)].flat(2).filter(Boolean).join(' '),icon:'menu',page:'settings',priority:13,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('product-menus');setSettingsMenuDepartment(menu.departmentId);if(typeof selectSettingsMenu==='function')requestAnimationFrame(()=>selectSettingsMenu(menu.id));})}));
     if(typeof profileCanManageProfiles!=='function'||profileCanManageProfiles())(state.profiles||[]).filter(item=>!item.archived).forEach(profile=>add({id:`profile:${profile.id}`,group:'People',title:profile.name||profile.email||'Unnamed user',subtitle:[profile.role,profile.email].filter(Boolean).join(' · '),keywords:[profile.position,profile.status].filter(Boolean).join(' '),icon:'people',page:'settings',priority:12,action:()=>masterSearchAfterPage('settings',()=>setSettingsSection('profiles'))}));
   }
   return records;

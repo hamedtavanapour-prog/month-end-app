@@ -802,6 +802,7 @@ function showPage(name,options={}){
   renderAccessControlledNav();
   pendingEdits={};selectedProds.clear();
   if(name==='products'){buildColPicker('prod-col-checks',PROD_COLS,'renderProducts');renderProducts();}
+  else if(name==='menu')renderMenuPage();
   else if(name==='live-inventory')renderLiveInventoryPage();
   else if(name==='inventory'){buildColPicker('inv-col-checks',INV_COLS,'renderInventoryTable');renderInventoryTable();}
   else if(name==='orders'){buildColPicker('ord-col-checks',ORD_COLS,'renderOrders');renderOrders();}

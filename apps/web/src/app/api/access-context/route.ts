@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const PAGE_PERMISSIONS: Record<string, string[]> = {
   dashboard: ["dashboard.view"],
   products: ["products.view"],
+  menu: ["products.view"],
   "live-inventory": ["inventory.view"],
   inventory: ["counts.view"],
   orders: ["orders.view"],
