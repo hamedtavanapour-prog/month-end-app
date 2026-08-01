@@ -127,7 +127,7 @@ function dynamicRoute(segments: string[]): WorkspaceRoute | null {
     return route(`/app/settings/departments/${encodeURIComponent(id)}`, "Department Settings", { page: "settings", section: "departments", resourceKind: "department", resourceId: id }, ["settings.departments"]);
   }
   if (area === "catalog" && subsection === "menus" && id) {
-    return route(`/app/catalog/menus/${encodeURIComponent(id)}`, "Edit Menu", { page: "menu", resourceKind: "menu", resourceId: id }, ["products.view"]);
+    return route(`/app/catalog/menus/${encodeURIComponent(id)}`, "Menu", { page: "menu", resourceKind: "menu", resourceId: id }, ["products.view"]);
   }
   return null;
 }

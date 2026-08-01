@@ -596,7 +596,7 @@ function openProductView(id){
       <div class="product-detail-field"><div class="label">Suppliers</div><div class="value">${productSuppliersHtml(p)}</div></div>
     </div>
     <div class="product-view-section"><div class="label">Alternate / Voice Names</div>${aliasBadges(p.aliases)||'<span style="color:var(--text-muted);font-size:0.84rem;">—</span>'}</div>
-    <div class="product-view-section"><div class="label">Used In Menu</div>${menuUses.length?`<div class="product-menu-use-list">${menuUses.map(({menu,item})=>`<button type="button" onclick="closeModal('modal-product-view');showPage('settings');setSettingsSection('product-menus');setSettingsMenuDepartment('${menu.departmentId}');requestAnimationFrame(()=>selectSettingsMenu('${menu.id}'))"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(menu.name)}</span></button>`).join('')}</div>`:'<p>Not linked to a menu recipe yet.</p>'}</div>
+    <div class="product-view-section"><div class="label">Used In Menu</div>${menuUses.length?`<div class="product-menu-use-list">${menuUses.map(({menu,item})=>`<button type="button" onclick="closeModal('modal-product-view');menuPageDepartment='${menu.departmentId}';menuPageMenuId='${menu.id}';showPage('menu');openMenuItemView('${item.id}')"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(menu.name)}</span></button>`).join('')}</div>`:'<p>Not linked to a menu recipe yet.</p>'}</div>
     <div class="product-view-section"><div class="label">Notes</div><p>${p.notes||'—'}</p></div>
     <div class="product-view-section"><div class="label">${isBar?'Packaging Options':'Units'}</div>
       <div class="table-wrap"><table><thead><tr><th>Default</th><th>${isBar?'Packaging':'Unit'}</th><th>${isBar?'Package Size':'Size'}</th><th>SKU</th><th>${isBar?'Packaging Cost':'Cost'}</th><th>Par</th></tr></thead><tbody>
@@ -915,27 +915,69 @@ function menuItemLinkedProducts(item){
 function productMenuUses(productId){
   ensureMenuLibrary();
   return(state.menus||[]).flatMap(menu=>(menu.items||[])
-    .filter(item=>(item.linkedProductIds||[]).includes(productId)||Object.values(item.ingredientLinks||{}).some(link=>link?.kind==='product'&&link.productId===productId))
+    .filter(item=>(item.linkedProductIds||[]).includes(productId)||(item.ingredients||[]).some(ingredient=>ingredient?.linkKind==='product'&&ingredient.productId===productId)||Object.values(item.ingredientLinks||{}).some(link=>link?.kind==='product'&&link.productId===productId))
     .map(item=>({menu,item})));
 }
 
+function normalizeMenuVariant(entry,index=0,fallbackGlassware=''){
+  const name=String(entry?.name||entry?.label||(['Single','Keg Size'][index])||'One Size').trim()||'One Size';
+  return{id:entry?.id||uid(),key:String(entry?.key||prepItemKey(name).replace(/\s+/g,'-')||`size-${index+1}`),name,glassware:String(entry?.glassware||fallbackGlassware||'').trim()};
+}
+
+function normalizeMenuIngredient(entry,index=0,legacyLinks={},variants=[]){
+  const parsed=typeof entry==='string'?parsedRecipeIngredient(entry):null;
+  const name=String(parsed?.name||entry?.name||entry?.ingredient||'').trim();
+  const amount=String(parsed?.amount||entry?.amount||entry?.quantity||'').trim();
+  const rawAmounts=entry?.amounts&&typeof entry.amounts==='object'&&!Array.isArray(entry.amounts)?entry.amounts:{};
+  const amounts=Object.fromEntries(variants.map((variant,variantIndex)=>[variant.key,String(rawAmounts[variant.key]??(variantIndex===0?amount:'')).trim()]));
+  const legacyLink=legacyLinks[prepItemKey(name)]||{};
+  let productId=String(entry?.productId||legacyLink.productId||'');
+  if(productId&&!getProduct(productId))productId='';
+  if(!productId&&entry?.linkKind!=='prep'&&legacyLink.kind!=='prep')productId=ingredientProductMatch(entry?.productName||name)?.id||'';
+  const prepItemId=productId?'':String(entry?.prepItemId||legacyLink.prepItemId||getPrepItemByName(name)?.id||'');
+  return{id:entry?.id||uid(),name,amount:amounts[variants[0]?.key]||amount,amounts,linkKind:productId?'product':'prep',productId,prepItemId,index};
+}
+
+function menuRecipeText(item){
+  const firstVariant=item?.variants?.[0];
+  const ingredients=(item?.ingredients||[]).filter(entry=>entry.name).map(entry=>`• ${[entry.amounts?.[firstVariant?.key]||entry.amount,entry.name].filter(Boolean).join(' ')}`);
+  const lines=[];
+  if(ingredients.length)lines.push('Ingredients:',...ingredients);
+  if(item?.description)lines.push(`Method: ${item.description}`);
+  if(firstVariant?.glassware||item?.glassware)lines.push(`Glassware: ${firstVariant?.glassware||item.glassware}`);
+  if(item?.garnish)lines.push(`Garnish: ${item.garnish}`);
+  return lines.join('\n');
+}
+
 function normalizeMenuLibraryItem(item,index=0){
-  const ingredients=Array.isArray(item?.ingredients)?item.ingredients.join('\n'):'';
+  const ingredients=Array.isArray(item?.ingredients)?item.ingredients.filter(entry=>typeof entry==='string').join('\n'):'';
   const recipe=String(item?.recipe||ingredients||item?.method||'').trim();
+  const legacyParts=menuRecipeParts({recipe});
   const ingredientLinks=item?.ingredientLinks&&typeof item.ingredientLinks==='object'&&!Array.isArray(item.ingredientLinks)
     ?Object.fromEntries(Object.entries(item.ingredientLinks).filter(([key,value])=>key&&value&&['product','prep'].includes(value.kind)).map(([key,value])=>[prepItemKey(key),{kind:value.kind,productId:String(value.productId||''),prepItemId:String(value.prepItemId||'')}]))
     :{};
-  return{
+  const variants=(Array.isArray(item?.variants)&&item.variants.length?item.variants:[{name:'One Size',glassware:item?.glassware||legacyParts.glassware||''}]).map((entry,variantIndex)=>normalizeMenuVariant(entry,variantIndex,item?.glassware||legacyParts.glassware||''));
+  const rawIngredients=Array.isArray(item?.ingredients)&&item.ingredients.length?item.ingredients:legacyParts.ingredientLines;
+  const structuredIngredients=rawIngredients.map((entry,ingredientIndex)=>normalizeMenuIngredient(entry,ingredientIndex,ingredientLinks,variants)).filter(entry=>entry.name);
+  const normalized={
     id:item?.id||uid(),
     name:String(item?.name||item?.title||`Menu item ${index+1}`).trim()||`Menu item ${index+1}`,
     category:String(item?.category||item?.section||'').trim(),
-    description:String(item?.description||item?.details||'').trim(),
-    recipe,
+    description:String(item?.description||item?.details||legacyParts.method||'').trim(),
+    glassware:String(item?.glassware||legacyParts.glassware||'').trim(),
+    garnish:String(item?.garnish||legacyParts.garnish||'').trim(),
+    imageUrl:String(item?.imageUrl||item?.image||'').trim(),
+    method:String(item?.method||'').trim(),
+    variants,
+    ingredients:structuredIngredients,
+    recipe:'',
     price:String(item?.price??item?.cost??'').replace(/^\$/,'').trim(),
     source:String(item?.source||'manual'),
-    linkedProductIds:[...new Set(Array.isArray(item?.linkedProductIds)?item.linkedProductIds:[])].filter(id=>getProduct(id)),
-    ingredientLinks
+    linkedProductIds:[...new Set(structuredIngredients.filter(entry=>entry.linkKind==='product'&&entry.productId).map(entry=>entry.productId))],
+    ingredientLinks:Object.fromEntries(structuredIngredients.map(entry=>[prepItemKey(entry.name),entry.linkKind==='product'?{kind:'product',productId:entry.productId,prepItemId:''}:{kind:'prep',productId:'',prepItemId:entry.prepItemId}]))
   };
+  normalized.recipe=menuRecipeText(normalized);
+  return normalized;
 }
 
 function starterMenuItemFromDrink(drink){
@@ -1003,6 +1045,21 @@ function ensureMenuLibrary(){
     if(combinedMenus.length){state.menus=regularMenus;changed=true;}
     state.menuLibraryVersion=3;changed=true;
   }
+  if(libraryVersion<4){state.menuLibraryVersion=4;changed=true;}
+  if(Number(state.coreDrinkRecipeVersion||0)<1&&Array.isArray(globalThis.CORE_DRINKS_MAY_2026)){
+    let coreMenu=state.menus.find(menu=>menu.departmentId==='bar'&&prepItemKey(menu.name)==='core drinks');
+    if(!coreMenu){coreMenu={id:'menu-core-drinks',departmentId:'bar',name:'Core Drinks',description:'CAN May 2026 Core Drink Recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};state.menus.unshift(coreMenu);}
+    const previousItems=coreMenu.items||[];
+    coreMenu.items=globalThis.CORE_DRINKS_MAY_2026.map((source,index)=>{
+      const previous=previousItems.find(item=>prepItemKey(item.name)===prepItemKey(source.name));
+      return normalizeMenuLibraryItem({...source,id:previous?.id||`core-may-2026-${prepItemKey(source.name).replace(/\s+/g,'-')}`,price:previous?.price||source.price||'',source:'CAN May 2026 Core Drinks.pdf'},index);
+    });
+    coreMenu.description='CAN May 2026 Core Drink Recipes - updated May 19, 2026';
+    coreMenu.sourceFile='CAN May 2026 Core Drinks.pdf';
+    coreMenu.importedAt=new Date().toISOString();
+    coreMenu.active=true;coreMenu.archived=false;
+    state.coreDrinkRecipeVersion=1;changed=true;
+  }
   return changed;
 }
 
@@ -1044,18 +1101,21 @@ function menuRecipeParts(item){
   const raw=String(item?.recipe||'').replace(/\r/g,'');
   const ingredientLines=[];
   const methodLines=[];
+  let glassware=String(item?.glassware||'').trim();
+  let garnish=String(item?.garnish||'').trim();
   let section='ingredients';
   raw.split('\n').forEach(rawLine=>{
     let line=rawLine.trim();
     if(!line)return;
     if(/^ingredients?\s*:?$/i.test(line)){section='ingredients';return;}
     if(/^method\s*:/i.test(line)){section='method';line=line.replace(/^method\s*:\s*/i,'');if(line)methodLines.push(line);return;}
-    if(/^glassware\s*:/i.test(line)){methodLines.push(line);return;}
+    if(/^glassware\s*:/i.test(line)){glassware=line.replace(/^glassware\s*:\s*/i,'').trim();return;}
+    if(/^garnish\s*:/i.test(line)){garnish=line.replace(/^garnish\s*:\s*/i,'').trim();return;}
     line=line.replace(/^[•\-*]\s*/,'').trim();
     if(!line)return;
     (section==='method'?methodLines:ingredientLines).push(line);
   });
-  return{ingredientLines,method:methodLines.join('\n')};
+  return{ingredientLines,method:methodLines.join('\n'),glassware,garnish};
 }
 
 function parsedRecipeIngredient(line){
@@ -1068,13 +1128,13 @@ function parsedRecipeIngredient(line){
 }
 
 function menuRecipeIngredients(item){
-  return menuRecipeParts(item).ingredientLines.map(line=>{
-    const parsed=parsedRecipeIngredient(line);
-    const link=item.ingredientLinks?.[prepItemKey(parsed.name)];
-    const product=link?.kind==='prep'?null:link?.kind==='product'?getProduct(link.productId):ingredientProductMatch(parsed.name);
-    const prep=product?null:(link?.prepItemId?getPrepItem(link.prepItemId):getPrepItemByName(parsed.name));
-    return{...parsed,product,prep};
+  if(Array.isArray(item?.ingredients))return item.ingredients.filter(entry=>entry.name).map(entry=>{
+    const product=entry.linkKind==='product'?getProduct(entry.productId):null;
+    const prep=product?null:(entry.prepItemId?getPrepItem(entry.prepItemId):getPrepItemByName(entry.name));
+    const variantKey=menuItemViewVariantId&&item.variants?.some(variant=>variant.id===menuItemViewVariantId)?item.variants.find(variant=>variant.id===menuItemViewVariantId)?.key:item.variants?.[0]?.key;
+    return{id:entry.id,name:entry.name,amount:entry.amounts?.[variantKey]??entry.amount??'',amounts:entry.amounts||{},product,prep};
   });
+  return menuRecipeParts(item).ingredientLines.map(line=>{const parsed=parsedRecipeIngredient(line);const product=ingredientProductMatch(parsed.name);return{...parsed,product,prep:product?null:getPrepItemByName(parsed.name)};});
 }
 
 function openMenuSettings(){toggleMenuManager();}
@@ -1083,10 +1143,24 @@ function setMenuPageDepartment(departmentId){
   if(!getDepartment(departmentId)||getDepartment(departmentId).archived)return;
   menuPageDepartment=departmentId;
   menuPageMenuId='';
+  const search=document.getElementById('menu-page-search');if(search)search.value='';
   renderMenuPage();
 }
 
-function setMenuPageMenu(menuId){menuPageMenuId=menuId||'';renderMenuPage();}
+function openMenuPageMenu(menuId){
+  const menu=menuId==='__all__'?null:getSettingsMenu(menuId);
+  if(menuId!=='__all__'&&(!menu||menu.archived))return;
+  menuPageMenuId=menuId;
+  if(menu)menuPageDepartment=menu.departmentId;
+  const search=document.getElementById('menu-page-search');if(search)search.value='';
+  document.getElementById('menu-page-manager').hidden=true;
+  document.getElementById('menu-page-editor').hidden=true;
+  document.getElementById('menu-page-browser').hidden=false;
+  renderMenuPage();
+}
+
+function showMenuPagePicker(){menuPageMenuId='';const search=document.getElementById('menu-page-search');if(search)search.value='';renderMenuPage();}
+function setMenuPageMenu(menuId){menuId?openMenuPageMenu(menuId):showMenuPagePicker();}
 
 function renderMenuPage(){
   ensureMenuLibrary();ensurePrepItems();
@@ -1095,28 +1169,29 @@ function renderMenuPage(){
   const departmentSelect=document.getElementById('menu-page-department');
   if(departmentSelect){departmentSelect.innerHTML=departments.map(department=>`<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join('');departmentSelect.value=menuPageDepartment;}
   const menus=state.menus.filter(menu=>menu.departmentId===menuPageDepartment&&!menu.archived&&menu.active);
-  if(menuPageMenuId&&!menus.some(menu=>menu.id===menuPageMenuId))menuPageMenuId='';
-  const menuSelect=document.getElementById('menu-page-menu');
-  if(menuSelect){menuSelect.innerHTML=`<option value="">All Drinks — combined</option>${menus.map(menu=>`<option value="${escapeHtml(menu.id)}">${escapeHtml(menu.name)}</option>`).join('')}`;menuSelect.value=menuPageMenuId;}
+  if(menuPageMenuId&&menuPageMenuId!=='__all__'&&!menus.some(menu=>menu.id===menuPageMenuId))menuPageMenuId='';
+  const searchGroup=document.getElementById('menu-page-search-group');if(searchGroup)searchGroup.hidden=!menuPageMenuId;
   const query=(document.getElementById('menu-page-search')?.value||'').trim().toLowerCase();
-  const selectedMenus=menuPageMenuId?menus.filter(menu=>menu.id===menuPageMenuId):menus;
+  const summary=document.getElementById('menu-page-summary');
+  const grid=document.getElementById('menu-page-grid');
+  if(!grid)return;
+  if(!menuPageMenuId){
+    if(summary)summary.innerHTML='<div class="menu-page-intro"><span class="detail-eyebrow">Choose a menu</span><h3>Which menu do you want to open?</h3><p>Select one menu first, or open the automatic combined list.</p></div>';
+    grid.className='menu-page-grid menu-selection-grid';
+    const allCount=new Set(menus.flatMap(menu=>menu.items.map(item=>item.id))).size;
+    grid.innerHTML=`<button class="menu-selection-card combined" type="button" onclick="openMenuPageMenu('__all__')"><span class="menu-status-badge">Combined</span><strong>All Drinks</strong><small>Every item from all active menus</small><b>${allCount} item${allCount===1?'':'s'}</b></button>${menus.map(menu=>`<button class="menu-selection-card" type="button" onclick="openMenuPageMenu('${menu.id}')"><span class="detail-eyebrow">${escapeHtml(departmentName(menu.departmentId))}</span><strong>${escapeHtml(menu.name)}</strong><small>${escapeHtml(menu.description||'Open this menu')}</small><b>${menu.items.length} item${menu.items.length===1?'':'s'}</b></button>`).join('')}`;
+    return;
+  }
+  const selectedMenus=menuPageMenuId==='__all__'?menus:menus.filter(menu=>menu.id===menuPageMenuId);
+  const selectedMenu=menuPageMenuId==='__all__'?null:selectedMenus[0];
   const records=selectedMenus.flatMap(menu=>(menu.items||[]).map(item=>({menu,item}))).filter(({menu,item})=>!query||[menu.name,item.name,item.category,item.description,item.recipe].join(' ').toLowerCase().includes(query));
   const uniqueItems=[];
   const seen=new Set();
   records.forEach(record=>{const key=`${record.item.name.toLowerCase()}|${record.item.recipe.toLowerCase()}`;if(!seen.has(key)){seen.add(key);uniqueItems.push(record);}});
-  const ingredientRows=uniqueItems.flatMap(({item})=>menuRecipeIngredients(item));
-  const counted=ingredientRows.filter(row=>row.product).length;
-  const summary=document.getElementById('menu-page-summary');
-  if(summary)summary.innerHTML=`<div class="menu-page-summary-card"><span>Menus</span><strong>${selectedMenus.length}</strong></div><div class="menu-page-summary-card"><span>Menu items</span><strong>${uniqueItems.length}</strong></div><div class="menu-page-summary-card"><span>Counted links</span><strong>${counted}</strong></div>`;
-  const grid=document.getElementById('menu-page-grid');
-  if(!grid)return;
+  if(summary)summary.innerHTML=`<div class="menu-selected-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="showMenuPagePicker()">← All menus</button><div><span class="detail-eyebrow">${menuPageMenuId==='__all__'?'Combined menu':escapeHtml(departmentName(selectedMenu?.departmentId))}</span><h3>${menuPageMenuId==='__all__'?'All Drinks':escapeHtml(selectedMenu?.name||'Menu')}</h3><p>${menuPageMenuId==='__all__'?'Every item from all active menus.':escapeHtml(selectedMenu?.description||`${uniqueItems.length} menu items`)}</p></div>${selectedMenu?`<button class="btn btn-primary btn-sm" type="button" onclick="addPageMenuItem('${selectedMenu.id}')">＋ Add Item</button>`:''}</div>`;
+  grid.className='menu-page-grid menu-item-row-list';
   if(!uniqueItems.length){grid.innerHTML=`<div class="menu-page-empty"><strong>${query?'No menu items match this search':'No active menu items yet'}</strong><span>${query?'Try a different item, section, or ingredient.':'Create or activate a menu in Manage Menus.'}</span>${query?'':'<button class="btn btn-primary" type="button" onclick="toggleMenuManager()">Manage Menus</button>'}</div>`;return;}
-  grid.innerHTML=uniqueItems.map(({menu,item})=>{
-    const ingredients=menuRecipeIngredients(item);
-    const productLinks=ingredients.filter(entry=>entry.product).length;
-    const prepLinks=Math.max(ingredients.length-productLinks,0);
-    return`<button class="menu-page-card" type="button" onclick="openMenuItemView('${item.id}')"><div class="menu-page-card-head"><div><h3>${escapeHtml(item.name)}</h3><div class="menu-page-card-section">${escapeHtml(item.category||menu.name)}</div></div>${item.price?`<span class="menu-page-card-price">$${escapeHtml(item.price)}</span>`:''}</div><p class="menu-page-card-description">${escapeHtml(item.description||'Open for recipe and preparation details.')}</p><div class="menu-page-card-meta"><span>${ingredients.length} ingredient${ingredients.length===1?'':'s'}</span><span>·</span><span>${productLinks} counted</span>${prepLinks?`<span>·</span><span>${prepLinks} prep/info</span>`:''}</div></button>`;
-  }).join('');
+  grid.innerHTML=uniqueItems.map(({menu,item})=>`<button class="menu-item-row" type="button" onclick="openMenuItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||menu.name)}</small></span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}<span class="menu-item-row-arrow">›</span></button>`).join('');
 }
 
 function toggleMenuManager(forceOpen=false){
@@ -1169,8 +1244,11 @@ function setPageMenuActive(id,active){const menu=getSettingsMenu(id);if(!menu)re
 function archivePageMenu(id,archived=true){const menu=getSettingsMenu(id);if(!menu)return;menu.archived=!!archived;save();renderMenuManager();renderMenuPage();toast(menu.archived?'Menu archived.':'Menu restored.');}
 function deletePageMenu(id){const menu=getSettingsMenu(id);if(!menu||!confirm(`Delete “${menu.name}” and its ${menu.items.length} item${menu.items.length===1?'':'s'}?`))return;state.menus=state.menus.filter(entry=>entry.id!==id);save();renderMenuManager();renderMenuPage();toast('Menu deleted.');}
 
-function menuProductLinkOptions(selectedId=''){
-  return`<option value="prep" ${selectedId?'':'selected'}>Prep / information item</option><optgroup label="Counted products">${(state.products||[]).filter(product=>!product.archived&&productInDepartment(product,menuPageDepartment)).sort((a,b)=>a.name.localeCompare(b.name)).map(product=>`<option value="product:${product.id}" ${product.id===selectedId?'selected':''}>${escapeHtml(product.name)}</option>`).join('')}</optgroup>`;
+function menuProductLinkOptions(ingredient={}){
+  const selected=ingredient.linkKind==='product'&&ingredient.productId?`product:${ingredient.productId}`:ingredient.prepItemId?`prep:${ingredient.prepItemId}`:'prep';
+  const prepOptions=(state.prepItems||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name)).map(item=>`<option value="prep:${item.id}" ${selected===`prep:${item.id}`?'selected':''}>${escapeHtml(item.name)}</option>`).join('');
+  const productOptions=(state.products||[]).filter(product=>!product.archived&&productInDepartment(product,menuPageDepartment)).sort((a,b)=>a.name.localeCompare(b.name)).map(product=>`<option value="product:${product.id}" ${selected===`product:${product.id}`?'selected':''}>${escapeHtml(product.name)}</option>`).join('');
+  return`<option value="prep" ${selected==='prep'?'selected':''}>Prep / information — use typed name</option>${prepOptions?`<optgroup label="Existing prep / information items">${prepOptions}</optgroup>`:''}<optgroup label="Counted products">${productOptions}</optgroup>`;
 }
 
 function renderPageMenuEditor(focusItemId=''){
@@ -1191,6 +1269,69 @@ function updatePageMenuIngredientLink(menuId,itemId,name,value){const item=getSe
 function movePageMenuItem(menuId,itemId,direction){const menu=getSettingsMenu(menuId);if(!menu)return;const index=menu.items.findIndex(item=>item.id===itemId);const target=index+direction;if(index<0||target<0||target>=menu.items.length)return;[menu.items[index],menu.items[target]]=[menu.items[target],menu.items[index]];save();renderPageMenuEditor(itemId);renderMenuPage();}
 function deletePageMenuItem(menuId,itemId){const menu=getSettingsMenu(menuId);if(!menu)return;const item=menu.items.find(entry=>entry.id===itemId);if(!item||!confirm(`Delete “${item.name}” from this menu?`))return;menu.items=menu.items.filter(entry=>entry.id!==itemId);save();renderPageMenuEditor();renderMenuPage();}
 
+// The menu manager edits menu-level details only. Recipe work happens in the
+// focused menu-item modal so a user never has to scan every recipe at once.
+function renderPageMenuEditor(){
+  const editor=document.getElementById('menu-page-editor');
+  const menu=getSettingsMenu(menuPageEditingMenuId);
+  if(!editor||!menu){closeMenuManager();return;}
+  editor.hidden=false;
+  editor.innerHTML=`<div class="menu-manager-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="closePageMenuEditor()">← Menus</button><div><span class="detail-eyebrow">${escapeHtml(departmentName(menu.departmentId))}</span><h3>Menu settings</h3><p>Manage this menu here. Open an item to edit its recipe separately.</p></div><button class="detail-close" type="button" aria-label="Close menu editor" onclick="closeMenuManager()">&times;</button></div><div class="menu-page-editor-fields"><label><span>Menu name</span><input type="text" value="${escapeHtml(menu.name)}" onchange="updatePageMenu('${menu.id}','name',this.value)"></label><label><span>Menu description</span><input type="text" value="${escapeHtml(menu.description)}" onchange="updatePageMenu('${menu.id}','description',this.value)"></label><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="setPageMenuActive('${menu.id}',this.checked)"><span>Active</span></label><button class="btn btn-primary" type="button" onclick="addPageMenuItem('${menu.id}')">＋ Add Item</button></div><div class="menu-manager-item-list">${menu.items.length?menu.items.map((item,index)=>`<div class="menu-manager-item-row"><button type="button" onclick="openMenuItemView('${item.id}')"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||'Uncategorized')}</small></button><div><button class="btn btn-secondary btn-sm" type="button" ${index===0?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" ${index===menu.items.length-1?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',1)">↓</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deletePageMenuItem('${menu.id}','${item.id}')">Delete</button></div></div>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Add the first item to this menu.</span></div>'}</div>`;
+}
+
+function openPageMenuEditor(id){const menu=getSettingsMenu(id);if(!menu)return;menuPageEditingMenuId=id;menuPageDepartment=menu.departmentId;document.getElementById('menu-page-browser').hidden=true;document.getElementById('menu-page-manager').hidden=true;renderPageMenuEditor();}
+function addPageMenuItem(menuId){const menu=getSettingsMenu(menuId);if(!menu)return;menuItemEditingMenuId=menuId;menuItemEditIsNew=true;menuItemEditDraft=normalizeMenuLibraryItem({id:uid(),name:'New menu item',ingredients:[]});renderMenuItemEditor();openModal('modal-menu-item-view');}
+function movePageMenuItem(menuId,itemId,direction){const menu=getSettingsMenu(menuId);if(!menu)return;const index=menu.items.findIndex(item=>item.id===itemId);const target=index+direction;if(index<0||target<0||target>=menu.items.length)return;[menu.items[index],menu.items[target]]=[menu.items[target],menu.items[index]];save();renderPageMenuEditor();renderMenuPage();}
+function deletePageMenuItem(menuId,itemId){const menu=getSettingsMenu(menuId);if(!menu)return;const item=menu.items.find(entry=>entry.id===itemId);if(!item||!confirm(`Delete “${item.name}” from this menu?`))return;menu.items=menu.items.filter(entry=>entry.id!==itemId);save();renderPageMenuEditor();renderMenuPage();toast('Menu item deleted.');}
+
+function openMenuItemEditor(menuId,itemId){
+  const item=getSettingsMenu(menuId)?.items.find(entry=>entry.id===itemId);if(!item)return;
+  menuItemEditingMenuId=menuId;menuItemEditIsNew=false;menuItemEditDraft=JSON.parse(JSON.stringify(normalizeMenuLibraryItem(item)));
+  renderMenuItemEditor();openModal('modal-menu-item-view');
+}
+
+function renderMenuItemEditor(){
+  const item=menuItemEditDraft;const menu=getSettingsMenu(menuItemEditingMenuId);const body=document.getElementById('menu-item-view-body');if(!item||!menu||!body)return;
+  body.innerHTML=`<div class="product-view-head"><div><span class="detail-eyebrow">${escapeHtml(menu.name)}</span><h3 id="menu-item-view-title">${menuItemEditIsNew?'Add Menu Item':`Edit ${escapeHtml(item.name)}`}</h3></div><button class="detail-close" type="button" aria-label="Close menu item editor" onclick="cancelMenuItemEditor()">&times;</button></div><div class="menu-item-edit-fields"><label><span>Item name</span><input type="text" value="${escapeHtml(item.name)}" oninput="updateMenuItemDraftField('name',this.value)"></label><label><span>Section</span><input type="text" value="${escapeHtml(item.category)}" oninput="updateMenuItemDraftField('category',this.value)"></label><label><span>Price</span><input type="text" inputmode="decimal" value="${escapeHtml(item.price)}" oninput="updateMenuItemDraftField('price',this.value)"></label></div><div class="menu-item-ingredient-editor"><div class="menu-item-editor-section-head"><div><span class="label">Ingredients &amp; amounts</span><p>Type the menu-facing name and connect it to the exact inventory or prep item.</p></div><button class="btn btn-primary btn-sm" type="button" onclick="addMenuItemDraftIngredient()">＋ Add Ingredient</button></div><div class="menu-item-ingredient-list">${item.ingredients.length?item.ingredients.map((ingredient,index)=>`<div class="menu-item-ingredient-edit-row"><label><span>Amount</span><input type="text" value="${escapeHtml(ingredient.amount)}" placeholder="2 oz" oninput="updateMenuItemDraftIngredient(${index},'amount',this.value)"></label><label><span>Ingredient name</span><input data-menu-ingredient-name type="text" value="${escapeHtml(ingredient.name)}" placeholder="Polar Ice Vodka" oninput="updateMenuItemDraftIngredient(${index},'name',this.value)"></label><label><span>Linked to</span><select onchange="updateMenuItemDraftIngredient(${index},'link',this.value)">${menuProductLinkOptions(ingredient)}</select></label><button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove ${escapeHtml(ingredient.name||'ingredient')}" onclick="removeMenuItemDraftIngredient(${index})">Remove</button></div>`).join(''):'<div class="menu-empty-state compact"><strong>No ingredients yet</strong><span>Add each ingredient and its amount separately.</span></div>'}</div></div><div class="menu-item-service-fields"><label class="wide"><span>Description / how to make it</span><textarea placeholder="Explain how to build, shake, strain, or serve this item." oninput="updateMenuItemDraftField('description',this.value)">${escapeHtml(item.description)}</textarea></label><label><span>Glassware</span><input type="text" value="${escapeHtml(item.glassware)}" placeholder="Tall Collins" oninput="updateMenuItemDraftField('glassware',this.value)"></label><label><span>Garnish</span><input type="text" value="${escapeHtml(item.garnish)}" placeholder="Lime wedge" oninput="updateMenuItemDraftField('garnish',this.value)"></label></div><div class="modal-actions">${menuItemEditIsNew?'':`<button class="btn btn-ghost-danger" type="button" onclick="deleteCurrentMenuItem()">Delete Item</button>`}<button class="btn btn-secondary" type="button" onclick="cancelMenuItemEditor()">Cancel</button><button class="btn btn-primary" type="button" onclick="saveMenuItemEditor()">Save Item</button></div>`;
+}
+
+function updateMenuItemDraftField(field,value){if(!menuItemEditDraft||!['name','category','price','description','glassware','garnish'].includes(field))return;menuItemEditDraft[field]=String(value||'');}
+function addMenuItemDraftIngredient(){if(!menuItemEditDraft)return;menuItemEditDraft.ingredients.push({id:uid(),name:'',amount:'',linkKind:'prep',productId:'',prepItemId:''});renderMenuItemEditor();requestAnimationFrame(()=>document.querySelector('#menu-item-view-body .menu-item-ingredient-edit-row:last-child [data-menu-ingredient-name]')?.focus());}
+function removeMenuItemDraftIngredient(index){if(!menuItemEditDraft)return;menuItemEditDraft.ingredients.splice(index,1);renderMenuItemEditor();}
+function updateMenuItemDraftIngredient(index,field,value){const ingredient=menuItemEditDraft?.ingredients?.[index];if(!ingredient)return;if(field==='name'||field==='amount'){ingredient[field]=String(value||'');return;}if(field==='link'){if(String(value).startsWith('product:')){ingredient.linkKind='product';ingredient.productId=String(value).slice(8);ingredient.prepItemId='';if(!ingredient.name)ingredient.name=getProduct(ingredient.productId)?.name||'';}else{ingredient.linkKind='prep';ingredient.productId='';ingredient.prepItemId=String(value).startsWith('prep:')?String(value).slice(5):'';if(!ingredient.name&&ingredient.prepItemId)ingredient.name=getPrepItem(ingredient.prepItemId)?.name||'';}renderMenuItemEditor();}}
+
+function cancelMenuItemEditor(){const itemId=menuItemEditDraft?.id;const isNew=menuItemEditIsNew;menuItemEditDraft=null;menuItemEditingMenuId='';menuItemEditIsNew=false;if(isNew)closeModal('modal-menu-item-view');else openMenuItemView(itemId);}
+function saveMenuItemEditor(){
+  const menu=getSettingsMenu(menuItemEditingMenuId);if(!menu||!menuItemEditDraft)return;
+  const name=String(menuItemEditDraft.name||'').trim();if(!name){toast('Item name is required.',true);return;}
+  menuItemEditDraft.name=name;menuItemEditDraft.ingredients=(menuItemEditDraft.ingredients||[]).filter(entry=>String(entry.name||'').trim()).map(entry=>({...entry,name:String(entry.name).trim(),amount:String(entry.amount||'').trim()}));
+  const saved=normalizeMenuLibraryItem(menuItemEditDraft);const index=menu.items.findIndex(entry=>entry.id===saved.id);
+  if(index>=0)menu.items[index]=saved;else menu.items.push(saved);
+  menuItemEditDraft=null;menuItemEditingMenuId='';menuItemEditIsNew=false;save();renderMenuPage();if(menuPageEditingMenuId)renderPageMenuEditor();openMenuItemView(saved.id);toast('Menu item saved.');
+}
+function deleteCurrentMenuItem(){if(!menuItemEditDraft||menuItemEditIsNew)return;const menuId=menuItemEditingMenuId,itemId=menuItemEditDraft.id;menuItemEditDraft=null;menuItemEditingMenuId='';menuItemEditIsNew=false;closeModal('modal-menu-item-view');deletePageMenuItem(menuId,itemId);}
+
+function menuItemVariantEditorHtml(item){
+  return`<div class="menu-item-variant-editor"><div class="menu-item-editor-section-head"><div><span class="label">Sizes &amp; glassware</span><p>Each POS size keeps its own glass and exact ingredient measurements.</p></div><button class="btn btn-secondary btn-sm" type="button" onclick="addMenuItemDraftVariant()">＋ Add Size</button></div><div class="menu-item-variant-list">${item.variants.map((variant,index)=>`<div class="menu-item-variant-row"><label><span>Size name</span><input type="text" value="${escapeHtml(variant.name)}" oninput="updateMenuItemDraftVariant(${index},'name',this.value)"></label><label><span>Glassware</span><input type="text" value="${escapeHtml(variant.glassware)}" placeholder="Small Rocks" oninput="updateMenuItemDraftVariant(${index},'glassware',this.value)"></label>${item.variants.length>1?`<button class="btn btn-ghost-danger btn-sm" type="button" onclick="removeMenuItemDraftVariant(${index})">Remove</button>`:''}</div>`).join('')}</div></div>`;
+}
+
+function menuItemIngredientEditorHtml(item){
+  const columns=`minmax(170px,.8fr) ${item.variants.map(()=>`minmax(92px,.38fr)`).join(' ')} minmax(230px,1fr) auto`;
+  return`<div class="menu-item-ingredient-editor"><div class="menu-item-editor-section-head"><div><span class="label">Ingredients &amp; amounts</span><p>Type the displayed ingredient name, enter the exact amount for each size, and connect it to inventory or prep information.</p></div><button class="btn btn-primary btn-sm" type="button" onclick="addMenuItemDraftIngredient()">＋ Add Ingredient</button></div><div class="menu-item-ingredient-list">${item.ingredients.length?item.ingredients.map((ingredient,index)=>`<div class="menu-item-ingredient-edit-row" style="grid-template-columns:${columns}"><label><span>Ingredient name</span><input data-menu-ingredient-name type="text" value="${escapeHtml(ingredient.name)}" placeholder="Polar Ice Vodka" oninput="updateMenuItemDraftIngredient(${index},'name',this.value)"></label>${item.variants.map(variant=>`<label><span>${escapeHtml(variant.name)}</span><input type="text" value="${escapeHtml(ingredient.amounts?.[variant.key]||'')}" placeholder="2 oz" oninput="updateMenuItemDraftIngredient(${index},'amount:${variant.key}',this.value)"></label>`).join('')}<label><span>Linked to</span><select onchange="updateMenuItemDraftIngredient(${index},'link',this.value)">${menuProductLinkOptions(ingredient)}</select></label><button class="btn btn-ghost-danger btn-sm" type="button" aria-label="Remove ${escapeHtml(ingredient.name||'ingredient')}" onclick="removeMenuItemDraftIngredient(${index})">Remove</button></div>`).join(''):'<div class="menu-empty-state compact"><strong>No ingredients yet</strong><span>Add each ingredient and its exact amount.</span></div>'}</div></div>`;
+}
+
+function renderMenuItemEditor(){
+  const item=menuItemEditDraft;const menu=getSettingsMenu(menuItemEditingMenuId);const body=document.getElementById('menu-item-view-body');if(!item||!menu||!body)return;
+  body.innerHTML=`<div class="product-view-head"><div><span class="detail-eyebrow">${escapeHtml(menu.name)}</span><h3 id="menu-item-view-title">${menuItemEditIsNew?'Add Menu Item':`Edit ${escapeHtml(item.name)}`}</h3></div><button class="detail-close" type="button" aria-label="Close menu item editor" onclick="cancelMenuItemEditor()">&times;</button></div><div class="menu-item-edit-fields"><label><span>Item name</span><input type="text" value="${escapeHtml(item.name)}" oninput="updateMenuItemDraftField('name',this.value)"></label><label><span>Section</span><input type="text" value="${escapeHtml(item.category)}" oninput="updateMenuItemDraftField('category',this.value)"></label><label><span>Price</span><input type="text" inputmode="decimal" value="${escapeHtml(item.price)}" oninput="updateMenuItemDraftField('price',this.value)"></label></div>${menuItemVariantEditorHtml(item)}${menuItemIngredientEditorHtml(item)}<div class="menu-item-service-fields"><label><span>Method</span><input list="menu-method-options" value="${escapeHtml(item.method)}" placeholder="Shake &amp; Strain" oninput="updateMenuItemDraftField('method',this.value)"><datalist id="menu-method-options"><option value="Shake & Strain"><option value="Shake & Double Strain"><option value="Shake & Dump"><option value="Shake & Top"><option value="Build in Glass"><option value="Stir & Strain"><option value="Blended"></datalist></label><label><span>Garnish</span><input type="text" value="${escapeHtml(item.garnish)}" placeholder="Dehydrated lime wheel" oninput="updateMenuItemDraftField('garnish',this.value)"></label><label class="wide"><span>Description / how to make it</span><textarea placeholder="Keep the complete preparation and garnish instructions here." oninput="updateMenuItemDraftField('description',this.value)">${escapeHtml(item.description)}</textarea></label></div><div class="modal-actions">${menuItemEditIsNew?'':`<button class="btn btn-ghost-danger" type="button" onclick="deleteCurrentMenuItem()">Delete Item</button>`}<button class="btn btn-secondary" type="button" onclick="cancelMenuItemEditor()">Cancel</button><button class="btn btn-primary" type="button" onclick="saveMenuItemEditor()">Save Item</button></div>`;
+}
+
+function updateMenuItemDraftField(field,value){if(!menuItemEditDraft||!['name','category','price','description','method','garnish'].includes(field))return;menuItemEditDraft[field]=String(value||'');}
+function addMenuItemDraftVariant(){if(!menuItemEditDraft)return;const variant=normalizeMenuVariant({name:`Size ${menuItemEditDraft.variants.length+1}`},menuItemEditDraft.variants.length);menuItemEditDraft.variants.push(variant);menuItemEditDraft.ingredients.forEach(ingredient=>{if(!ingredient.amounts)ingredient.amounts={};ingredient.amounts[variant.key]='';});renderMenuItemEditor();}
+function updateMenuItemDraftVariant(index,field,value){const variant=menuItemEditDraft?.variants?.[index];if(!variant||!['name','glassware'].includes(field))return;variant[field]=String(value||'');}
+function removeMenuItemDraftVariant(index){if(!menuItemEditDraft||menuItemEditDraft.variants.length<2)return;const[removed]=menuItemEditDraft.variants.splice(index,1);menuItemEditDraft.ingredients.forEach(ingredient=>{if(ingredient.amounts)delete ingredient.amounts[removed.key];});renderMenuItemEditor();}
+function addMenuItemDraftIngredient(){if(!menuItemEditDraft)return;menuItemEditDraft.ingredients.push({id:uid(),name:'',amount:'',amounts:Object.fromEntries(menuItemEditDraft.variants.map(variant=>[variant.key,''])),linkKind:'prep',productId:'',prepItemId:''});renderMenuItemEditor();requestAnimationFrame(()=>document.querySelector('#menu-item-view-body .menu-item-ingredient-edit-row:last-child [data-menu-ingredient-name]')?.focus());}
+function updateMenuItemDraftIngredient(index,field,value){const ingredient=menuItemEditDraft?.ingredients?.[index];if(!ingredient)return;if(field==='name'){ingredient.name=String(value||'');return;}if(field.startsWith('amount:')){if(!ingredient.amounts)ingredient.amounts={};ingredient.amounts[field.slice(7)]=String(value||'');return;}if(field==='link'){if(String(value).startsWith('product:')){ingredient.linkKind='product';ingredient.productId=String(value).slice(8);ingredient.prepItemId='';if(!ingredient.name)ingredient.name=getProduct(ingredient.productId)?.name||'';}else{ingredient.linkKind='prep';ingredient.productId='';ingredient.prepItemId=String(value).startsWith('prep:')?String(value).slice(5):'';if(!ingredient.name&&ingredient.prepItemId)ingredient.name=getPrepItem(ingredient.prepItemId)?.name||'';}renderMenuItemEditor();}}
+
 async function handleMenuPageImport(event){
   const input=event.target;const file=input.files?.[0];if(!file)return;
   setMenuPageImportStatus(`Reading ${file.name}…`);
@@ -1208,7 +1349,7 @@ function openRecipeProduct(id,menuId,itemId){
   closeModal('modal-menu-item-view');
   const product=getProduct(id);
   if(!product)return;
-  recipeProductReturn={menuId,itemId,departmentId:menuPageDepartment,menuViewId:menuPageMenuId};
+  recipeProductReturn={menuId,itemId,departmentId:menuPageDepartment,menuViewId:menuPageMenuId,variantId:menuItemViewVariantId};
   productDepartmentView=productDepartmentIds(product)[0]||'bar';
   productCatalogView='products';
   showPage('products');
@@ -1221,12 +1362,14 @@ function returnToRecipe(){
   const target=recipeProductReturn;if(!target)return;
   recipeProductReturn=null;
   closeModal('modal-product-view');
+  closeModal('modal-prep-item-view');
   menuPageDepartment=target.departmentId||'bar';menuPageMenuId=target.menuViewId||'';
   showPage('menu');
-  openMenuItemView(target.itemId);
+  menuItemViewVariantId=target.variantId||'';openMenuItemView(target.itemId,!!target.variantId);
 }
 
 function openPrepItemByName(name){
+  if(!window.__openingRecipePrep)recipeProductReturn=null;
   const existing=getPrepItemByName(name);
   const item=existing||{id:uid(),name:String(name||'Prep item').trim()||'Prep item',description:'',prepInstructions:'',notes:'',archived:false};
   closeModal('modal-menu-item-view');
@@ -1235,13 +1378,17 @@ function openPrepItemByName(name){
   document.getElementById('prep-item-description').value=item.description||'';
   document.getElementById('prep-item-instructions').value=item.prepInstructions||'';
   document.getElementById('prep-item-view-title').textContent=item.name;
+  const back=document.getElementById('prep-item-back-recipe');if(back)back.hidden=!recipeProductReturn;
   openModal('modal-prep-item-view');
 }
 
-function openRecipePrep(name){
+function openRecipePrep(name,menuId,itemId){
+  recipeProductReturn={menuId,itemId,departmentId:menuPageDepartment,menuViewId:menuPageMenuId,variantId:menuItemViewVariantId};
+  window.__openingRecipePrep=true;
   const existing=getPrepItemByName(name);
   if(existing)openPrepItemView(existing.id);
   else openPrepItemByName(name);
+  window.__openingRecipePrep=false;
 }
 
 function openPrepItemView(id){const item=getPrepItem(id);if(item)openPrepItemByName(item.name);}
@@ -1264,21 +1411,17 @@ function savePrepItem(){
 }
 
 function editMenuItemRecipe(menuId,itemId){
-  closeModal('modal-menu-item-view');
-  const menu=getSettingsMenu(menuId);
-  if(!menu)return;
-  showPage('menu');
-  openPageMenuEditor(menu.id,itemId);
+  openMenuItemEditor(menuId,itemId);
 }
 
-function openMenuItemView(id){
-  const record=getMenuItemRecord(id);
-  if(!record)return;
-  const{menu,item}=record;
-  const ingredients=menuRecipeIngredients(item);
-  const parts=menuRecipeParts(item);
+function setMenuItemViewVariant(itemId,variantId){menuItemViewVariantId=variantId;openMenuItemView(itemId,true);}
+function openMenuItemView(id,preserveVariant=false){
+  const record=getMenuItemRecord(id);if(!record)return;
+  const{menu,item}=record;const variants=item.variants?.length?item.variants:[normalizeMenuVariant({name:'One Size',glassware:item.glassware})];
+  if(!preserveVariant||!variants.some(variant=>variant.id===menuItemViewVariantId))menuItemViewVariantId=variants[0].id;
+  const activeVariant=variants.find(variant=>variant.id===menuItemViewVariantId)||variants[0];const ingredients=menuRecipeIngredients(item);
   const body=document.getElementById('menu-item-view-body');
-  body.innerHTML=`<div class="product-view-head"><div><span class="detail-eyebrow">${escapeHtml(menu.name)}</span><h3 id="menu-item-view-title">${escapeHtml(item.name)}</h3><div class="product-view-meta"><span class="sub-badge">${escapeHtml(item.category||'Uncategorized')}</span>${item.price?`<span class="sub-badge">$${escapeHtml(item.price)}</span>`:''}</div></div><div class="detail-heading-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="editMenuItemRecipe('${menu.id}','${item.id}')">Edit Recipe</button><button class="detail-close" type="button" aria-label="Close menu item" onclick="closeModal('modal-menu-item-view')">&times;</button></div></div>${item.description?`<div class="product-view-section"><div class="label">Description</div><p>${escapeHtml(item.description)}</p></div>`:''}<div class="product-view-section"><div class="label">Recipe ingredients</div><div class="menu-recipe-list">${ingredients.length?ingredients.map(entry=>{const encoded=encodeURIComponent(entry.name);return`<div class="menu-recipe-row"><div class="menu-recipe-main">${entry.amount?`<span class="menu-recipe-amount">${escapeHtml(entry.amount)}</span>`:''}${entry.product?`<button class="menu-recipe-link" type="button" onclick="openRecipeProduct('${entry.product.id}','${menu.id}','${item.id}')">${escapeHtml(entry.name)}</button>`:`<button class="menu-recipe-link" type="button" onclick="openRecipePrep(decodeURIComponent('${encoded}'))">${escapeHtml(entry.name)}</button>`}</div><span class="menu-recipe-kind ${entry.product?'counted':''}">${entry.product?'Counted product':'Prep / info'}</span></div>`;}).join(''):'<p class="menu-method-copy">No ingredients have been added yet.</p>'}</div></div><div class="product-view-section"><div class="label">Method &amp; service</div><p class="menu-method-copy">${escapeHtml(parts.method||'Add the method, glassware, and service notes when ready.')}</p></div><div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-menu-item-view')">Close</button></div>`;
+  body.innerHTML=`<div class="product-view-head"><div><span class="detail-eyebrow">${escapeHtml(menu.name)}</span><h3 id="menu-item-view-title">${escapeHtml(item.name)}</h3><div class="product-view-meta"><span class="sub-badge">${escapeHtml(item.category||'Uncategorized')}</span>${item.price?`<span class="sub-badge">$${escapeHtml(item.price)}</span>`:''}${item.method?`<span class="sub-badge">${escapeHtml(item.method)}</span>`:''}</div></div><div class="detail-heading-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="editMenuItemRecipe('${menu.id}','${item.id}')">Edit Item</button><button class="detail-close" type="button" aria-label="Close menu item" onclick="closeModal('modal-menu-item-view')">&times;</button></div></div>${item.imageUrl?`<div class="menu-item-hero-image"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}"></div>`:''}${variants.length>1?`<div class="menu-size-switch" role="group" aria-label="Recipe size">${variants.map(variant=>`<button class="${variant.id===activeVariant.id?'active':''}" type="button" onclick="setMenuItemViewVariant('${item.id}','${variant.id}')">${escapeHtml(variant.name)}</button>`).join('')}</div>`:''}<div class="product-view-section"><div class="label">Ingredients - ${escapeHtml(activeVariant.name)}</div><div class="menu-recipe-list">${ingredients.length?ingredients.map(entry=>{const encoded=encodeURIComponent(entry.name);return`<div class="menu-recipe-row"><div class="menu-recipe-main">${entry.amount?`<span class="menu-recipe-amount">${escapeHtml(entry.amount)}</span>`:''}${entry.product?`<button class="menu-recipe-link" type="button" onclick="openRecipeProduct('${entry.product.id}','${menu.id}','${item.id}')">${escapeHtml(entry.name)}</button>`:`<button class="menu-recipe-link" type="button" onclick="openRecipePrep(decodeURIComponent('${encoded}'),'${menu.id}','${item.id}')">${escapeHtml(entry.name)}</button>`}</div></div>`;}).join(''):'<p class="menu-method-copy">No ingredients have been added yet.</p>'}</div></div>${item.description?`<div class="product-view-section"><div class="label">How to make it</div><p class="menu-method-copy">${escapeHtml(item.description)}</p></div>`:''}<div class="menu-service-summary">${activeVariant.glassware?`<div><span>Glassware</span><strong>${escapeHtml(activeVariant.glassware)}</strong></div>`:''}${item.garnish?`<div><span>Garnish</span><strong>${escapeHtml(item.garnish)}</strong></div>`:''}</div><div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-menu-item-view')">Close</button></div>`;
   openModal('modal-menu-item-view');
 }
 

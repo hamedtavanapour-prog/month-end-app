@@ -1,6 +1,6 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
-const CURRENT_WORKSPACE_SCHEMA_VERSION=3;
+const CURRENT_WORKSPACE_SCHEMA_VERSION=4;
 
 function compactUsageRow(row){
   return{
@@ -105,6 +105,7 @@ function compactStateForStorage(){
     drinks:state.drinks||[],
     menus:state.menus||[],
     menuLibraryVersion:state.menuLibraryVersion||0,
+    coreDrinkRecipeVersion:state.coreDrinkRecipeVersion||0,
     prepItems:state.prepItems||[],
     inventories:state.inventories||[],
     orders:state.orders||[],
@@ -276,6 +277,7 @@ function normalizeLoadedState(){
   if(!state.products)state.products=[];
   if(!state.drinks)state.drinks=[];
   if(!state.menus)state.menus=[];
+  if(!Number.isFinite(Number(state.coreDrinkRecipeVersion)))state.coreDrinkRecipeVersion=0;
   if(!Array.isArray(state.prepItems))state.prepItems=[];
   if(!state.inventories)state.inventories=[];
   if(!state.orders)state.orders=[];

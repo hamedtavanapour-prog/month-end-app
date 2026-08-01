@@ -1,6 +1,6 @@
 // state.js — in-memory app state and transient UI flags.
 
-let state={workspaceSchemaVersion:0,products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,prepItems:[],inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[],inventoryCategories:null};
+let state={workspaceSchemaVersion:0,products:[],productCatalogVersion:null,drinks:[],menus:[],menuLibraryVersion:0,coreDrinkRecipeVersion:0,prepItems:[],inventories:[],orders:[],suppliers:[],uploadedUsage:[],usageLogs:[],inventoryEntryTemplate:null,importBacklog:[],departments:[],productMenus:null,rooms:[],profiles:[],inventoryCategories:null};
 let editingProductId=null,editingOrderId=null,editingSupId=null;
 let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
 let countReportInventoryId=null;
@@ -58,6 +58,10 @@ let productDepartmentView='bar';
 let menuPageDepartment='bar';
 let menuPageMenuId='';
 let menuPageEditingMenuId='';
+let menuItemEditingMenuId='';
+let menuItemEditDraft=null;
+let menuItemEditIsNew=false;
+let menuItemViewVariantId='';
 let recipeProductReturn=null;
 let pendingEdits={};
 let liveInvCounts={};

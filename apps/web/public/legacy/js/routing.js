@@ -92,7 +92,7 @@
       if(state.resourceKind==='room')return[`/app/settings/floor-plan/rooms/${id}`,'Room Settings'];
       if(state.resourceKind==='category')return[`/app/catalog/categories/${id}`,'Category Settings'];
       if(state.resourceKind==='department')return[`/app/settings/departments/${id}`,'Department Settings'];
-      if(state.resourceKind==='menu')return[`/app/catalog/menus/${id}`,'Menu Settings'];
+      if(state.resourceKind==='menu')return[`/app/catalog/menus/${id}`,'Menu'];
     }
     if(state.action){
       if(state.page==='products')return['/app/catalog/products/new','New Product'];
@@ -152,7 +152,7 @@
     else if(kind==='room')openFloorPlanRoomEditor(id);
     else if(kind==='category')openInventoryCategoryEditor(id);
     else if(kind==='department'&&typeof selectDepartmentSettings==='function')selectDepartmentSettings(id);
-    else if(kind==='menu')openPageMenuEditor(id);
+    else if(kind==='menu')openMenuPageMenu(id);
   }
 
   function applyRoute(path){
@@ -198,9 +198,10 @@
     wrap('openFloorPlanRoomEditor',id=>{routeState={...routeState,page:'settings',section:'floor-plan',resourceKind:'room',resourceId:id,action:''};publishRoute();});
     wrap('openInventoryCategoryEditor',name=>{if(name){routeState={...routeState,page:'settings',section:'categories',resourceKind:'category',resourceId:name,action:''};publishRoute();}});
     wrap('selectDepartmentSettings',id=>{if(id){routeState={...routeState,page:'settings',section:'departments',resourceKind:'department',resourceId:id,action:''};publishRoute();}});
-    wrap('openPageMenuEditor',id=>{if(id){routeState={...routeState,page:'menu',resourceKind:'menu',resourceId:id,action:''};publishRoute();}});
+    wrap('openMenuPageMenu',id=>{if(id&&id!=='__all__'){routeState={...routeState,page:'menu',resourceKind:'menu',resourceId:id,action:''};publishRoute();}else{routeState={...routeState,page:'menu',resourceKind:'',resourceId:'',action:''};publishRoute();}});
+    wrap('showMenuPagePicker',()=>{routeState={...routeState,page:'menu',resourceKind:'',resourceId:'',action:''};publishRoute();});
     wrap('openModal',id=>{if(id==='modal-usage-upload'){routeState={...routeState,page:'usage',resourceKind:'',resourceId:'',action:'import'};publishRoute();}});
-    wrap('closeModal',id=>{if(BASE_ROUTE_BY_MODAL[id]){routeState.page=BASE_ROUTE_BY_MODAL[id];if(id==='modal-floor-plan-room')routeState.section='floor-plan';if(id==='modal-category-editor')routeState.section='categories';resetDetail();publishRoute();}});
+    wrap('closeModal',id=>{if(BASE_ROUTE_BY_MODAL[id]){routeState.page=BASE_ROUTE_BY_MODAL[id];if(id==='modal-floor-plan-room')routeState.section='floor-plan';if(id==='modal-category-editor')routeState.section='categories';resetDetail();if(id==='modal-menu-item-view'&&menuPageMenuId&&menuPageMenuId!=='__all__'){routeState.resourceKind='menu';routeState.resourceId=menuPageMenuId;}publishRoute();}});
   }
 
   window.addEventListener('message',event=>{

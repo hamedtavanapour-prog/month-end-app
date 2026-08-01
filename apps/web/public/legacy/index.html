@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=menu-recipes-3"/>
+<link rel="stylesheet" href="css/styles.css?v=menu-recipes-4"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -35,7 +35,7 @@
   </button>
   <button class="nav-item active" type="button" onclick="showPage('dashboard')" id="nav-dashboard" aria-label="Dashboard" aria-current="page"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></span><span>Dashboard</span></button>
   <button class="nav-item" type="button" onclick="showPage('products')" id="nav-products" aria-label="Products"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7 8 4 8-4M4 7v10l8 4 8-4V7M12 11v10"/></svg></span><span>Products</span></button>
-  <button class="nav-item" type="button" onclick="showPage('menu')" id="nav-menu" aria-label="Menu"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/></svg></span><span>Menu</span></button>
+  <button class="nav-item" type="button" onclick="showMenuPagePicker();showPage('menu')" id="nav-menu" aria-label="Menu"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/></svg></span><span>Menu</span></button>
   <button class="nav-item" type="button" onclick="showPage('live-inventory')" id="nav-live-inventory" aria-label="Live Inventory"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span>Live Inventory</span></button>
   <button class="nav-item" type="button" onclick="showPage('inventory')" id="nav-inventory" aria-label="Counts"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg></span><span>Counts</span></button>
   <button class="nav-item" type="button" onclick="showPage('orders')" id="nav-orders" aria-label="Orders"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span><span>Orders</span></button>
@@ -209,8 +209,7 @@
   <div id="menu-page-browser">
     <div class="menu-page-toolbar card">
       <div class="form-group"><label for="menu-page-department">Department</label><select id="menu-page-department" onchange="setMenuPageDepartment(this.value)"></select></div>
-      <div class="form-group"><label for="menu-page-menu">Menu</label><select id="menu-page-menu" onchange="setMenuPageMenu(this.value)"></select></div>
-      <div class="form-group menu-page-search"><label for="menu-page-search">Search</label><input type="search" id="menu-page-search" placeholder="Menu item, section, ingredient…" oninput="renderMenuPage()"></div>
+      <div class="form-group menu-page-search" id="menu-page-search-group" hidden><label for="menu-page-search">Search this menu</label><input type="search" id="menu-page-search" placeholder="Item name or section…" oninput="renderMenuPage()"></div>
     </div>
     <div class="menu-page-summary" id="menu-page-summary"></div>
     <div class="menu-page-grid" id="menu-page-grid"></div>
@@ -751,6 +750,7 @@
 <div class="modal-overlay" id="modal-prep-item-view">
 <div class="modal product-view-modal prep-item-view-modal" role="dialog" aria-modal="true" aria-labelledby="prep-item-view-title">
   <button class="modal-close" type="button" aria-label="Close prep item" onclick="closeModal('modal-prep-item-view')">&times;</button>
+  <button class="btn btn-secondary btn-sm recipe-back-button" id="prep-item-back-recipe" type="button" onclick="returnToRecipe()" hidden>← Back to Recipe</button>
   <span class="detail-eyebrow">Prep / information item</span>
   <h3 id="prep-item-view-title">Prep item</h3>
   <p class="prep-item-context">This item is used in recipes for information only. It will not appear in month-end counts.</p>
@@ -1104,12 +1104,13 @@
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=menu-recipes-3"></script>
+<script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-1"></script>
+<script src="js/state.js?v=menu-recipes-4"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
-<script src="js/store.js?v=menu-recipes-3"></script>
-<script src="js/ui.js?v=menu-recipes-3"></script>
-<script src="js/products.js?v=menu-recipes-3"></script>
+<script src="js/store.js?v=menu-recipes-4"></script>
+<script src="js/ui.js?v=menu-recipes-4"></script>
+<script src="js/products.js?v=menu-recipes-4"></script>
 <script src="js/inventory.js?v=menu-recipes-3"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
@@ -1118,7 +1119,7 @@
 <script src="js/export-tools.js?v=count-report-export-1"></script>
 <script src="js/voice.js?v=recount-transcription-1"></script>
 <script src="js/master-search.js"></script>
-<script src="js/routing.js?v=menu-recipes-3"></script>
+<script src="js/routing.js?v=menu-recipes-4"></script>
 <script src="js/main.js?v=local-count-mode-1"></script>
 <script src="js/access.js?v=local-count-mode-1"></script>
 </body>
