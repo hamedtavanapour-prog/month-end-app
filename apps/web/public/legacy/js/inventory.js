@@ -6,9 +6,36 @@ let recountSourceCountId=null;
 let recountSelectedProductIds=new Set();
 
 function latestInventoryCount(){
-  return [...state.inventories].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0]||null;
+  return finalisedInventoryBaselines()[0]||null;
 }
 function inventoryIsFinalised(inv){return!!inv&&(inv.status==='finalised'||inv.finalised===true);}
+function finalisedInventoryBaselines(){
+  return(state.inventories||[]).filter(inv=>inventoryIsFinalised(inv)&&!inv.archived).sort((a,b)=>
+    String(b.date||'').localeCompare(String(a.date||''))||
+    String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||''))||
+    Number(b.recountNumber||0)-Number(a.recountNumber||0)
+  );
+}
+function selectedLiveInventoryBaseline(){
+  const available=finalisedInventoryBaselines();
+  if(liveInventoryBaselineId){
+    const selected=available.find(inv=>inv.id===liveInventoryBaselineId);
+    if(selected)return selected;
+    liveInventoryBaselineId=null;
+  }
+  return available[0]||null;
+}
+function setLiveInventoryBaseline(id=''){
+  liveInventoryBaselineId=id||null;
+  renderLiveInventoryPage();
+}
+function renderLiveInventoryBaselineOptions(){
+  const select=document.getElementById('live-inv-baseline-f');if(!select)return;
+  const available=finalisedInventoryBaselines().slice(0,12);
+  const selected=selectedLiveInventoryBaseline();
+  select.innerHTML=available.length?available.map((inv,index)=>`<option value="${escapeHtml(inv.id)}">${index===0?'Latest · ':''}${fmtDate(inv.date)} · ${escapeHtml(inv.label||'Inventory Count')}${inv.recordType==='recount'?` · Re-count ${inv.recountNumber||''}`:' · Count'}</option>`).join(''):'<option value="">No finalized counts</option>';
+  if(selected)select.value=selected.id;
+}
 function inventoryStatusLabel(inv){return inventoryIsFinalised(inv)?'Finalised':'Saved';}
 function inventoryRootId(inv){return inv?.parentCountId||inv?.id||null;}
 function recountsForInventory(inv){
@@ -564,18 +591,31 @@ function inventoryRoomForFloorRoom(inv,floorRoomId){
   normalizeInventoryRooms(inv);
   return inv.rooms.find(room=>room.roomId===floorRoomId)||null;
 }
+function resolvedLiveBaselineItems(inv){
+  if(!inv)return{};
+  if(inv.recordType!=='recount')return inv.items||{};
+  const source=recountSourceInventory(inv);
+  return{...(source?.items||{}),...(inv.items||{})};
+}
+function resolvedLiveBaselineRoomItems(inv,floorRoomId){
+  if(!inv)return{};
+  const room=inventoryRoomForFloorRoom(inv,floorRoomId);
+  if(inv.recordType!=='recount')return room?.items||{};
+  const sourceRoom=inventoryRoomForFloorRoom(recountSourceInventory(inv),floorRoomId);
+  return{...(sourceRoom?.items||{}),...(room?.items||{})};
+}
 function liveInventoryRows(){
-  const baseline=latestInventoryCount();
+  const baseline=selectedLiveInventoryBaseline();
   const baselineDate=baseline?.date||'';
   const rooms=selectedLiveInventoryRooms();
   const allRooms=liveInventoryRoomIds===null;
-  const invRooms=rooms.map(room=>inventoryRoomForFloorRoom(baseline,room.id)).filter(Boolean);
+  const baselineItems=resolvedLiveBaselineItems(baseline);
   const ordered=allRooms?liveOrderQtyByProduct(baselineDate):{};
   const used=allRooms?liveUsageQtyByProduct(baselineDate):{};
   const allowed=allRooms?null:new Set(rooms.flatMap(room=>roomProductIds(room)));
   const roomLabel=allRooms?'All rooms':rooms.length===1?rooms[0].name:`${rooms.length} rooms`;
   return state.products.filter(product=>!product.archived&&(!allowed||allowed.has(product.id))).map(product=>{
-    const base=allRooms?(baseline?.items?.[product.id]??product.lastCount??0):invRooms.reduce((sum,room)=>sum+(parseFloat(room.items?.[product.id])||0),0);
+    const base=allRooms?(baselineItems[product.id]??product.lastCount??0):rooms.reduce((sum,room)=>sum+(parseFloat(resolvedLiveBaselineRoomItems(baseline,room.id)?.[product.id])||0),0);
     const orderQty=ordered[product.id]||0;
     const usageQty=used[product.id]||0;
     const live=base+orderQty-usageQty;
@@ -674,7 +714,8 @@ function updateLiveInventoryFilterSummary(){
   const status=document.getElementById('live-inv-status-f')?.value||'';
   const sort=document.getElementById('live-inv-sort-f')?.value||'name-asc';
   const roomFiltered=liveInventoryRoomIds!==null;
-  const active=[category,subcategory,status,sort!=='name-asc'?sort:'',roomFiltered?'rooms':''].filter(Boolean).length;
+  const manualBaseline=liveInventoryBaselineId&&liveInventoryBaselineId!==latestInventoryCount()?.id;
+  const active=[category,subcategory,status,sort!=='name-asc'?sort:'',roomFiltered?'rooms':'',manualBaseline?'baseline':''].filter(Boolean).length;
   summary.textContent=active?`${active} active`:'Default';
 }
 
@@ -727,6 +768,7 @@ function renderLiveInventoryPage(){
   const results=document.getElementById('live-inv-results');
   if(!results)return;
   renderLiveInventoryRoomTabs();
+  renderLiveInventoryBaselineOptions();
   renderLiveInventoryViewButtons();
   updateLiveInventoryFilterSummary();
   if(!state.products.length){
@@ -739,7 +781,7 @@ function renderLiveInventoryPage(){
   const sub=document.getElementById('live-inv-sub-f')?.value||'';
   const status=document.getElementById('live-inv-status-f')?.value||'';
   const sort=document.getElementById('live-inv-sort-f')?.value||'name-asc';
-  const baseline=latestInventoryCount();
+  const baseline=selectedLiveInventoryBaseline();
   const allLiveRows=liveInventoryRows();
   const selectedRooms=selectedLiveInventoryRooms();
   const allRooms=liveInventoryRoomIds===null;
@@ -782,7 +824,7 @@ function openLiveInventoryDetail(productId){
   const row=liveInventoryRows().find(item=>item.product.id===productId);
   if(!row)return;
   const body=document.getElementById('live-inv-detail-body');
-  const baseline=latestInventoryCount();
+  const baseline=selectedLiveInventoryBaseline();
   body.innerHTML=`
     <div class="product-view-head">
       <div>
@@ -1254,9 +1296,7 @@ function focusFirstInventoryQuantity(){
 function setInventoryFinishSaving(saving){
   inventoryCountSaving=saving;
   const saveButton=document.getElementById('inventory-count-finish');
-  const doneButton=document.getElementById('inventory-count-done');
   if(saveButton){saveButton.disabled=saving;saveButton.setAttribute('aria-busy',String(saving));saveButton.textContent=saving?'Saving…':'Save';}
-  if(doneButton){doneButton.disabled=saving;doneButton.setAttribute('aria-busy',String(saving));doneButton.textContent=saving?'Saving…':'Done';}
 }
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentCountProducts();
@@ -1336,7 +1376,7 @@ async function saveInventory(done=false){
     renderInventoryTable();refreshLiveInventoryIfVisible();
     window.recordServerEvent?.({action:'count.room_saved',entityType:'count',entityId:lock.countId,details:{roomId:lock.roomId,roomName:room.name,items:Object.keys(items).length}});
     if(!done){
-      toast(`${room.name} saved. Continue counting or press Done.`);
+      toast(`${room.name} saved.`);
       return;
     }
     clearInterval(countRoomLockHeartbeatTimer);
@@ -1348,7 +1388,7 @@ async function saveInventory(done=false){
     inventoryRoomExitInProgress=true;
     closeModal('modal-inventory');
     inventoryRoomExitInProgress=false;
-    toast(`${room.name} saved — choose another room, press Done, or finalise the count.`);
+    toast(`${room.name} saved — choose another room or finalise the count.`);
     await openCountRoomPicker(lock.countId);
   }catch(error){
     console.error('Inventory save failed:',error);
@@ -1483,6 +1523,8 @@ function openRecountSelector(countId,preselectedProductIds=[]){
   const source=recountSourceInventory(requested);
   if(!source){toast('Choose a saved count before starting a re-count.',true);return;}
   recountSourceCountId=source.id;
+  if(typeof recountTranscribeHistory!=='undefined')recountTranscribeHistory=[];
+  if(typeof renderTranscribeHistory==='function')renderTranscribeHistory('recount');
   const available=new Set(recountSelectableProducts(source).map(product=>product.id));
   recountSelectedProductIds=new Set((preselectedProductIds||[]).filter(id=>available.has(id)));
   const context=document.getElementById('recount-source-context');
@@ -1695,6 +1737,25 @@ function countReportRows(items,order){
   rows.push(['','','','','','','TOTAL',+total.toFixed(2)]);
   return{entries,rows,total};
 }
+function recountComparisonReport(inv,order='category'){
+  const source=recountSourceInventory(inv);
+  const productIds=new Set(Object.keys(source?.items||{}));
+  expectedInventoryProductIds(source).forEach(id=>productIds.add(id));
+  const entries=sortCountReportEntries([...productIds].map(productId=>{
+    const product=getProduct(productId);if(!product)return null;
+    const original=parseFloat(source?.items?.[productId])||0;
+    const hasRecount=Object.prototype.hasOwnProperty.call(inv.items||{},productId);
+    const recount=hasRecount?(parseFloat(inv.items[productId])||0):null;
+    const finalQty=recount===null?original:recount;
+    return{product,qty:finalQty,value:finalQty*(parseFloat(product.cost)||0),original,recount,finalQty};
+  }).filter(Boolean),order);
+  let total=0;
+  const rows=[['Product','Category','Subcategory','Original Count','Re-count','Final Count','Unit','Unit Cost','Final Value']];
+  entries.forEach(entry=>{total+=entry.value;rows.push([entry.product.name,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost||0,+entry.value.toFixed(2)]);});
+  rows.push(['','','','','','','','TOTAL',+total.toFixed(2)]);
+  return{entries,rows,total};
+}
+function inventoryExportReport(inv,order){return inv.recordType==='recount'?recountComparisonReport(inv,order):countReportRows(inv.items,order);}
 function openCountReportExport(id=viewInvId){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);
@@ -1707,7 +1768,10 @@ function openCountReportExport(id=viewInvId){
   const usageOption=orderSelect?.querySelector('option[value="usage"]');
   const hasInventoryEntryOrder=inventoryEntryReportOrderMap().size>0;
   if(title)title.textContent=`Export report — ${inv.label||'Count'}`;
-  if(summary)summary.textContent=`${fmtDate(inv.date)} · ${inv.rooms.length} room${inv.rooms.length===1?'':'s'} · ${Object.keys(inv.items||{}).length} counted item${Object.keys(inv.items||{}).length===1?'':'s'}`;
+  if(summary){
+    const reportItemCount=inv.recordType==='recount'?recountComparisonReport(inv,'category').entries.length:Object.keys(inv.items||{}).length;
+    summary.textContent=`${fmtDate(inv.date)} · ${inv.rooms.length} room${inv.rooms.length===1?'':'s'} · ${reportItemCount} report item${reportItemCount===1?'':'s'}${inv.recordType==='recount'?' · Original, re-count, and final quantities':''}`;
+  }
   if(usageOption){
     usageOption.disabled=!hasInventoryEntryOrder;
     usageOption.textContent=hasInventoryEntryOrder?'Usage order — Inventory Entry Form':'Usage order — Inventory Entry Form (not set)';
@@ -1723,7 +1787,7 @@ function updateCountReportExportPreview(){
   if(!inv)return;
   const order=document.getElementById('count-report-order')?.value||'category';
   const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
-  const report=countReportRows(inv.items,order);
+  const report=inventoryExportReport(inv,order);
   const names=report.entries.slice(0,4).map(entry=>entry.product.name);
   const remaining=Math.max(report.entries.length-names.length,0);
   const previewTitle=document.getElementById('count-report-preview-title');
@@ -1755,7 +1819,7 @@ function exportInventoryExcel(id,order='category'){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
-  const merged=countReportRows(inv.items,order);
+  const merged=inventoryExportReport(inv,order);
   const sheets=[{name:(`Merged ${inv.date}`).slice(0,31),rows:merged.rows}];
   inv.rooms.forEach(room=>{
     const roomReport=countReportRows(room.items||{},order);
@@ -1767,14 +1831,16 @@ function printInventoryCount(id,order='category'){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
-  const report=countReportRows(inv.items,order);
-  const bodyRows=report.entries.map(({product,qty,value})=>[
-    product.name,product.category,product.subcategory||'',qty,product.unit,product.par||'—',product.cost>0?fmt(product.cost):'—',fmt(value)
-  ]);
+  const report=inventoryExportReport(inv,order);
+  const isRecount=inv.recordType==='recount';
+  const bodyRows=report.entries.map(entry=>isRecount
+    ?[entry.product.name,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'—':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)]
+    :[entry.product.name,entry.product.category,entry.product.subcategory||'',entry.qty,entry.product.unit,entry.product.par||'—',entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)]
+  );
   printTable(
     `Count Report — ${inv.label||fmtDate(inv.date)}`,
     `Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Order: ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category} · Merged Total: ${fmt(report.total)}`,
-    ['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value'],
+    isRecount?['Product','Category','Subcategory','Original Count','Re-count','Final Count','Unit','Unit Cost','Final Value']:['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value'],
     bodyRows
   );
 }
@@ -1805,7 +1871,6 @@ document.addEventListener('click',event=>{
 },true);
 document.getElementById('inventory-count-cancel')?.addEventListener('click',()=>exitInventoryRoom());
 document.getElementById('inventory-count-finish')?.addEventListener('click',()=>saveInventory(false));
-document.getElementById('inventory-count-done')?.addEventListener('click',()=>saveInventory(true));
 document.addEventListener('click',event=>{
   // This coordinate fallback is registered before voice.js. Without an
   // explicit top-layer guard, a tap on Stop & Review can also activate the
@@ -1815,7 +1880,6 @@ document.addEventListener('click',event=>{
   const actions=[
     {button:document.getElementById('inventory-count-cancel'),run:()=>exitInventoryRoom()},
     {button:document.getElementById('inventory-count-finish'),run:()=>saveInventory(false)},
-    {button:document.getElementById('inventory-count-done'),run:()=>saveInventory(true)}
   ];
   const action=actions.find(item=>{
     if(!item.button)return false;

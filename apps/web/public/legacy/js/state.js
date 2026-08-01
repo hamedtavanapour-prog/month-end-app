@@ -27,6 +27,7 @@ let usageLogHeaderPinned=true;
 let usageSummaryExpanded=false;
 let liveInventoryViewMode='list';
 let liveInventoryRoomIds=null;
+let liveInventoryBaselineId=null;
 let currentProfileId=null;
 let editingSettingsRoomId=null;
 let addingSettingsRoom=false;

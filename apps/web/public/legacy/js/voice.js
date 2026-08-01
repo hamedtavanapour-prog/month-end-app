@@ -13,6 +13,7 @@ let voicePreviousFocus=null;
 let voiceRecordingTimer=null;
 let voiceTranscriptionController=null;
 let inventoryTranscribeHistory=[];
+let recountTranscribeHistory=[];
 const VOICE_MAX_RECORDING_MS=2*60*1000;
 const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 
@@ -20,6 +21,7 @@ function voiceHints(){
   return{
     products:'Say product name + par: "Disaronno 2, Jameson 4"',
     inventory:'Say product + count: "Absolut 3, goose 2, tank 4"',
+    recount:'Call out product names: "Absolut, goose, Jameson"',
     orders:'Say product + qty: "Absolut 6, Heineken 2"'
   };
 }
@@ -28,12 +30,13 @@ function voiceLabels(){
   return{
     products:'Record Par Levels',
     inventory:'Record Inventory Count',
+    recount:'Select Re-count Products',
     orders:'Record Order Quantities'
   };
 }
 
 function setVoiceButtons(activeContext){
-  ['products','orders','inventory'].forEach(context=>{
+  ['products','orders','inventory','recount'].forEach(context=>{
     const button=document.getElementById('voice-btn-'+context);
     if(button)button.classList.toggle('listening',context===activeContext);
   });
@@ -55,13 +58,13 @@ function setVoiceModal(text){
 }
 
 function voiceParsedItemCount(text){
-  return voiceContext==='inventory'?parseVoice(String(text||'')).length:0;
+  return['inventory','recount'].includes(voiceContext)?parseVoice(String(text||'')).length:0;
 }
 function updateVoiceItemCount(text=document.getElementById('voice-review-text')?.value||''){
   const counter=document.getElementById('voice-item-counter');
   const value=document.getElementById('voice-item-count');
   if(!counter||!value)return;
-  counter.hidden=voiceContext!=='inventory';
+  counter.hidden=!['inventory','recount'].includes(voiceContext);
   value.textContent=String(voiceParsedItemCount(text));
 }
 function resetInventoryTranscribeHistory(){
@@ -73,14 +76,21 @@ function addInventoryTranscribeHistory(type,title,text){
   inventoryTranscribeHistory.push({type,title,text:String(text||''),time:new Date()});
   renderTranscribeHistory();
 }
-function renderTranscribeHistory(){
-  const list=document.getElementById('transcribe-history-list');
-  const button=document.getElementById('transcribe-history-button');
-  if(button)button.textContent=`Transcribe History${inventoryTranscribeHistory.length?` (${inventoryTranscribeHistory.length})`:''}`;
-  if(!list)return;
-  list.innerHTML=inventoryTranscribeHistory.length?inventoryTranscribeHistory.map(entry=>`<div class="transcribe-history-entry ${entry.type}"><strong>${escapeHtml(entry.title)}</strong><p>${escapeHtml(entry.text)}</p><time>${entry.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):'<div class="empty-cell">No transcription activity in this room yet.</div>';
+function addRecountTranscribeHistory(type,title,text){
+  recountTranscribeHistory.push({type,title,text:String(text||''),time:new Date()});
+  renderTranscribeHistory('recount');
 }
-function openTranscribeHistory(){renderTranscribeHistory();openModal('modal-transcribe-history');}
+function activeTranscribeHistory(context){return context==='recount'?recountTranscribeHistory:inventoryTranscribeHistory;}
+function renderTranscribeHistory(context=voiceContext==='recount'?'recount':'inventory'){
+  const history=activeTranscribeHistory(context);
+  const list=document.getElementById('transcribe-history-list');
+  const button=document.getElementById(context==='recount'?'recount-transcribe-history-button':'transcribe-history-button');
+  if(button)button.textContent=`Transcribe History${history.length?` (${history.length})`:''}`;
+  if(!list)return;
+  document.getElementById('transcribe-history-title').textContent=context==='recount'?'Re-count Transcribe History':'Transcribe History';
+  list.innerHTML=history.length?history.map(entry=>`<div class="transcribe-history-entry ${entry.type}"><strong>${escapeHtml(entry.title)}</strong><p>${escapeHtml(entry.text)}</p><time>${entry.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):`<div class="empty-cell">No transcription activity ${context==='recount'?'for this re-count selection':'in this room'} yet.</div>`;
+}
+function openTranscribeHistory(context='inventory'){renderTranscribeHistory(context);openModal('modal-transcribe-history');}
 
 function setVoiceBlocking(active){
   document.body.classList.toggle('voice-ui-open',active);
@@ -133,6 +143,7 @@ function reviewVoiceTranscript(transcript){
   const cleaned=String(transcript||'').trim();
   if(!cleaned){
     if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
+    if(voiceContext==='recount')addRecountTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
     resetVoiceState();
     toast('Nothing heard.',true);
     return;
@@ -146,7 +157,8 @@ function reviewVoiceTranscript(transcript){
   document.getElementById('voice-ctx-label').textContent='Review Transcription';
   document.getElementById('voice-hint').textContent='Check or correct the text, then apply it or discard it.';
   document.getElementById('voice-review-text').value=cleaned;
-  addInventoryTranscribeHistory('transcript','Transcription',cleaned);
+  if(voiceContext==='inventory')addInventoryTranscribeHistory('transcript','Transcription',cleaned);
+  if(voiceContext==='recount')addRecountTranscribeHistory('transcript','Transcription',cleaned);
   updateVoiceItemCount(cleaned);
   setVoiceActionState('review');
   setTimeout(()=>document.getElementById('voice-review-text')?.focus(),0);
@@ -252,6 +264,7 @@ function resetVoiceState(){
 
 function cancelVoice(){
   if(voiceContext==='inventory'&&voicePendingTranscript)addInventoryTranscribeHistory('unmatched','Transcription discarded',voicePendingTranscript);
+  if(voiceContext==='recount'&&voicePendingTranscript)addRecountTranscribeHistory('unmatched','Transcription discarded',voicePendingTranscript);
   voicePendingTranscript='';
   voiceReviewPending=false;
   resetVoiceState();
@@ -277,7 +290,7 @@ async function transcribeVoiceRecording(){
     const form=new FormData();
     const extension=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';
     form.append('audio',audio,`count-recording.${extension}`);
-    const products=voiceContext==='inventory'&&typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
+    const products=voiceContext==='inventory'&&typeof currentRoomProducts==='function'?currentRoomProducts():voiceContext==='recount'&&typeof recountSelectableProducts==='function'?recountSelectableProducts(recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId))):state.products;
     const vocabulary=[...new Set(products.flatMap(product=>[product.name,product.inventoryName].filter(Boolean)))].join(', ');
     form.append('vocabulary',vocabulary.slice(0,6000));
     const controller=new AbortController();
@@ -301,6 +314,7 @@ async function transcribeVoiceRecording(){
     voiceFinal=transcript;
     if(!transcript){
       if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
+      if(voiceContext==='recount')addRecountTranscribeHistory('unmatched','Nothing transcribed','No speech was detected.');
       resetVoiceState();
       toast('No speech detected.',true);
       return;
@@ -308,6 +322,7 @@ async function transcribeVoiceRecording(){
     reviewVoiceTranscript(transcript);
   }catch(error){
     if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Transcription failed',error?.name==='AbortError'?'The recording took too long to transcribe.':error.message||'Voice transcription failed.');
+    if(voiceContext==='recount')addRecountTranscribeHistory('unmatched','Transcription failed',error?.name==='AbortError'?'The recording took too long to transcribe.':error.message||'Voice transcription failed.');
     resetVoiceState();
     toast(error?.name==='AbortError'?'Voice transcription took too long. Try a shorter recording.':error.message||'Voice transcription failed.',true);
   }
@@ -346,11 +361,13 @@ function applyVoiceTranscript(text){
   const parsed=parseVoice(t);
   if(!parsed.length){
     if(voiceContext==='inventory')addInventoryTranscribeHistory('unmatched','Transcription not applied',t);
+    if(voiceContext==='recount')addRecountTranscribeHistory('unmatched','Transcription not applied',t);
     toast('Could not parse: '+t,true);
     return;
   }
   if(voiceContext==='products')applyVoiceProducts(parsed);
   else if(voiceContext==='inventory')applyVoiceInventory(parsed);
+  else if(voiceContext==='recount')applyVoiceRecount(parsed);
   else if(voiceContext==='orders')applyVoiceOrders(parsed);
 }
 
@@ -485,5 +502,22 @@ function applyVoiceInventory(parsed){
   }else updateInvProgress();
   if(ambiguous.length)setTimeout(()=>toast('Ambiguous: '+ambiguous.join(', '),true),700);
   else if(unmatched.length)setTimeout(()=>toast('No match: '+unmatched.join(', '),true),700);
+}
+function applyVoiceRecount(parsed){
+  const source=recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId));
+  const products=recountSelectableProducts(source);
+  const applied=[],ambiguous=[],unmatched=[];
+  parsed.forEach(({nameStr})=>{
+    const result=voiceProductMatch(nameStr,products);
+    if(result&&!result.ambiguous){recountSelectedProductIds.add(result.product.id);applied.push(result.product.name);}
+    else if(result?.ambiguous)ambiguous.push(`${nameStr}: ${result.candidates.map(candidate=>candidate.product.name).join(' / ')}`);
+    else unmatched.push(nameStr);
+  });
+  if(applied.length)addRecountTranscribeHistory('applied',`${applied.length} product${applied.length===1?'':'s'} selected`,applied.join('\n'));
+  if(ambiguous.length)addRecountTranscribeHistory('ambiguous',`${ambiguous.length} ambiguous product${ambiguous.length===1?'':'s'}`,ambiguous.join('\n'));
+  if(unmatched.length)addRecountTranscribeHistory('unmatched',`${unmatched.length} product${unmatched.length===1?'':'s'} missed`,unmatched.join('\n'));
+  renderRecountProductSelector();
+  toast(applied.length?`Voice: ${applied.length} product${applied.length===1?'':'s'} selected.`:'No products were selected.',!applied.length);
+  if(ambiguous.length||unmatched.length)setTimeout(()=>toast(`${ambiguous.length+unmatched.length} product${ambiguous.length+unmatched.length===1?' was':'s were'} not applied. Check Transcribe History.`,true),700);
 }
 function applyVoiceOrders(parsed){const lines=[];const um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r)lines.push({productId:r.product.id,productName:r.product.name,productNumber:r.product.sku||r.product.id,sku:r.product.sku||'',qty,unit:r.product.unit||'',unitSize:'',unitPrice:r.product.cost||0,deposit:0});else um.push(nameStr);});if(!lines.length){toast('No products matched.',true);return;}resetOrderModal();editingOrderId=null;document.getElementById('ord-modal-title').textContent='New Voice Invoice';document.getElementById('om-date').value=today();document.getElementById('om-invoice').value='Voice Invoice - '+new Date().toLocaleDateString('en-CA');document.getElementById('om-status').value='Draft';document.getElementById('om-notes').value=um.length?'Unmatched: '+um.join(', '):'';document.getElementById('order-lines').innerHTML='';lines.forEach(l=>addOrderLine(l));updateOrderTotal();openModal('modal-order');toast(`Voice: ${lines.length} line${lines.length>1?'s':''} added.`);if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),800);}

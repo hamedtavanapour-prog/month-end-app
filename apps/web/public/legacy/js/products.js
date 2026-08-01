@@ -294,6 +294,7 @@ function openProductModal(id=null){
     document.getElementById('pm-cost').value=p.cost;document.getElementById('pm-par').value=p.par||'';
     document.getElementById('pm-last-count').value=p.lastCount??'';
     document.getElementById('pm-sku').value=p.sku||'';document.getElementById('pm-notes').value=p.notes||'';
+    document.getElementById('pm-status').value=p.status==='delisted'||p.archived?'delisted':'active';
     buildProductUnitRows(normalizeProductUnits(p));
     selectProductUnitByValues(p.unit,p.sku,p.cost,p.par);
     previewAliases();
@@ -303,6 +304,7 @@ function openProductModal(id=null){
     document.getElementById('pm-cat').value=department==='bar'?'Spirits':department==='kitchen'?'Food':'Supplies';updateSubcatOptions('pm-sub','pm-cat');
     buildProductUnitRows([{unit:'',unitSize:'',sku:'',cost:0,par:0}]);
     rebuildProductUnitSelect();
+    document.getElementById('pm-status').value='active';
   }
   document.getElementById('pm-sup-search').value='';
   buildProdSuppliers(id?(getProduct(id).suppliers||[]):[]);
@@ -514,7 +516,8 @@ async function saveProduct(){
   const {primary,orderedUnits}=orderUnitsByDefault(units);
   const existing=editingProductId?getProduct(editingProductId):null;
   const lastCountValue=document.getElementById('pm-last-count').value;
-  const prod={...existing,id:editingProductId||uid(),name,inventoryName:document.getElementById('pm-inventory-name').value.trim(),aliases:document.getElementById('pm-aliases').value.trim(),departments,unit:primary.unit,category:document.getElementById('pm-cat').value,subcategory:document.getElementById('pm-sub').value,cost:primary.cost||parseFloat(document.getElementById('pm-cost').value)||0,par:parseFloat(primary.par)||parseFloat(document.getElementById('pm-par').value)||0,sku:primary.sku||document.getElementById('pm-sku').value.trim(),notes:document.getElementById('pm-notes').value.trim(),suppliers:getProdSuppliers(),units:orderedUnits,lastCount:lastCountValue===''?null:parseFloat(lastCountValue)||0,archived:existing?.archived||false};
+  const status=document.getElementById('pm-status').value;
+  const prod={...existing,id:editingProductId||uid(),name,inventoryName:document.getElementById('pm-inventory-name').value.trim(),aliases:document.getElementById('pm-aliases').value.trim(),departments,unit:primary.unit,category:document.getElementById('pm-cat').value,subcategory:document.getElementById('pm-sub').value,cost:primary.cost||parseFloat(document.getElementById('pm-cost').value)||0,par:parseFloat(primary.par)||parseFloat(document.getElementById('pm-par').value)||0,sku:primary.sku||document.getElementById('pm-sku').value.trim(),notes:document.getElementById('pm-notes').value.trim(),suppliers:getProdSuppliers(),units:orderedUnits,lastCount:lastCountValue===''?null:parseFloat(lastCountValue)||0,status,archived:status==='delisted'};
   const wasEditing=Boolean(editingProductId);
   const saveButton=document.getElementById('product-save-button');
   productSaveInProgress=true;saveButton.disabled=true;saveButton.textContent='Saving…';
@@ -530,7 +533,7 @@ async function saveProduct(){
   saveButton.disabled=false;saveButton.textContent='Save Product';
 }
 function deleteProduct(id){closeAllMenus();if(!confirm('Delete this product?'))return;state.products=state.products.filter(p=>p.id!==id);state.suppliers.forEach(s=>{if(Array.isArray(s.products))s.products=s.products.filter(pid=>pid!==id);});save();closeModal('modal-product-view');renderProducts();toast('Deleted.');}
-function archiveProduct(id,archived=true){closeAllMenus();const p=getProduct(id);if(!p)return;p.archived=archived;save();closeModal('modal-product-view');renderProducts();toast(archived?'Archived.':'Restored.');}
+function archiveProduct(id,archived=true){closeAllMenus();const p=getProduct(id);if(!p)return;p.archived=archived;p.status=archived?'delisted':'active';save();closeModal('modal-product-view');renderProducts();toast(archived?'De-listed.':'Activated.');}
 function onInlineEdit(pid,field,val){if(!pendingEdits[pid])pendingEdits[pid]={};pendingEdits[pid][field]=val;}
 function saveAllInlineEdits(){let n=0;Object.entries(pendingEdits).forEach(([pid,ch])=>{const i=state.products.findIndex(p=>p.id===pid);if(i===-1)return;if(ch.par!==undefined)state.products[i].par=parseFloat(ch.par)||0;if(ch.lastCount!==undefined)state.products[i].lastCount=ch.lastCount===''?null:parseFloat(ch.lastCount);n++;});pendingEdits={};save();renderProducts();toast(`${n} product(s) saved.`);}
 
@@ -555,7 +558,7 @@ function openProductQuickAction(action,id){
   }
 }
 function productMenuHtml(product,menuId){
-  const archiveLabel=product.archived?'Restore':'Archive';
+  const archiveLabel=product.archived?'Set Active':'De-list';
   const archiveAction=product.archived?`archiveProduct('${product.id}',false)`:`archiveProduct('${product.id}',true)`;
   return`<div class="drop-wrap product-actions">
     <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Product actions" aria-label="Product actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
@@ -582,7 +585,7 @@ function openProductView(id){
   body.innerHTML=`
     <div class="product-view-head">
       <div>
-        <h3 id="product-view-title">${escapeHtml(p.name)}${p.archived?' <span class="sub-badge">Archived</span>':''}</h3>
+        <h3 id="product-view-title">${escapeHtml(p.name)}${p.archived?' <span class="sub-badge">De-listed</span>':''}</h3>
         <div class="product-view-meta">${departmentBadges} ${catBadge(p.category)} ${subBadge(p.subcategory)} ${low?'<span class="missing-pill"><span class="missing-dot"></span>At / below par</span>':''}</div>
       </div>
       <div class="detail-heading-actions">
@@ -592,6 +595,7 @@ function openProductView(id){
       </div>
     </div>
     <div class="product-detail-grid">
+      <div class="product-detail-field"><div class="label">Status</div><div class="value">${p.archived||p.status==='delisted'?'De-listed':'Active'}</div></div>
       <div class="product-detail-field"><div class="label">Inventory Name</div><div class="value">${escapeHtml(p.inventoryName||p.name||'—')}</div></div>
       <div class="product-detail-field"><div class="label">${isBar?'Packaging':'Unit'}</div><div class="value">${escapeHtml(p.unit||'—')}</div></div>
       <div class="product-detail-field"><div class="label">${isBar?'Packaging Cost':'Unit Cost'}</div><div class="value">${p.cost>0?fmt(p.cost):'—'}</div></div>

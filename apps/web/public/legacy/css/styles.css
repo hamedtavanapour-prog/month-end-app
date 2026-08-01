@@ -509,6 +509,7 @@ body.sidebar-collapsed .profile-menu{left:58px;bottom:0;}
 .segmented-control button:hover,.segmented-control button.active{background:var(--surface3);color:var(--accent);}
 .live-view-mode-group{min-width:132px;}
 .live-inv-filter-sheet,.live-inv-filter-fields{display:contents;}
+.live-baseline-group select{min-width:220px;}
 .live-room-group{min-width:160px;flex:1.1!important;}
 .live-room-picker{width:100%;}
 .live-room-picker-button{width:100%;min-height:38px;justify-content:space-between;overflow:hidden;}
@@ -1098,6 +1099,7 @@ body.voice-ui-open{overflow:hidden;}
 .recount-select-modal{width:min(620px,calc(100vw - 24px));}
 .recount-select-toolbar{display:flex;align-items:flex-end;gap:12px;margin:16px 0 12px;}
 .recount-select-toolbar .form-group{flex:1;}
+.recount-voice-actions{display:flex;gap:8px;align-items:center;margin:0 0 12px;}
 .recount-select-shortcuts{display:flex;gap:8px;}
 .recount-product-list{display:grid;gap:8px;max-height:min(430px,52vh);overflow:auto;padding:2px;}
 .recount-product-option{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);cursor:pointer;}
@@ -2103,7 +2105,7 @@ body.sidebar-collapsed .master-search-trigger:hover::after,body.sidebar-collapse
   .live-inv-filter-sheet-head button{display:grid;width:38px;height:38px;place-items:center;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-size:1rem;}
   .live-inv-filter-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
   .live-inv-filter-fields .form-group{min-width:0!important;}
-  .live-inv-filter-fields .live-room-group{grid-column:1/-1;}
+  .live-inv-filter-fields .live-room-group,.live-inv-filter-fields .live-baseline-group{grid-column:1/-1;}
   .live-inv-filter-sheet .live-room-picker-button{display:flex;min-height:46px;}
   .live-inv-filter-done{display:flex;width:100%;min-height:46px;justify-content:center;}
 }

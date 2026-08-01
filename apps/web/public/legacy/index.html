@@ -176,7 +176,7 @@
               </select>
             </div>
             <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-sub-f">Subcategory</label><select id="prod-sub-f" onchange="renderProducts()"><option value="">All</option></select></div>
-            <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-status-f">Status</label><select id="prod-status-f" onchange="renderProducts()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div>
+            <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-status-f">Status</label><select id="prod-status-f" onchange="renderProducts()"><option value="active">Active</option><option value="archived">De-listed</option><option value="all">All</option></select></div>
             <div class="form-group" style="flex:1;min-width:110px;"><label for="prod-sort-f">Sort</label><select id="prod-sort-f" onchange="setProductSort(this.value)"><option value="name:asc">Name A–Z</option><option value="name:desc">Name Z–A</option><option value="category:asc">Category</option><option value="cost:asc">Cost low to high</option><option value="cost:desc">Cost high to low</option><option value="par:desc">Highest par</option><option value="lastCount:desc">Latest count quantity</option></select></div>
           </div>
           <button class="btn btn-primary product-filter-done mobile-only" type="button" onclick="closeProductFilterSheet()">Done</button>
@@ -211,6 +211,7 @@
       <div class="live-inv-filter-sheet" id="live-inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="live-inv-filter-title">
         <div class="live-inv-filter-sheet-head mobile-only"><div><span>Live inventory options</span><h4 id="live-inv-filter-title">Sort &amp; Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeLiveInventoryFilterSheet()">&times;</button></div>
         <div class="live-inv-filter-fields">
+          <div class="form-group live-baseline-group" style="flex:1;min-width:180px;"><label for="live-inv-baseline-f">Baseline</label><select id="live-inv-baseline-f" onchange="setLiveInventoryBaseline(this.value)"></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-cat-f">Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-sub-f">Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-status-f">Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
@@ -628,7 +629,6 @@
     <div class="inventory-room-actions" style="display:flex;gap:10px;">
       <button class="btn btn-secondary" id="inventory-count-cancel" type="button">Exit Room</button>
       <button class="btn btn-secondary" id="inventory-count-finish" type="button">Save</button>
-      <button class="btn btn-primary" id="inventory-count-done" type="button">Done</button>
     </div>
   </div>
 </div>
@@ -652,6 +652,10 @@
   <div class="recount-select-toolbar">
     <div class="form-group"><label for="recount-product-search">Search items</label><input type="search" id="recount-product-search" placeholder="Product or category…" autocomplete="off" oninput="renderRecountProductSelector()"></div>
     <div class="recount-select-shortcuts"><button class="btn btn-secondary btn-sm" type="button" onclick="setAllRecountProducts(true)">Select all</button><button class="btn btn-secondary btn-sm" type="button" onclick="setAllRecountProducts(false)">Clear</button></div>
+  </div>
+  <div class="recount-voice-actions">
+    <button class="voice-btn compact" id="voice-btn-recount" type="button" onclick="toggleVoice('recount')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Transcribe Products</span></button>
+    <button class="btn btn-secondary btn-sm" id="recount-transcribe-history-button" type="button" onclick="openTranscribeHistory('recount')">Transcribe History</button>
   </div>
   <div class="recount-product-list" id="recount-product-list"></div>
   <div class="modal-actions recount-select-actions"><span id="recount-selected-count">0 selected</span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-recount-select')">Cancel</button><button class="btn btn-primary" id="recount-create-button" type="button" onclick="createRecount()">Create Re-count</button></div>
@@ -693,6 +697,7 @@
     </div>
     <div class="form-group"><label for="pm-cat">Category</label><select id="pm-cat" onchange="updateSubcatOptions('pm-sub','pm-cat')"><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
     <div class="form-group"><label for="pm-sub">Subcategory</label><select id="pm-sub"></select></div>
+    <div class="form-group"><label for="pm-status">Status</label><select id="pm-status"><option value="active">Active</option><option value="delisted">De-listed</option></select></div>
     <div class="form-group"><label id="pm-unit-label" for="pm-unit">Packaging</label><select id="pm-unit" onchange="onProductUnitSelected()"></select></div>
     <div class="form-group"><label id="pm-cost-label" for="pm-cost">Packaging Cost ($)</label><input type="number" id="pm-cost" min="0" step="0.01" readonly></div>
     <div class="form-group"><label for="pm-par">Par Level</label><input type="number" id="pm-par" min="0" oninput="syncSelectedProductUnitField('par',this.value)"></div>
@@ -1058,19 +1063,19 @@
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/state.js?v=count-report-export-1"></script>
+<script src="js/state.js?v=live-baseline-selector-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=performance-recovery-3"></script>
 <script src="js/ui.js?v=local-count-mode-1"></script>
-<script src="js/products.js?v=shared-room-count-1"></script>
-<script src="js/inventory.js?v=local-count-mode-1"></script>
+<script src="js/products.js?v=product-status-1"></script>
+<script src="js/inventory.js?v=live-baseline-selector-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>
-<script src="js/voice.js?v=transcribe-variances-1"></script>
+<script src="js/voice.js?v=recount-transcription-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=temporary-count-items-1"></script>
 <script src="js/main.js?v=local-count-mode-1"></script>
