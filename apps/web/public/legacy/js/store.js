@@ -1,6 +1,6 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
-const CURRENT_WORKSPACE_SCHEMA_VERSION=4;
+const CURRENT_WORKSPACE_SCHEMA_VERSION=5;
 
 function compactUsageRow(row){
   return{
@@ -106,6 +106,8 @@ function compactStateForStorage(){
     menus:state.menus||[],
     menuLibraryVersion:state.menuLibraryVersion||0,
     coreDrinkRecipeVersion:state.coreDrinkRecipeVersion||0,
+    springMenuRecipeVersion:state.springMenuRecipeVersion||0,
+    springPrepRecipeVersion:state.springPrepRecipeVersion||0,
     prepItems:state.prepItems||[],
     inventories:state.inventories||[],
     orders:state.orders||[],

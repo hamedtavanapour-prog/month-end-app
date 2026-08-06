@@ -7,6 +7,7 @@ let mobileExpandedProductId=null;
 
 const PRODUCT_MENU_DEFINITIONS={
   products:{label:'Inventory Products',description:'Items assigned to this department'},
+  'info-items':{label:'Prep & Info',description:'Non-counted ingredients, mixes, garnishes, and preparation notes'},
   'import-backlog':{label:'Import Backlog',description:'Unmatched imported items saved for later'},
   drinks:{label:'All Drinks',description:'Complete Bar drink catalog'},
   'core-drinks':{label:'Core Drinks',description:'Drinks marked Core in Settings'},
@@ -74,8 +75,8 @@ function productInDepartment(product,departmentId){return productDepartmentIds(p
 
 function defaultProductMenuSettings(){
   return Object.fromEntries(allDepartments().map(department=>{
-    const views=department.id==='bar'?['products','import-backlog','drinks','core-drinks','non-core-drinks','archived']:['products','import-backlog','archived'];
-    return[department.id,views.map(view=>({view,label:department.id==='bar'?PRODUCT_MENU_DEFINITIONS[view].label:`${department.name} ${view==='products'?'Products':view==='import-backlog'?'Import Backlog':'Archived'}`,visible:true}))];
+    const views=['products','info-items','import-backlog','archived'];
+    return[department.id,views.map(view=>({view,label:view==='info-items'?PRODUCT_MENU_DEFINITIONS[view].label:department.id==='bar'?PRODUCT_MENU_DEFINITIONS[view].label:`${department.name} ${view==='products'?'Products':view==='import-backlog'?'Import Backlog':'Archived'}`,visible:true}))];
   }));
 }
 
@@ -130,14 +131,15 @@ function renderProductDepartmentTabs(){
 function renderProductCatalogMenu(){
   const sidebar=document.getElementById('product-catalog-sidebar');
   if(!sidebar)return;
-  if(!['products','import-backlog','archived'].includes(productCatalogView))productCatalogView='products';
+  if(!['products','info-items','import-backlog','archived'].includes(productCatalogView))productCatalogView='products';
   sidebar.innerHTML=`
     <button class="catalog-nav ${productCatalogView==='products'?'active':''}" data-catalog-view="products" type="button" onclick="setProductCatalogView('products')"><span>Inventory</span><strong id="catalog-count-products">0</strong></button>
+    <button class="catalog-nav ${productCatalogView==='info-items'?'active':''}" data-catalog-view="info-items" type="button" onclick="setProductCatalogView('info-items')"><span>Prep &amp; Info</span><strong id="catalog-count-info-items">0</strong></button>
     <button class="catalog-nav ${productCatalogView==='import-backlog'?'active':''}" data-catalog-view="import-backlog" type="button" onclick="setProductCatalogView('import-backlog')"><span>Import Backlog</span><strong id="catalog-count-import-backlog">0</strong></button>
     <button class="catalog-nav ${productCatalogView==='archived'?'active':''}" data-catalog-view="archived" type="button" onclick="setProductCatalogView('archived')"><span>Archived</span><strong id="catalog-count-archived">0</strong></button>`;
   const select=document.getElementById('product-catalog-select');
   if(select){
-    select.innerHTML='<option value="products">Inventory</option><option value="import-backlog">Import Backlog</option><option value="archived">Archived</option>';
+    select.innerHTML='<option value="products">Inventory</option><option value="info-items">Prep &amp; Info</option><option value="import-backlog">Import Backlog</option><option value="archived">Archived</option>';
     select.value=productCatalogView;
   }
 }
@@ -220,6 +222,7 @@ function updateCatalogCounts(){
   const departmentProducts=(state.products||[]).filter(product=>productInDepartment(product,productDepartmentView));
   const counts={
     products:departmentProducts.filter(p=>!p.archived).length,
+    'info-items':(state.prepItems||[]).filter(item=>!item.archived).length,
     'import-backlog':(state.importBacklog||[]).filter(item=>backlogDepartment(item)===productDepartmentView).length,
     drinks:drinks.filter(d=>!d.archived).length,
     'core-drinks':drinks.filter(d=>d.type==='core'&&!d.archived).length,
@@ -638,21 +641,27 @@ function mobileProductCardHtml(product){
 function renderProducts(){
   ensureCurrentDepartmentView();
   renderProductDepartmentTabs();
+  ensurePrepItems();
+  const infoLibraryMode=productCatalogView==='info-items';
+  const productsPage=document.getElementById('page-products');
+  productsPage?.classList.toggle('info-library-mode',infoLibraryMode);
   const title=departmentName(productDepartmentView);
   const addButton=document.getElementById('add-product-button');
-  if(addButton)addButton.textContent=`＋ Add ${title} Product`;
+  if(addButton){addButton.textContent=infoLibraryMode?'＋ Add Info Item':`＋ Add ${title} Product`;addButton.setAttribute('onclick',infoLibraryMode?'openNewPrepItem()':'openProductModal()');}
   const help=document.getElementById('product-department-help');
-  if(help)help.textContent=`Items assigned to ${title}. Shared items may also appear in other departments.`;
+  if(help)help.textContent=infoLibraryMode?'Shared non-counted ingredients, mixes, garnishes, and preparation notes.':`Items assigned to ${title}. Shared items may also appear in other departments.`;
+  const productSearch=document.getElementById('prod-search');if(productSearch)productSearch.placeholder=infoLibraryMode?'Search prep and information items…':'Search products…';
   renderProductCatalogMenu();
   updateCatalogCounts();
   updateProductFilterSummary();
   const catalogCard=document.querySelector('#page-products .catalog-card');
   const mobileList=document.getElementById('product-mobile-list');
-  const mobileCardMode=productCatalogView==='products';
+  const mobileCardMode=['products','info-items'].includes(productCatalogView);
   catalogCard?.classList.toggle('product-mobile-card-mode',mobileCardMode);
   if(mobileList)mobileList.innerHTML='';
   document.querySelectorAll('.catalog-nav[data-catalog-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.catalogView===productCatalogView));
   document.querySelectorAll('[data-product-department]').forEach(button=>button.classList.toggle('active',button.dataset.productDepartment===productDepartmentView));
+  if(productCatalogView==='info-items')return renderPrepInfoCatalog();
   if(productCatalogView==='import-backlog')return renderImportBacklogCatalog();
   if(productCatalogView==='archived')return renderArchivedCatalog();
   if(productCatalogView.startsWith('menu:'))return renderMenuCatalog(productCatalogView.slice(5));
@@ -721,9 +730,28 @@ function renderProducts(){
   syncHeaderCb();
 }
 
+function prepItemMenuUses(prepItem){
+  const key=prepItemKey(prepItem?.name);
+  return(state.menus||[]).flatMap(menu=>(menu.items||[]).filter(item=>(item.ingredients||[]).some(ingredient=>ingredient.linkKind!=='product'&&(ingredient.prepItemId===prepItem.id||prepItemKey(ingredient.name)===key))).map(item=>({menu,item})));
+}
+
+function renderPrepInfoCatalog(){
+  ensurePrepItems();
+  const query=(document.getElementById('prod-search')?.value||'').trim().toLowerCase();
+  const items=(state.prepItems||[]).filter(item=>!item.archived).filter(item=>!query||[item.name,item.description,item.prepInstructions,item.notes,...prepItemMenuUses(item).flatMap(use=>[use.menu.name,use.item.name])].join(' ').toLowerCase().includes(query)).sort((a,b)=>a.name.localeCompare(b.name));
+  const thead=document.getElementById('prod-thead');const tbody=document.getElementById('prod-tbody');const mobileList=document.getElementById('product-mobile-list');
+  thead.innerHTML='<tr><th>Info Item</th><th>Used In</th><th>Description</th><th>Prep Instructions</th></tr>';
+  if(!items.length){
+    const empty=`<div class="table-empty-state"><strong>${query?'No information items match this search':'No prep or information items yet'}</strong><p>${query?'Try another name, recipe, or description.':'Non-counted recipe ingredients will appear here automatically.'}</p>${query?'':'<button class="btn btn-primary" type="button" onclick="openNewPrepItem()">＋ Add Info Item</button>'}</div>`;
+    tbody.innerHTML=`<tr><td colspan="4">${empty}</td></tr>`;if(mobileList)mobileList.innerHTML=empty;return;
+  }
+  tbody.innerHTML=items.map(item=>{const uses=prepItemMenuUses(item);return`<tr class="prep-info-row" onclick="openPrepItemView('${item.id}')"><td><strong>${escapeHtml(item.name)}</strong><div class="prep-info-type">Not included in inventory counts</div></td><td>${uses.length?uses.slice(0,3).map(use=>`<span class="sub-badge">${escapeHtml(use.item.name)}</span>`).join(' '):'—'}</td><td>${escapeHtml(item.description||'Add a description')}</td><td>${escapeHtml(item.prepInstructions||'Add preparation instructions')}</td></tr>`;}).join('');
+  if(mobileList)mobileList.innerHTML=items.map(item=>{const uses=prepItemMenuUses(item);return`<button class="prep-info-mobile-card" type="button" onclick="openPrepItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>Prep / information · not counted</small></span><p>${escapeHtml(item.description||item.prepInstructions||'Open to add description and preparation instructions.')}</p><b>${uses.length} menu use${uses.length===1?'':'s'} <span>›</span></b></button>`;}).join('');
+}
+
 function renderMenuCatalog(menuId){
   const menu=getSettingsMenu(menuId);
-  if(!menu||menu.departmentId!==productDepartmentView||menu.archived||!menu.active){productCatalogView='products';renderProducts();return;}
+  if(!menu||!menuInDepartment(menu,productDepartmentView)||menu.archived||!menu.active){productCatalogView='products';renderProducts();return;}
   const search=(document.getElementById('prod-search')?.value||'').trim().toLowerCase();
   const tbody=document.getElementById('prod-tbody');
   const thead=document.getElementById('prod-thead');
@@ -995,9 +1023,21 @@ function starterMenuItemFromDrink(drink){
 function starterMenuLibrary(){
   const drinks=(state.drinks||[]).filter(drink=>!drink.archived);
   return[
-    {id:'menu-core-drinks',departmentId:'bar',name:'Core Drinks',description:'Core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='core').map(starterMenuItemFromDrink)},
-    {id:'menu-non-core-drinks',departmentId:'bar',name:'Non-Core Drinks',description:'Non-core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='non-core').map(starterMenuItemFromDrink)}
+    {id:'menu-core-drinks',departmentId:'bar',departmentIds:['bar'],name:'Core Drinks',description:'Core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='core').map(starterMenuItemFromDrink)},
+    {id:'menu-non-core-drinks',departmentId:'bar',departmentIds:['bar'],name:'Non-Core Drinks',description:'Non-core drink recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:drinks.filter(drink=>drink.type==='non-core').map(starterMenuItemFromDrink)}
   ];
+}
+
+function menuDepartmentIds(menu){
+  const valid=new Set(activeDepartments().map(department=>department.id));
+  const source=Array.isArray(menu?.departmentIds)?menu.departmentIds:[menu?.departmentId];
+  const ids=[...new Set(source.filter(id=>valid.has(id)))];
+  return ids.length?ids:[activeDepartments()[0]?.id||'bar'];
+}
+function menuInDepartment(menu,departmentId){return departmentId==='all'||menuDepartmentIds(menu).includes(departmentId);}
+function menuDepartmentLabel(menu){
+  const ids=menuDepartmentIds(menu);
+  return ids.length===activeDepartments().length?'All departments':ids.map(departmentName).join(' + ');
 }
 
 function ensureMenuLibrary(){
@@ -1009,7 +1049,8 @@ function ensureMenuLibrary(){
     if(!menu||seen.has(menu.id)){changed=true;return null;}
     const next={
       id:menu.id||uid(),
-      departmentId:getDepartment(menu.departmentId)?menu.departmentId:'bar',
+      departmentId:menuDepartmentIds(menu)[0],
+      departmentIds:menuDepartmentIds(menu),
       name:String(menu.name||`Menu ${index+1}`).trim()||`Menu ${index+1}`,
       description:String(menu.description||'').trim(),
       active:menu.active!==false,
@@ -1046,21 +1087,72 @@ function ensureMenuLibrary(){
     state.menuLibraryVersion=3;changed=true;
   }
   if(libraryVersion<4){state.menuLibraryVersion=4;changed=true;}
-  if(Number(state.coreDrinkRecipeVersion||0)<1&&Array.isArray(globalThis.CORE_DRINKS_MAY_2026)){
-    let coreMenu=state.menus.find(menu=>menu.departmentId==='bar'&&prepItemKey(menu.name)==='core drinks');
-    if(!coreMenu){coreMenu={id:'menu-core-drinks',departmentId:'bar',name:'Core Drinks',description:'CAN May 2026 Core Drink Recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};state.menus.unshift(coreMenu);}
-    const previousItems=coreMenu.items||[];
-    coreMenu.items=globalThis.CORE_DRINKS_MAY_2026.map((source,index)=>{
-      const previous=previousItems.find(item=>prepItemKey(item.name)===prepItemKey(source.name));
-      return normalizeMenuLibraryItem({...source,id:previous?.id||`core-may-2026-${prepItemKey(source.name).replace(/\s+/g,'-')}`,price:previous?.price||source.price||'',source:'CAN May 2026 Core Drinks.pdf'},index);
-    });
-    coreMenu.description='CAN May 2026 Core Drink Recipes - updated May 19, 2026';
-    coreMenu.sourceFile='CAN May 2026 Core Drinks.pdf';
-    coreMenu.importedAt=new Date().toISOString();
-    coreMenu.active=true;coreMenu.archived=false;
-    state.coreDrinkRecipeVersion=1;changed=true;
+  const coreRecipeVersion=Number(state.coreDrinkRecipeVersion||0);
+  if(coreRecipeVersion<2&&Array.isArray(globalThis.CORE_DRINKS_MAY_2026)){
+    let coreMenu=state.menus.find(menu=>menuDepartmentIds(menu).includes('bar')&&prepItemKey(menu.name)==='core drinks');
+    if(!coreMenu){coreMenu={id:'menu-core-drinks',departmentId:'bar',departmentIds:['bar'],name:'Core Drinks',description:'CAN May 2026 Core Drink Recipes',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};state.menus.unshift(coreMenu);}
+    if(coreRecipeVersion<1||!coreMenu.items?.length){
+      const previousItems=coreMenu.items||[];
+      coreMenu.items=globalThis.CORE_DRINKS_MAY_2026.map((source,index)=>{
+        const previous=previousItems.find(item=>prepItemKey(item.name)===prepItemKey(source.name));
+        return normalizeMenuLibraryItem({...source,id:previous?.id||`core-may-2026-${prepItemKey(source.name).replace(/\s+/g,'-')}`,price:previous?.price||source.price||'',source:'CAN May 2026 Core Drinks.pdf'},index);
+      });
+      coreMenu.description='CAN May 2026 Core Drink Recipes - updated May 19, 2026';
+      coreMenu.sourceFile='CAN May 2026 Core Drinks.pdf';coreMenu.importedAt=new Date().toISOString();coreMenu.active=true;coreMenu.archived=false;
+    }else{
+      coreMenu.items.forEach(item=>{const source=globalThis.CORE_DRINKS_MAY_2026.find(entry=>prepItemKey(entry.name)===prepItemKey(item.name));if(source&&item.imageUrl!==source.imageUrl)item.imageUrl=source.imageUrl;});
+    }
+    state.coreDrinkRecipeVersion=2;changed=true;
   }
+  if(ensureSpring2026MenuRecipes())changed=true;
   return changed;
+}
+
+function mergeSpringMenuItems(menu,sources){
+  let changed=false;
+  if(!Array.isArray(menu.items))menu.items=[];
+  sources.forEach((source,index)=>{
+    const existing=menu.items.find(item=>prepItemKey(item.name)===prepItemKey(source.name));
+    const normalized=normalizeMenuLibraryItem({...source,id:existing?.id||`spring-2026-${prepItemKey(source.name).replace(/\s+/g,'-')}`,price:existing?.price||source.price||'',imageUrl:source.imageUrl||existing?.imageUrl||'',source:source.source||'CAN Spring 2026'},index);
+    if(existing){
+      const itemIndex=menu.items.indexOf(existing);
+      if(JSON.stringify(existing)!==JSON.stringify(normalized)){menu.items[itemIndex]=normalized;changed=true;}
+    }else{menu.items.push(normalized);changed=true;}
+  });
+  return changed;
+}
+
+function ensureSpring2026MenuRecipes(){
+  if((Number(state.springMenuRecipeVersion)||0)>=1)return false;
+  if(!Array.isArray(globalThis.SPRING_2026_NON_CORE_DRINKS)||!Array.isArray(globalThis.SPRING_2026_CORE_ADDITIONS))return false;
+  let changed=false;
+  let coreMenu=state.menus.find(menu=>menuDepartmentIds(menu).includes('bar')&&prepItemKey(menu.name)==='core drinks');
+  if(!coreMenu){
+    coreMenu={id:'menu-core-drinks',departmentId:'bar',departmentIds:['bar'],name:'Core Drinks',description:'CAN Spring 2026 Classics & Creations',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};
+    state.menus.unshift(coreMenu);changed=true;
+  }
+  if(mergeSpringMenuItems(coreMenu,globalThis.SPRING_2026_CORE_ADDITIONS))changed=true;
+  Object.entries(globalThis.SPRING_2026_CORE_UPDATES||{}).forEach(([name,updates])=>{
+    const item=coreMenu.items.find(entry=>prepItemKey(entry.name)===name);if(!item)return;
+    const ingredientRenames=updates.ingredientRenames||{};
+    (item.ingredients||[]).forEach(ingredient=>{const nextName=ingredientRenames[prepItemKey(ingredient.name)];if(nextName){ingredient.name=nextName;ingredient.prepItemId='';}});
+    Object.assign(item,Object.fromEntries(Object.entries(updates).filter(([key])=>key!=='ingredientRenames')));item.recipe=menuRecipeText(item);changed=true;
+  });
+  coreMenu.description='CAN Spring 2026 Classics & Creations';
+  coreMenu.sourceFile='CAN Pocket Bar Information Sheet Spring 2026 (2).pdf + New Drinks.pdf';
+  coreMenu.importedAt=new Date().toISOString();
+
+  let nonCoreMenu=state.menus.find(menu=>menuDepartmentIds(menu).includes('bar')&&prepItemKey(menu.name)==='non core drinks');
+  if(!nonCoreMenu){
+    nonCoreMenu={id:'menu-non-core-drinks',departmentId:'bar',departmentIds:['bar'],name:'Non-Core Drinks',description:'CAN Spring 2026 non-core cocktails, specialty coffees, and shots',active:true,archived:false,sourceFile:'',importedAt:'',items:[]};
+    state.menus.push(nonCoreMenu);changed=true;
+  }
+  if(mergeSpringMenuItems(nonCoreMenu,globalThis.SPRING_2026_NON_CORE_DRINKS))changed=true;
+  nonCoreMenu.description='CAN Spring 2026 non-core cocktails, specialty coffees, and shots';
+  nonCoreMenu.sourceFile='CAN - Spring 2026 Non-Core Cocktails.pdf';
+  nonCoreMenu.importedAt=new Date().toISOString();nonCoreMenu.active=true;nonCoreMenu.archived=false;
+  state.springMenuRecipeVersion=1;
+  return true;
 }
 
 function getSettingsMenu(id){ensureMenuLibrary();return state.menus.find(menu=>menu.id===id)||null;}
@@ -1077,11 +1169,31 @@ function ensurePrepItems(){
     if(!name||!key||seen.has(key)){changed=true;return null;}
     seen.add(key);
     const normalized={
-      id:item.id||uid(),name,description:String(item.description||''),prepInstructions:String(item.prepInstructions||''),notes:String(item.notes||''),archived:!!item.archived
+      id:item.id||uid(),name,description:String(item.description||''),prepInstructions:String(item.prepInstructions||''),notes:String(item.notes||''),imageUrls:Array.isArray(item.imageUrls)?item.imageUrls.map(String).filter(Boolean):[],archived:!!item.archived
     };
     if(JSON.stringify(item)!==JSON.stringify(normalized))changed=true;
     return normalized;
   }).filter(Boolean);
+  if((Number(state.springPrepRecipeVersion)||0)<1&&Array.isArray(globalThis.SPRING_2026_PREP_RECIPES)){
+    const existingByName=new Map(state.prepItems.map(item=>[prepItemKey(item.name),item]));
+    globalThis.SPRING_2026_PREP_RECIPES.forEach(source=>{
+      const existing=existingByName.get(prepItemKey(source.name));
+      if(existing)Object.assign(existing,{description:source.description,prepInstructions:source.prepInstructions,notes:source.notes,imageUrls:Array.isArray(source.imageUrls)?source.imageUrls:existing.imageUrls||[],archived:false});
+      else{const item={id:`spring-prep-${prepItemKey(source.name).replace(/\s+/g,'-')}`,name:source.name,description:source.description,prepInstructions:source.prepInstructions,notes:source.notes,imageUrls:Array.isArray(source.imageUrls)?source.imageUrls:[],archived:false};state.prepItems.push(item);existingByName.set(prepItemKey(item.name),item);}
+    });
+    state.springPrepRecipeVersion=1;changed=true;
+  }
+  const byName=new Map(state.prepItems.map(item=>[prepItemKey(item.name),item]));
+  (state.menus||[]).forEach(menu=>(menu.items||[]).forEach(menuItem=>(menuItem.ingredients||[]).forEach(ingredient=>{
+    if(ingredient.linkKind==='product'||!String(ingredient.name||'').trim())return;
+    const key=prepItemKey(ingredient.name);
+    let prepItem=byName.get(key);
+    if(!prepItem){
+      prepItem={id:uid(),name:String(ingredient.name).trim(),description:'',prepInstructions:'',notes:'Added from a menu recipe',imageUrls:[],archived:false};
+      state.prepItems.push(prepItem);byName.set(key,prepItem);changed=true;
+    }
+    if(ingredient.prepItemId!==prepItem.id){ingredient.prepItemId=prepItem.id;changed=true;}
+  })));
   return changed;
 }
 
@@ -1140,7 +1252,7 @@ function menuRecipeIngredients(item){
 function openMenuSettings(){toggleMenuManager();}
 
 function setMenuPageDepartment(departmentId){
-  if(!getDepartment(departmentId)||getDepartment(departmentId).archived)return;
+  if(departmentId!=='all'&&(!getDepartment(departmentId)||getDepartment(departmentId).archived))return;
   menuPageDepartment=departmentId;
   menuPageMenuId='';
   const search=document.getElementById('menu-page-search');if(search)search.value='';
@@ -1148,10 +1260,10 @@ function setMenuPageDepartment(departmentId){
 }
 
 function openMenuPageMenu(menuId){
-  const menu=menuId==='__all__'?null:getSettingsMenu(menuId);
-  if(menuId!=='__all__'&&(!menu||menu.archived))return;
+  const menu=menuId==='__all_items__'?null:getSettingsMenu(menuId);
+  if(menuId!=='__all_items__'&&(!menu||menu.archived))return;
   menuPageMenuId=menuId;
-  if(menu)menuPageDepartment=menu.departmentId;
+  if(menu&&menuPageDepartment!=='all'&&!menuInDepartment(menu,menuPageDepartment))menuPageDepartment=menuDepartmentIds(menu)[0];
   const search=document.getElementById('menu-page-search');if(search)search.value='';
   document.getElementById('menu-page-manager').hidden=true;
   document.getElementById('menu-page-editor').hidden=true;
@@ -1165,33 +1277,37 @@ function setMenuPageMenu(menuId){menuId?openMenuPageMenu(menuId):showMenuPagePic
 function renderMenuPage(){
   ensureMenuLibrary();ensurePrepItems();
   const departments=activeDepartments();
-  if(!getDepartment(menuPageDepartment)||getDepartment(menuPageDepartment).archived)menuPageDepartment=departments[0]?.id||'bar';
+  if(menuPageDepartment!=='all'&&(!getDepartment(menuPageDepartment)||getDepartment(menuPageDepartment).archived))menuPageDepartment='all';
   const departmentSelect=document.getElementById('menu-page-department');
-  if(departmentSelect){departmentSelect.innerHTML=departments.map(department=>`<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join('');departmentSelect.value=menuPageDepartment;}
-  const menus=state.menus.filter(menu=>menu.departmentId===menuPageDepartment&&!menu.archived&&menu.active);
-  if(menuPageMenuId&&menuPageMenuId!=='__all__'&&!menus.some(menu=>menu.id===menuPageMenuId))menuPageMenuId='';
+  if(departmentSelect){departmentSelect.innerHTML=`<option value="all">All departments</option>${departments.map(department=>`<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join('')}`;departmentSelect.value=menuPageDepartment;}
+  const allActiveMenus=state.menus.filter(menu=>!menu.archived&&menu.active);
+  const menus=allActiveMenus.filter(menu=>menuInDepartment(menu,menuPageDepartment));
+  if(menuPageMenuId&&menuPageMenuId!=='__all_items__'&&!allActiveMenus.some(menu=>menu.id===menuPageMenuId))menuPageMenuId='';
   const searchGroup=document.getElementById('menu-page-search-group');if(searchGroup)searchGroup.hidden=!menuPageMenuId;
+  const menuSearchGroup=document.getElementById('menu-page-menu-search-group');if(menuSearchGroup)menuSearchGroup.hidden=!!menuPageMenuId;
   const query=(document.getElementById('menu-page-search')?.value||'').trim().toLowerCase();
+  const menuQuery=(document.getElementById('menu-page-menu-search')?.value||'').trim().toLowerCase();
   const summary=document.getElementById('menu-page-summary');
   const grid=document.getElementById('menu-page-grid');
   if(!grid)return;
   if(!menuPageMenuId){
-    if(summary)summary.innerHTML='<div class="menu-page-intro"><span class="detail-eyebrow">Choose a menu</span><h3>Which menu do you want to open?</h3><p>Select one menu first, or open the automatic combined list.</p></div>';
+    if(summary)summary.innerHTML='<div class="menu-page-intro"><span class="detail-eyebrow">Choose a menu</span><h3>Open one menu at a time</h3><p>Menus can contain drinks, food, or both. Use Browse all items when you need the complete searchable library.</p></div>';
     grid.className='menu-page-grid menu-selection-grid';
-    const allCount=new Set(menus.flatMap(menu=>menu.items.map(item=>item.id))).size;
-    grid.innerHTML=`<button class="menu-selection-card combined" type="button" onclick="openMenuPageMenu('__all__')"><span class="menu-status-badge">Combined</span><strong>All Drinks</strong><small>Every item from all active menus</small><b>${allCount} item${allCount===1?'':'s'}</b></button>${menus.map(menu=>`<button class="menu-selection-card" type="button" onclick="openMenuPageMenu('${menu.id}')"><span class="detail-eyebrow">${escapeHtml(departmentName(menu.departmentId))}</span><strong>${escapeHtml(menu.name)}</strong><small>${escapeHtml(menu.description||'Open this menu')}</small><b>${menu.items.length} item${menu.items.length===1?'':'s'}</b></button>`).join('')}`;
+    const visibleMenus=menus.filter(menu=>!menuQuery||[menu.name,menu.description,...menu.items.map(item=>`${item.name} ${item.category}`)].join(' ').toLowerCase().includes(menuQuery));
+    grid.innerHTML=visibleMenus.length?visibleMenus.map(menu=>`<button class="menu-selection-card" type="button" onclick="openMenuPageMenu('${menu.id}')"><span class="detail-eyebrow">${escapeHtml(menuDepartmentLabel(menu))}</span><strong>${escapeHtml(menu.name)}</strong><small>${escapeHtml(menu.description||'Open this menu')}</small><b>${menu.items.length} item${menu.items.length===1?'':'s'}</b></button>`).join(''):`<div class="menu-page-empty"><strong>No menus match this search</strong><span>Try a menu name, season, or one of its item names.</span></div>`;
     return;
   }
-  const selectedMenus=menuPageMenuId==='__all__'?menus:menus.filter(menu=>menu.id===menuPageMenuId);
-  const selectedMenu=menuPageMenuId==='__all__'?null:selectedMenus[0];
+  const browsingAllItems=menuPageMenuId==='__all_items__';
+  const selectedMenus=browsingAllItems?allActiveMenus:allActiveMenus.filter(menu=>menu.id===menuPageMenuId);
+  const selectedMenu=browsingAllItems?null:selectedMenus[0];
   const records=selectedMenus.flatMap(menu=>(menu.items||[]).map(item=>({menu,item}))).filter(({menu,item})=>!query||[menu.name,item.name,item.category,item.description,item.recipe].join(' ').toLowerCase().includes(query));
   const uniqueItems=[];
   const seen=new Set();
   records.forEach(record=>{const key=`${record.item.name.toLowerCase()}|${record.item.recipe.toLowerCase()}`;if(!seen.has(key)){seen.add(key);uniqueItems.push(record);}});
-  if(summary)summary.innerHTML=`<div class="menu-selected-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="showMenuPagePicker()">← All menus</button><div><span class="detail-eyebrow">${menuPageMenuId==='__all__'?'Combined menu':escapeHtml(departmentName(selectedMenu?.departmentId))}</span><h3>${menuPageMenuId==='__all__'?'All Drinks':escapeHtml(selectedMenu?.name||'Menu')}</h3><p>${menuPageMenuId==='__all__'?'Every item from all active menus.':escapeHtml(selectedMenu?.description||`${uniqueItems.length} menu items`)}</p></div>${selectedMenu?`<button class="btn btn-primary btn-sm" type="button" onclick="addPageMenuItem('${selectedMenu.id}')">＋ Add Item</button>`:''}</div>`;
+  if(summary)summary.innerHTML=`<div class="menu-selected-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="showMenuPagePicker()">← Menus</button><div><span class="detail-eyebrow">${browsingAllItems?'Item library':escapeHtml(menuDepartmentLabel(selectedMenu))}</span><h3>${browsingAllItems?'All Menu Items':escapeHtml(selectedMenu?.name||'Menu')}</h3><p>${browsingAllItems?'Every item from every active menu, together in one searchable view.':escapeHtml(selectedMenu?.description||`${uniqueItems.length} menu items`)}</p></div>${selectedMenu?`<button class="btn btn-primary btn-sm" type="button" onclick="addPageMenuItem('${selectedMenu.id}')">＋ Add Item</button>`:''}</div>`;
   grid.className='menu-page-grid menu-item-row-list';
   if(!uniqueItems.length){grid.innerHTML=`<div class="menu-page-empty"><strong>${query?'No menu items match this search':'No active menu items yet'}</strong><span>${query?'Try a different item, section, or ingredient.':'Create or activate a menu in Manage Menus.'}</span>${query?'':'<button class="btn btn-primary" type="button" onclick="toggleMenuManager()">Manage Menus</button>'}</div>`;return;}
-  grid.innerHTML=uniqueItems.map(({menu,item})=>`<button class="menu-item-row" type="button" onclick="openMenuItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||menu.name)}</small></span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}<span class="menu-item-row-arrow">›</span></button>`).join('');
+  grid.innerHTML=uniqueItems.map(({menu,item})=>`<button class="menu-item-row" type="button" onclick="openMenuItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml([item.category,browsingAllItems?menu.name:''].filter(Boolean).join(' · ')||menu.name)}</small></span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}<span class="menu-item-row-arrow">›</span></button>`).join('');
 }
 
 function toggleMenuManager(forceOpen=false){
@@ -1224,9 +1340,10 @@ function createMenuFromPage(){
   const descriptionInput=document.getElementById('menu-page-new-description');
   const name=String(nameInput?.value||'').trim();
   if(!name){toast('Enter a menu name.',true);nameInput?.focus();return;}
-  if(prepItemKey(name)==='all drinks'){toast('All Drinks is created automatically by combining your active menus.',true);return;}
-  if(state.menus.some(menu=>menu.departmentId===menuPageDepartment&&!menu.archived&&prepItemKey(menu.name)===prepItemKey(name))){toast('A menu with that name already exists.',true);return;}
-  const menu={id:uid(),departmentId:menuPageDepartment,name,description:String(descriptionInput?.value||'').trim(),active:true,archived:false,sourceFile:'',importedAt:'',items:[]};
+  if(['all drinks','all menu items'].includes(prepItemKey(name))){toast('That name is reserved for the item library.',true);return;}
+  if(state.menus.some(menu=>!menu.archived&&prepItemKey(menu.name)===prepItemKey(name))){toast('A menu with that name already exists.',true);return;}
+  const departmentIds=menuPageDepartment==='all'?activeDepartments().map(department=>department.id):[menuPageDepartment];
+  const menu={id:uid(),departmentId:departmentIds[0]||'bar',departmentIds,name,description:String(descriptionInput?.value||'').trim(),active:true,archived:false,sourceFile:'',importedAt:'',items:[]};
   state.menus.push(menu);save();
   if(nameInput)nameInput.value='';if(descriptionInput)descriptionInput.value='';
   renderMenuManager();openPageMenuEditor(menu.id);toast(`${name} created.`);
@@ -1234,10 +1351,10 @@ function createMenuFromPage(){
 
 function renderMenuManager(){
   const list=document.getElementById('menu-manager-list');if(!list)return;
-  const menus=state.menus.filter(menu=>menu.departmentId===menuPageDepartment);
+  const menus=state.menus.filter(menu=>menuInDepartment(menu,menuPageDepartment));
   const active=menus.filter(menu=>!menu.archived);
   const archived=menus.filter(menu=>menu.archived);
-  list.innerHTML=`<div class="menu-manager-combined"><span><strong>All Drinks</strong><small>Automatic combined view of every active menu · not stored as a separate menu</small></span><span class="menu-status-badge">Combined</span></div>${active.map(menu=>`<div class="menu-manager-row"><button class="menu-manager-row-main" type="button" onclick="openPageMenuEditor('${menu.id}')"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} item${menu.items.length===1?'':'s'}${menu.description?` · ${escapeHtml(menu.description)}`:''}</small></button><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="setPageMenuActive('${menu.id}',this.checked)"><span>Active</span></label><button class="btn btn-secondary btn-sm" type="button" onclick="openPageMenuEditor('${menu.id}')">Edit</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="archivePageMenu('${menu.id}',true)">Archive</button></div>`).join('')||'<div class="menu-empty-state"><strong>No menus yet</strong><span>Create or import the first menu above.</span></div>'}${archived.length?`<div class="menu-manager-archived"><h4>Archived</h4>${archived.map(menu=>`<div class="menu-manager-row"><span class="menu-manager-row-main"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} stored item${menu.items.length===1?'':'s'}</small></span><button class="btn btn-secondary btn-sm" type="button" onclick="archivePageMenu('${menu.id}',false)">Restore</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deletePageMenu('${menu.id}')">Delete</button></div>`).join('')}</div>`:''}`;
+  list.innerHTML=`${active.map(menu=>`<div class="menu-manager-row"><button class="menu-manager-row-main" type="button" onclick="openPageMenuEditor('${menu.id}')"><strong>${escapeHtml(menu.name)}</strong><small>${escapeHtml(menuDepartmentLabel(menu))} · ${menu.items.length} item${menu.items.length===1?'':'s'}${menu.description?` · ${escapeHtml(menu.description)}`:''}</small></button><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="setPageMenuActive('${menu.id}',this.checked)"><span>Active</span></label><button class="btn btn-secondary btn-sm" type="button" onclick="openPageMenuEditor('${menu.id}')">Edit</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="archivePageMenu('${menu.id}',true)">Archive</button></div>`).join('')||'<div class="menu-empty-state"><strong>No menus yet</strong><span>Create or import the first menu above.</span></div>'}${archived.length?`<div class="menu-manager-archived"><h4>Archived</h4>${archived.map(menu=>`<div class="menu-manager-row"><span class="menu-manager-row-main"><strong>${escapeHtml(menu.name)}</strong><small>${menu.items.length} stored item${menu.items.length===1?'':'s'}</small></span><button class="btn btn-secondary btn-sm" type="button" onclick="archivePageMenu('${menu.id}',false)">Restore</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deletePageMenu('${menu.id}')">Delete</button></div>`).join('')}</div>`:''}`;
 }
 
 function setPageMenuActive(id,active){const menu=getSettingsMenu(id);if(!menu)return;menu.active=!!active;save();renderMenuManager();renderMenuPage();}
@@ -1247,7 +1364,9 @@ function deletePageMenu(id){const menu=getSettingsMenu(id);if(!menu||!confirm(`D
 function menuProductLinkOptions(ingredient={}){
   const selected=ingredient.linkKind==='product'&&ingredient.productId?`product:${ingredient.productId}`:ingredient.prepItemId?`prep:${ingredient.prepItemId}`:'prep';
   const prepOptions=(state.prepItems||[]).filter(item=>!item.archived).sort((a,b)=>a.name.localeCompare(b.name)).map(item=>`<option value="prep:${item.id}" ${selected===`prep:${item.id}`?'selected':''}>${escapeHtml(item.name)}</option>`).join('');
-  const productOptions=(state.products||[]).filter(product=>!product.archived&&productInDepartment(product,menuPageDepartment)).sort((a,b)=>a.name.localeCompare(b.name)).map(product=>`<option value="product:${product.id}" ${selected===`product:${product.id}`?'selected':''}>${escapeHtml(product.name)}</option>`).join('');
+  const editingMenu=getSettingsMenu(menuItemEditingMenuId||menuPageEditingMenuId);
+  const allowedDepartments=editingMenu?menuDepartmentIds(editingMenu):(menuPageDepartment==='all'?activeDepartments().map(department=>department.id):[menuPageDepartment]);
+  const productOptions=(state.products||[]).filter(product=>!product.archived&&allowedDepartments.some(departmentId=>productInDepartment(product,departmentId))).sort((a,b)=>a.name.localeCompare(b.name)).map(product=>`<option value="product:${product.id}" ${selected===`product:${product.id}`?'selected':''}>${escapeHtml(product.name)}</option>`).join('');
   return`<option value="prep" ${selected==='prep'?'selected':''}>Prep / information — use typed name</option>${prepOptions?`<optgroup label="Existing prep / information items">${prepOptions}</optgroup>`:''}<optgroup label="Counted products">${productOptions}</optgroup>`;
 }
 
@@ -1262,7 +1381,7 @@ function renderPageMenuEditor(focusItemId=''){
 
 function openPageMenuEditor(id,focusItemId=''){const menu=getSettingsMenu(id);if(!menu)return;menuPageEditingMenuId=id;menuPageDepartment=menu.departmentId;document.getElementById('menu-page-browser').hidden=true;document.getElementById('menu-page-manager').hidden=true;renderPageMenuEditor(focusItemId);}
 function closePageMenuEditor(){menuPageEditingMenuId='';document.getElementById('menu-page-editor').hidden=true;document.getElementById('menu-page-manager').hidden=false;renderMenuManager();}
-function updatePageMenu(id,field,value){const menu=getSettingsMenu(id);if(!menu||!['name','description'].includes(field))return;const next=String(value||'').trim();if(field==='name'&&!next){toast('A menu needs a name.',true);renderPageMenuEditor();return;}if(field==='name'&&prepItemKey(next)==='all drinks'){toast('All Drinks is reserved for the automatic combined view.',true);renderPageMenuEditor();return;}menu[field]=next;save();renderPageMenuEditor();renderMenuPage();}
+function updatePageMenu(id,field,value){const menu=getSettingsMenu(id);if(!menu||!['name','description'].includes(field))return;const next=String(value||'').trim();if(field==='name'&&!next){toast('A menu needs a name.',true);renderPageMenuEditor();return;}if(field==='name'&&['all drinks','all menu items'].includes(prepItemKey(next))){toast('That name is reserved for the item library.',true);renderPageMenuEditor();return;}menu[field]=next;save();renderPageMenuEditor();renderMenuPage();}
 function addPageMenuItem(menuId){const menu=getSettingsMenu(menuId);if(!menu)return;const item=normalizeMenuLibraryItem({id:uid(),name:'New menu item'});menu.items.push(item);save();renderPageMenuEditor(item.id);}
 function updatePageMenuItem(menuId,itemId,field,value){const item=getSettingsMenu(menuId)?.items.find(entry=>entry.id===itemId);if(!item||!['name','category','description','recipe','price'].includes(field))return;item[field]=String(value||'').trim();if(field==='recipe'){const names=new Set(menuRecipeParts(item).ingredientLines.map(line=>prepItemKey(parsedRecipeIngredient(line).name)));Object.keys(item.ingredientLinks||{}).forEach(key=>{if(!names.has(key))delete item.ingredientLinks[key];});item.linkedProductIds=[...new Set(menuRecipeIngredients(item).filter(entry=>entry.product).map(entry=>entry.product.id))];}save();renderPageMenuEditor(itemId);renderMenuPage();}
 function updatePageMenuIngredientLink(menuId,itemId,name,value){const item=getSettingsMenu(menuId)?.items.find(entry=>entry.id===itemId);if(!item)return;if(!item.ingredientLinks)item.ingredientLinks={};const key=prepItemKey(name);if(String(value).startsWith('product:'))item.ingredientLinks[key]={kind:'product',productId:String(value).slice(8),prepItemId:''};else item.ingredientLinks[key]={kind:'prep',productId:'',prepItemId:getPrepItemByName(name)?.id||''};item.linkedProductIds=[...new Set(menuRecipeIngredients(item).filter(entry=>entry.product).map(entry=>entry.product.id))];save();renderPageMenuEditor(itemId);renderMenuPage();}
@@ -1276,10 +1395,17 @@ function renderPageMenuEditor(){
   const menu=getSettingsMenu(menuPageEditingMenuId);
   if(!editor||!menu){closeMenuManager();return;}
   editor.hidden=false;
-  editor.innerHTML=`<div class="menu-manager-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="closePageMenuEditor()">← Menus</button><div><span class="detail-eyebrow">${escapeHtml(departmentName(menu.departmentId))}</span><h3>Menu settings</h3><p>Manage this menu here. Open an item to edit its recipe separately.</p></div><button class="detail-close" type="button" aria-label="Close menu editor" onclick="closeMenuManager()">&times;</button></div><div class="menu-page-editor-fields"><label><span>Menu name</span><input type="text" value="${escapeHtml(menu.name)}" onchange="updatePageMenu('${menu.id}','name',this.value)"></label><label><span>Menu description</span><input type="text" value="${escapeHtml(menu.description)}" onchange="updatePageMenu('${menu.id}','description',this.value)"></label><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="setPageMenuActive('${menu.id}',this.checked)"><span>Active</span></label><button class="btn btn-primary" type="button" onclick="addPageMenuItem('${menu.id}')">＋ Add Item</button></div><div class="menu-manager-item-list">${menu.items.length?menu.items.map((item,index)=>`<div class="menu-manager-item-row"><button type="button" onclick="openMenuItemView('${item.id}')"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||'Uncategorized')}</small></button><div><button class="btn btn-secondary btn-sm" type="button" ${index===0?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" ${index===menu.items.length-1?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',1)">↓</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deletePageMenuItem('${menu.id}','${item.id}')">Delete</button></div></div>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Add the first item to this menu.</span></div>'}</div>`;
+  const assigned=new Set(menuDepartmentIds(menu));
+  editor.innerHTML=`<div class="menu-manager-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="closePageMenuEditor()">← Menus</button><div><span class="detail-eyebrow">${escapeHtml(menuDepartmentLabel(menu))}</span><h3>Menu settings</h3><p>Menus can include drinks, food, or both. Open an item to edit its recipe separately.</p></div><button class="detail-close" type="button" aria-label="Close menu editor" onclick="closeMenuManager()">&times;</button></div><div class="menu-page-editor-fields"><label><span>Menu name</span><input type="text" value="${escapeHtml(menu.name)}" onchange="updatePageMenu('${menu.id}','name',this.value)"></label><label><span>Menu description</span><input type="text" value="${escapeHtml(menu.description)}" onchange="updatePageMenu('${menu.id}','description',this.value)"></label><label class="menu-active-toggle"><input type="checkbox" ${menu.active?'checked':''} onchange="setPageMenuActive('${menu.id}',this.checked)"><span>Active</span></label><button class="btn btn-primary" type="button" onclick="addPageMenuItem('${menu.id}')">＋ Add Item</button></div><div class="menu-department-scope"><span>Visible in departments</span><div>${activeDepartments().map(department=>`<label><input type="checkbox" ${assigned.has(department.id)?'checked':''} onchange="updatePageMenuDepartments('${menu.id}','${department.id}',this.checked)"><strong>${escapeHtml(department.name)}</strong></label>`).join('')}</div><p>Select more than one department for feature menus that combine food and drinks.</p></div><div class="menu-manager-item-list">${menu.items.length?menu.items.map((item,index)=>`<div class="menu-manager-item-row"><button type="button" onclick="openMenuItemView('${item.id}')"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||'Uncategorized')}</small></button><div><button class="btn btn-secondary btn-sm" type="button" ${index===0?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',-1)">↑</button><button class="btn btn-secondary btn-sm" type="button" ${index===menu.items.length-1?'disabled':''} onclick="movePageMenuItem('${menu.id}','${item.id}',1)">↓</button><button class="btn btn-ghost-danger btn-sm" type="button" onclick="deletePageMenuItem('${menu.id}','${item.id}')">Delete</button></div></div>`).join(''):'<div class="menu-empty-state"><strong>No menu items yet</strong><span>Add the first item to this menu.</span></div>'}</div>`;
 }
 
-function openPageMenuEditor(id){const menu=getSettingsMenu(id);if(!menu)return;menuPageEditingMenuId=id;menuPageDepartment=menu.departmentId;document.getElementById('menu-page-browser').hidden=true;document.getElementById('menu-page-manager').hidden=true;renderPageMenuEditor();}
+function updatePageMenuDepartments(id,departmentId,enabled){
+  const menu=getSettingsMenu(id);if(!menu||!getDepartment(departmentId))return;
+  const ids=new Set(menuDepartmentIds(menu));enabled?ids.add(departmentId):ids.delete(departmentId);
+  if(!ids.size){toast('A menu must stay visible in at least one department.',true);renderPageMenuEditor();return;}
+  menu.departmentIds=[...ids];menu.departmentId=menu.departmentIds[0];save();renderPageMenuEditor();renderMenuPage();
+}
+function openPageMenuEditor(id){const menu=getSettingsMenu(id);if(!menu)return;menuPageEditingMenuId=id;if(menuPageDepartment!=='all'&&!menuInDepartment(menu,menuPageDepartment))menuPageDepartment=menuDepartmentIds(menu)[0];document.getElementById('menu-page-browser').hidden=true;document.getElementById('menu-page-manager').hidden=true;renderPageMenuEditor();}
 function addPageMenuItem(menuId){const menu=getSettingsMenu(menuId);if(!menu)return;menuItemEditingMenuId=menuId;menuItemEditIsNew=true;menuItemEditDraft=normalizeMenuLibraryItem({id:uid(),name:'New menu item',ingredients:[]});renderMenuItemEditor();openModal('modal-menu-item-view');}
 function movePageMenuItem(menuId,itemId,direction){const menu=getSettingsMenu(menuId);if(!menu)return;const index=menu.items.findIndex(item=>item.id===itemId);const target=index+direction;if(index<0||target<0||target>=menu.items.length)return;[menu.items[index],menu.items[target]]=[menu.items[target],menu.items[index]];save();renderPageMenuEditor();renderMenuPage();}
 function deletePageMenuItem(menuId,itemId){const menu=getSettingsMenu(menuId);if(!menu)return;const item=menu.items.find(entry=>entry.id===itemId);if(!item||!confirm(`Delete “${item.name}” from this menu?`))return;menu.items=menu.items.filter(entry=>entry.id!==itemId);save();renderPageMenuEditor();renderMenuPage();toast('Menu item deleted.');}
@@ -1339,8 +1465,9 @@ async function handleMenuPageImport(event){
     const imported=await readMenuImportData(file);
     const items=Array.isArray(imported.items)?imported.items.map(normalizeMenuLibraryItem):menuItemsFromRows(imported.rows);
     if(!items.length)throw new Error('No menu items could be identified in this file.');
-    let name=String(imported.name||menuNameFromFile(file.name)).trim();if(prepItemKey(name)==='all drinks')name='Imported Drinks';
-    const menu={id:uid(),departmentId:menuPageDepartment,name,description:String(imported.description||'Imported menu — review recipes and ingredient links before activating.').trim(),active:false,archived:false,sourceFile:file.name,importedAt:new Date().toISOString(),items};
+    let name=String(imported.name||menuNameFromFile(file.name)).trim();if(['all drinks','all menu items'].includes(prepItemKey(name)))name='Imported Menu';
+    const departmentIds=menuPageDepartment==='all'?activeDepartments().map(department=>department.id):[menuPageDepartment];
+    const menu={id:uid(),departmentId:departmentIds[0]||'bar',departmentIds,name,description:String(imported.description||'Imported menu — review recipes and ingredient links before activating.').trim(),active:false,archived:false,sourceFile:file.name,importedAt:new Date().toISOString(),items};
     state.menus.push(menu);save();setMenuPageImportStatus(`Imported ${items.length} item${items.length===1?'':'s'} from ${file.name}.`);openPageMenuEditor(menu.id);toast('Menu imported as an inactive draft.');
   }catch(error){setMenuPageImportStatus(error?.message||'The menu could not be imported.',true);toast('Menu import failed.',true);}finally{input.value='';}
 }
@@ -1371,15 +1498,31 @@ function returnToRecipe(){
 function openPrepItemByName(name){
   if(!window.__openingRecipePrep)recipeProductReturn=null;
   const existing=getPrepItemByName(name);
-  const item=existing||{id:uid(),name:String(name||'Prep item').trim()||'Prep item',description:'',prepInstructions:'',notes:'',archived:false};
+  const item=existing||{id:uid(),name:String(name||'Prep item').trim()||'Prep item',description:'',prepInstructions:'',notes:'',imageUrls:[],archived:false};
   closeModal('modal-menu-item-view');
   document.getElementById('prep-item-id').value=item.id;
   document.getElementById('prep-item-name').value=item.name;
   document.getElementById('prep-item-description').value=item.description||'';
   document.getElementById('prep-item-instructions').value=item.prepInstructions||'';
   document.getElementById('prep-item-view-title').textContent=item.name;
+  const gallery=document.getElementById('prep-item-image-gallery');
+  if(gallery){gallery.innerHTML=(item.imageUrls||[]).map((url,index)=>`<img src="${escapeHtml(url)}" alt="${escapeHtml(item.name)}${item.imageUrls.length>1?` - reference ${index+1}`:''}">`).join('');gallery.hidden=!(item.imageUrls||[]).length;}
   const back=document.getElementById('prep-item-back-recipe');if(back)back.hidden=!recipeProductReturn;
   openModal('modal-prep-item-view');
+}
+
+function openNewPrepItem(){
+  recipeProductReturn=null;
+  closeModal('modal-menu-item-view');
+  document.getElementById('prep-item-id').value=uid();
+  document.getElementById('prep-item-name').value='';
+  document.getElementById('prep-item-description').value='';
+  document.getElementById('prep-item-instructions').value='';
+  const gallery=document.getElementById('prep-item-image-gallery');if(gallery){gallery.innerHTML='';gallery.hidden=true;}
+  document.getElementById('prep-item-view-title').textContent='New prep / information item';
+  const back=document.getElementById('prep-item-back-recipe');if(back)back.hidden=true;
+  openModal('modal-prep-item-view');
+  requestAnimationFrame(()=>document.getElementById('prep-item-name')?.focus());
 }
 
 function openRecipePrep(name,menuId,itemId){
@@ -1397,7 +1540,8 @@ function savePrepItem(){
   const id=document.getElementById('prep-item-id').value||uid();
   const name=document.getElementById('prep-item-name').value.trim();
   if(!name){toast('Prep item name is required.',true);return;}
-  const item={id,name,description:document.getElementById('prep-item-description').value.trim(),prepInstructions:document.getElementById('prep-item-instructions').value.trim(),notes:'',archived:false};
+  const existingItem=state.prepItems.find(entry=>entry.id===id);
+  const item={id,name,description:document.getElementById('prep-item-description').value.trim(),prepInstructions:document.getElementById('prep-item-instructions').value.trim(),notes:existingItem?.notes||'',imageUrls:existingItem?.imageUrls||[],archived:false};
   const duplicate=state.prepItems.find(entry=>prepItemKey(entry.name)===prepItemKey(name)&&entry.id!==id);
   if(duplicate){item.id=duplicate.id;state.prepItems=state.prepItems.filter(entry=>entry.id!==id&&entry.id!==duplicate.id);}
   const index=state.prepItems.findIndex(entry=>entry.id===item.id);
@@ -1407,6 +1551,7 @@ function savePrepItem(){
   document.getElementById('prep-item-view-title').textContent=item.name;
   toast('Prep information saved. This item remains outside inventory counts.');
   renderMenuPage();
+  if(document.getElementById('page-products')?.classList.contains('active'))renderProducts();
   window.openPrepItemView?.(item.id);
 }
 

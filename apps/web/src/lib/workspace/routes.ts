@@ -11,6 +11,7 @@ export type LegacyPage =
   | "insights"
   | "suppliers"
   | "reports"
+  | "profile"
   | "settings";
 
 export type LegacyDestination = {
@@ -28,6 +29,7 @@ export type WorkspaceRoute = {
   destination: LegacyDestination;
   permissions: string[];
   managerAllowed?: boolean;
+  signedInAllowed?: boolean;
 };
 
 const pageRoutes: Record<string, WorkspaceRoute> = {
@@ -43,6 +45,7 @@ const pageRoutes: Record<string, WorkspaceRoute> = {
   "intelligence/reports/usage": route("/app/intelligence/reports/usage", "Usage Reports", { page: "reports", reportView: "usage" }, ["reports.view"]),
   "intelligence/reports/inventory-value": route("/app/intelligence/reports/inventory-value", "Inventory Value", { page: "reports", reportView: "value" }, ["reports.view"]),
   "intelligence/reports/order-history": route("/app/intelligence/reports/order-history", "Order History", { page: "reports", reportView: "rorders" }, ["reports.view"]),
+  profile: { ...route("/app/profile", "My Profile", { page: "profile" }, []), signedInAllowed: true },
   "settings/general": settingsRoute("/app/settings/general", "General Settings", "general"),
   "settings/floor-plan": settingsRoute("/app/settings/floor-plan", "Floor Plan", "floor-plan", ["settings.rooms"]),
   "catalog/categories": settingsRoute("/app/catalog/categories", "Categories", "categories"),
@@ -142,6 +145,7 @@ export function workspaceRouteAlias(segments: string[]) {
 }
 
 export function canAccessWorkspaceRoute(context: AccessContext, workspaceRoute: WorkspaceRoute) {
+  if (workspaceRoute.signedInAllowed) return true;
   if (context.role === "owner" || context.role === "admin") return true;
   if (workspaceRoute.managerAllowed && context.role === "manager") return true;
   return workspaceRoute.permissions.some((permission) => context.permissionKeys.includes(permission));

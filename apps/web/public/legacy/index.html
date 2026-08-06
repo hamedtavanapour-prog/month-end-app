@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=menu-recipes-4"/>
+<link rel="stylesheet" href="css/styles.css?v=menu-library-5"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -69,7 +69,8 @@
       </button>
       <div class="profile-menu" id="profile-menu">
         <div class="profile-menu-head"><strong id="profile-menu-name">Manager</strong><small id="profile-menu-role">Active user</small></div>
-        <button type="button" onclick="showPage('settings');setSettingsSection('profiles');closeAllMenus()">Switch User</button>
+        <button type="button" id="profile-menu-my-profile" onclick="openCurrentProfileSettings()">My Profile</button>
+        <button type="button" id="profile-menu-manage-users" onclick="showPage('settings');setSettingsSection('profiles');closeAllMenus()">Users &amp; Access</button>
         <button type="button" onclick="logoutProfile()">Logout</button>
       </div>
     </div>
@@ -209,7 +210,9 @@
   <div id="menu-page-browser">
     <div class="menu-page-toolbar card">
       <div class="form-group"><label for="menu-page-department">Department</label><select id="menu-page-department" onchange="setMenuPageDepartment(this.value)"></select></div>
-      <div class="form-group menu-page-search" id="menu-page-search-group" hidden><label for="menu-page-search">Search this menu</label><input type="search" id="menu-page-search" placeholder="Item name or section…" oninput="renderMenuPage()"></div>
+      <div class="form-group menu-page-search" id="menu-page-menu-search-group"><label for="menu-page-menu-search">Search menus</label><input type="search" id="menu-page-menu-search" placeholder="Menu name, season, or item…" oninput="renderMenuPage()"></div>
+      <div class="form-group menu-page-search" id="menu-page-search-group" hidden><label for="menu-page-search">Search menu items</label><input type="search" id="menu-page-search" placeholder="Item, section, ingredient, or menu…" oninput="renderMenuPage()"></div>
+      <button class="btn btn-secondary menu-all-items-button" type="button" onclick="openMenuPageMenu('__all_items__')">Browse all items</button>
     </div>
     <div class="menu-page-summary" id="menu-page-summary"></div>
     <div class="menu-page-grid" id="menu-page-grid"></div>
@@ -411,6 +414,105 @@
   </div>
 </div>
 
+<!-- PROFILE -->
+<div class="page" id="page-profile">
+  <div class="profile-page-shell">
+    <header class="profile-hero">
+      <div class="profile-photo-editor">
+        <span class="profile-photo-preview" id="profile-photo-preview" aria-label="Profile photo">M</span>
+        <button class="profile-photo-edit-button" id="profile-photo-edit-button" type="button" onclick="toggleProfilePhotoEditor()" aria-label="Edit profile photo" title="Edit profile photo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg></button>
+        <div class="profile-photo-actions" hidden>
+          <label class="btn btn-secondary" for="profile-photo-input">Change photo</label>
+          <input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp" onchange="handleProfilePhoto(event)" hidden>
+          <button class="btn btn-ghost" id="profile-photo-remove" type="button" onclick="removeProfilePhoto()">Remove</button>
+          <small>JPG, PNG, or WebP. Your photo appears throughout the workspace.</small>
+        </div>
+      </div>
+      <div class="profile-hero-copy">
+        <span class="profile-eyebrow">My profile</span>
+        <h2 id="profile-page-name">Manager</h2>
+        <p id="profile-page-summary">Keep your contact details, workplace information, and preferences up to date.</p>
+        <div class="profile-completion"><span><i id="profile-completion-bar"></i></span><strong id="profile-completion-label">Profile setup</strong></div>
+      </div>
+      <div class="profile-hero-actions">
+        <button class="btn btn-secondary" id="profile-manage-access" type="button" onclick="openUsersAndAccess()">Users &amp; Access</button>
+        <button class="btn btn-secondary profile-edit-action" id="profile-cancel-edit" type="button" onclick="cancelProfileEditing()" hidden>Cancel</button>
+        <button class="btn btn-primary profile-edit-action" id="profile-save-top" type="submit" form="profile-edit-form" hidden>Save changes</button>
+      </div>
+    </header>
+
+    <form id="profile-edit-form" class="profile-workspace" onsubmit="saveCurrentProfile(event)">
+      <nav class="profile-section-nav" aria-label="Profile sections">
+        <button type="button" class="active" onclick="scrollProfileSection('profile-section-basics',this)">About</button>
+        <button type="button" onclick="scrollProfileSection('profile-section-contact',this)">Contact</button>
+        <button type="button" onclick="scrollProfileSection('profile-section-work',this)">Work</button>
+        <button type="button" onclick="scrollProfileSection('profile-section-preferences',this)">Preferences</button>
+      </nav>
+      <div class="profile-form-sections">
+        <section class="profile-form-card" id="profile-section-basics">
+          <div class="profile-form-card-head"><span class="profile-card-icon">01</span><div><h3>About you</h3><p>The name and personal details people see in the workspace.</p></div><button class="profile-section-edit" type="button" onclick="editProfileSection('profile-section-basics',this)" aria-label="Edit about you" title="Edit about you"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg><span>Edit</span></button></div>
+          <div class="profile-field-grid">
+            <label><span>Full name</span><input id="profile-full-name" name="name" type="text" autocomplete="name" required></label>
+            <label><span>Preferred name</span><input id="profile-preferred-name" name="preferredName" type="text" autocomplete="nickname" placeholder="What should we call you?"></label>
+            <label><span>Pronouns</span><input id="profile-pronouns" name="pronouns" type="text" placeholder="e.g. he/him"></label>
+            <label><span>Birthday</span><input id="profile-birthday" name="birthday" type="date" autocomplete="bday"></label>
+            <label class="profile-field-wide"><span>About me</span><textarea id="profile-bio" name="bio" rows="4" placeholder="Share a short introduction, your specialties, or what teammates should know."></textarea><small>Visible to other workspace members.</small></label>
+          </div>
+        </section>
+
+        <section class="profile-form-card" id="profile-section-contact">
+          <div class="profile-form-card-head"><span class="profile-card-icon">02</span><div><h3>Contact &amp; address</h3><p>How your team can reach you and your preferred mailing address.</p></div><button class="profile-section-edit" type="button" onclick="editProfileSection('profile-section-contact',this)" aria-label="Edit contact and address" title="Edit contact and address"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg><span>Edit</span></button></div>
+          <div class="profile-field-grid">
+            <label><span>Email address</span><input id="profile-email" name="email" type="email" autocomplete="email" placeholder="name@example.com"></label>
+            <label><span>Phone number</span><input id="profile-phone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 000 0000"></label>
+            <label class="profile-field-wide"><span>Street address</span><input id="profile-address-line1" name="addressLine1" type="text" autocomplete="address-line1"></label>
+            <label class="profile-field-wide"><span>Apartment, suite, or unit</span><input id="profile-address-line2" name="addressLine2" type="text" autocomplete="address-line2"></label>
+            <label><span>City</span><input id="profile-city" name="city" type="text" autocomplete="address-level2"></label>
+            <label><span>Province / state</span><input id="profile-region" name="region" type="text" autocomplete="address-level1"></label>
+            <label><span>Postal code</span><input id="profile-postal-code" name="postalCode" type="text" autocomplete="postal-code"></label>
+            <label><span>Country</span><input id="profile-country" name="country" type="text" autocomplete="country-name"></label>
+          </div>
+        </section>
+
+        <section class="profile-form-card" id="profile-section-work">
+          <div class="profile-form-card-head"><span class="profile-card-icon">03</span><div><h3>Work details</h3><p>Set by managers to keep roles and assignments consistent.</p></div><button class="profile-section-edit manager-controlled" type="button" onclick="editProfileSection('profile-section-work',this,true)" aria-label="Edit work details" title="Edit work details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg><span>Edit</span></button></div>
+          <div class="profile-managed-note" id="profile-work-managed-note"><span aria-hidden="true">🔒</span><div><strong>Managed information</strong><small>Only managers with user-access permission can change these details.</small></div></div>
+          <div class="profile-field-grid">
+            <label><span>Job title</span><input id="profile-job-title" name="jobTitle" type="text" autocomplete="organization-title" placeholder="e.g. Bar Manager"></label>
+            <label><span>Home department</span><select id="profile-department" name="departmentId"><option value="">No home department</option></select></label>
+            <label><span>Employee ID</span><input id="profile-employee-id" name="employeeId" type="text" placeholder="Optional internal ID"></label>
+            <label><span>Start date</span><input id="profile-start-date" name="startDate" type="date"></label>
+            <label class="profile-field-wide"><span>Skills &amp; certifications</span><input id="profile-skills" name="skills" type="text" placeholder="Wine knowledge, First Aid, Smart Serve…"><small>Separate multiple skills with commas.</small></label>
+          </div>
+        </section>
+
+        <section class="profile-form-card" id="profile-section-preferences">
+          <div class="profile-form-card-head"><span class="profile-card-icon">04</span><div><h3>Workspace preferences</h3><p>Personalize dates, language, and the updates you receive.</p></div><button class="profile-section-edit" type="button" onclick="editProfileSection('profile-section-preferences',this)" aria-label="Edit workspace preferences" title="Edit workspace preferences"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l11-11-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg><span>Edit</span></button></div>
+          <div class="profile-field-grid">
+            <label><span>Language</span><select id="profile-language" name="language"><option value="en">English</option><option value="fr">French</option><option value="de">German</option><option value="es">Spanish</option></select></label>
+            <label><span>Time zone</span><select id="profile-timezone" name="timezone"><option value="America/Toronto">Eastern Time</option><option value="America/Winnipeg">Central Time</option><option value="America/Edmonton">Mountain Time</option><option value="America/Vancouver">Pacific Time</option><option value="Europe/Berlin">Central European Time</option><option value="UTC">UTC</option></select></label>
+            <label><span>Date format</span><select id="profile-date-format" name="dateFormat"><option value="MMM D, YYYY">May 31, 2026</option><option value="DD/MM/YYYY">31/05/2026</option><option value="MM/DD/YYYY">05/31/2026</option><option value="YYYY-MM-DD">2026-05-31</option></select></label>
+            <label><span>Default department view</span><select id="profile-default-department" name="defaultDepartmentId"><option value="">Remember my last choice</option></select></label>
+          </div>
+          <div class="profile-preference-list">
+            <label><span><strong>Count reminders</strong><small>Remind me about upcoming inventory counts.</small></span><input id="profile-notify-counts" name="notifyCounts" type="checkbox"></label>
+            <label><span><strong>Order updates</strong><small>Notify me when purchase orders change status.</small></span><input id="profile-notify-orders" name="notifyOrders" type="checkbox"></label>
+            <label><span><strong>Weekly summary</strong><small>Receive a concise workspace activity summary.</small></span><input id="profile-notify-summary" name="notifySummary" type="checkbox"></label>
+          </div>
+        </section>
+
+        <section class="profile-form-card profile-account-card">
+          <div class="profile-form-card-head"><span class="profile-card-icon">✓</span><div><h3>Account &amp; access</h3><p>Your sign-in and workspace permissions are managed separately from personal profile details.</p></div></div>
+          <div class="profile-account-facts"><div><span>Account status</span><strong id="profile-account-status">Active</strong></div><div><span>Access level</span><strong id="profile-account-role">Member</strong></div><div><span>Sign-in email</span><strong id="profile-signin-email">—</strong></div></div>
+          <button class="btn btn-secondary" id="profile-account-access-button" type="button" onclick="openUsersAndAccess()">Manage users &amp; permissions</button>
+        </section>
+
+        <div class="profile-save-bar" id="profile-save-bar" hidden><span id="profile-save-state">Review your changes before saving.</span><div><button class="btn btn-secondary" type="button" onclick="cancelProfileEditing()">Cancel</button><button class="btn btn-primary" type="submit">Save changes</button></div></div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- SETTINGS -->
 <div class="page" id="page-settings">
   <div class="page-header">
@@ -420,9 +522,9 @@
     <aside class="settings-sidebar">
       <button class="settings-sidebar-toggle" type="button" onclick="toggleSettingsSidebar()" aria-label="Collapse settings navigation" title="Collapse settings navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="settings-search"><span>⌕</span><input type="text" id="settings-search" placeholder="Search" oninput="filterSettingsNav()"></div>
-      <button class="settings-account" type="button" onclick="setSettingsSection('profiles')">
+      <button class="settings-account" type="button" onclick="openCurrentProfileSettings()">
         <span class="profile-avatar small" id="settings-profile-avatar">M</span>
-        <span><strong id="settings-profile-title">Manager</strong><small>Profile & access</small></span>
+        <span><strong id="settings-profile-title">Manager</strong><small>View my profile</small></span>
       </button>
       <div class="settings-nav-list" id="settings-nav-list">
         <button class="settings-nav-item active" type="button" data-settings-key="general" onclick="setSettingsSection('general')"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span><span>General</span></button>
@@ -754,6 +856,7 @@
   <span class="detail-eyebrow">Prep / information item</span>
   <h3 id="prep-item-view-title">Prep item</h3>
   <p class="prep-item-context">This item is used in recipes for information only. It will not appear in month-end counts.</p>
+  <div class="prep-item-image-gallery" id="prep-item-image-gallery" hidden></div>
   <input type="hidden" id="prep-item-id">
   <div class="form-grid prep-item-form">
     <div class="form-group" style="grid-column:1/-1"><label for="prep-item-name">Name</label><input type="text" id="prep-item-name"></div>
@@ -1104,13 +1207,15 @@
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/seed-suppliers.js"></script>
 <script src="js/data/seed-drinks.js"></script>
-<script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-1"></script>
-<script src="js/state.js?v=menu-recipes-4"></script>
+<script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-2"></script>
+<script src="js/data/spring-drinks-2026.js?v=spring-drinks-2026-1"></script>
+<script src="js/state.js?v=spring-menu-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
-<script src="js/store.js?v=menu-recipes-4"></script>
+<script src="js/store.js?v=spring-menu-1"></script>
 <script src="js/ui.js?v=menu-recipes-4"></script>
-<script src="js/products.js?v=menu-recipes-4"></script>
+<script src="js/profile.js?v=profile-workspace-1"></script>
+<script src="js/products.js?v=spring-menu-1"></script>
 <script src="js/inventory.js?v=menu-recipes-3"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
@@ -1119,7 +1224,7 @@
 <script src="js/export-tools.js?v=count-report-export-1"></script>
 <script src="js/voice.js?v=recount-transcription-1"></script>
 <script src="js/master-search.js"></script>
-<script src="js/routing.js?v=menu-recipes-4"></script>
+<script src="js/routing.js?v=menu-library-5"></script>
 <script src="js/main.js?v=local-count-mode-1"></script>
 <script src="js/access.js?v=local-count-mode-1"></script>
 </body>

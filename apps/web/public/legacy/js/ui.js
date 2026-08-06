@@ -287,8 +287,7 @@ initProfileMenuHover();
 function openCurrentProfileSettings(){
   closeAllMenus();
   dismissSidebarHoverMenu(document.querySelector('.profile-menu-wrap'));
-  showPage('settings',{profileOnly:true});
-  setSettingsSection('profiles');
+  showPage('profile',{profileOnly:true});
 }
 
 function profileInitials(profile){
@@ -316,6 +315,7 @@ function normalizeProfiles(){
   state.profiles=state.profiles.map((profile,index)=>{
     const status=profile.status||'active';
     const normalized={
+      ...profile,
       id:profile.id||uid(),
       name:String(profile.name||`Manager ${index+1}`).trim()||`Manager ${index+1}`,
       email:String(profile.email||'').trim().toLowerCase(),
@@ -325,6 +325,7 @@ function normalizeProfiles(){
       invitedAt:profile.invitedAt||'',
       acceptedAt:profile.acceptedAt||'',
       permissions:normalizeProfilePermissions(profile),
+      details:typeof normalizeProfileDetails==='function'?normalizeProfileDetails(profile.details):profile.details||{},
       archived:!!profile.archived
     };
     if(JSON.stringify(profile)!==JSON.stringify(normalized))changed=true;
@@ -787,18 +788,18 @@ function recoverMobileNavTap(event){
 
 function showPage(name,options={}){
   const profile=currentProfile();
-  const profileOnlySettings=options.profileOnly&&name==='settings';
-  if(!profileOnlySettings&&!profileCanAccessPage(profile,name)){
+  const personalProfile=name==='profile';
+  if(!personalProfile&&!profileCanAccessPage(profile,name)){
     toast('You do not have access to that area.',true);
     name=profile.permissions.pages[0]||'dashboard';
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>{n.classList.remove('active');n.removeAttribute('aria-current');});
-  document.getElementById('page-'+name).classList.add('active');
+  const activePage=document.getElementById('page-'+name);
+  if(!activePage)return;
+  activePage.classList.add('active');
   const activeNav=document.getElementById('nav-'+name);
-  activeNav.classList.add('active');
-  activeNav.setAttribute('aria-current','page');
-  revealActiveMobileNav(activeNav);
+  if(activeNav){activeNav.classList.add('active');activeNav.setAttribute('aria-current','page');revealActiveMobileNav(activeNav);}
   renderAccessControlledNav();
   pendingEdits={};selectedProds.clear();
   if(name==='products'){buildColPicker('prod-col-checks',PROD_COLS,'renderProducts');renderProducts();}
@@ -814,6 +815,7 @@ function showPage(name,options={}){
     if(window.innerWidth<=820)document.getElementById('settings-app')?.classList.remove('detail-open');
     renderSettings();
   }
+  else if(name==='profile'&&typeof renderProfilePage==='function')renderProfilePage();
   else if(name==='dashboard')renderDashboard();
   annotateResponsiveTables(document.getElementById('page-'+name));
 }

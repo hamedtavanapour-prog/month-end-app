@@ -2,7 +2,15 @@
 const coreSingleKeg=glassware=>[{key:'single',name:'Single',glassware},{key:'keg',name:'Keg Size',glassware}];
 const coreOne=(glassware,name='One Size')=>[{key:'one',name,glassware}];
 const coreIngredient=(name,one,keg='',productName='')=>({name,amounts:keg===''?{one}:{single:one,keg},...(productName?{productName}:{linkKind:'prep'})});
-const coreImage=name=>`/legacy/assets/menu/core-drinks/${name}.jpg`;
+// The first PDF extraction crossed four embedded-image filenames. Keep the
+// shipped assets stable and map each recipe to the visually verified photo.
+const coreImageFile={
+  'whisky-sour':'espresso-martini','espresso-martini':'whisky-sour',
+  'passion-fruit-ranch-water':'aperol-spritz','aperol-spritz':'passion-fruit-ranch-water',
+  'spicy-watermelon-margarita':'yuzu-pina-colada','yuzu-pina-colada':'spicy-watermelon-margarita',
+  'zero-amaretto-sour':'no-paloma','no-paloma':'zero-amaretto-sour'
+};
+const coreImage=name=>`/legacy/assets/menu/core-drinks/${coreImageFile[name]||name}.jpg?v=core-drinks-verified-2`;
 
 globalThis.CORE_DRINKS_MAY_2026=[
   {name:'Famous Keg Caesar',category:'Caesars',method:'Build in Glass',variants:coreSingleKeg('Tall Collins'),ingredients:[coreIngredient('Polar Ice Vodka','1 oz','2 oz','Polar Ice'),coreIngredient('Keg Caesar Mix','Fill','Fill'),coreIngredient('Tabasco','As Requested','As Requested'),coreIngredient('Worcestershire','As Requested','As Requested')],description:'Season the rim of a tall collins glass with celery salt. Add ice, Polar Ice, and fill with Keg Caesar mix. Season with Tabasco and Worcestershire. Garnish with celery, spicy bean, and a lime wedge.',garnish:'Celery, spicy bean, and a lime wedge',imageUrl:coreImage('famous-keg-caesar')},

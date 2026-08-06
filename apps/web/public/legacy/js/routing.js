@@ -11,6 +11,7 @@
     insights:['/app/intelligence/insights','Insights'],
     suppliers:['/app/purchasing/suppliers','Suppliers'],
     reports:['/app/intelligence/reports/usage','Usage Reports'],
+    profile:['/app/profile','My Profile'],
     settings:['/app/settings/general','General Settings']
   };
   const SETTINGS_ROUTES={
@@ -52,6 +53,7 @@
     const parts=cleanSegments(path);
     if(!parts.length)return null;
     if(parts[0]==='dashboard')return{page:'dashboard'};
+    if(parts[0]==='profile')return{page:'profile'};
     if(parts[0]==='catalog'&&parts[1]==='products')return{page:'products',resourceKind:parts[2]&&parts[2]!=='new'?'product':'',resourceId:parts[2]&&parts[2]!=='new'?parts[2]:'',action:parts[2]==='new'?'new':parts[3]==='edit'?'edit':''};
     if(parts[0]==='catalog'&&parts[1]==='menu')return{page:'menu'};
     if(parts[0]==='catalog'&&parts[1]==='menu-items'&&parts[2])return{page:'menu',resourceKind:'menu-item',resourceId:parts[2]};
@@ -198,10 +200,10 @@
     wrap('openFloorPlanRoomEditor',id=>{routeState={...routeState,page:'settings',section:'floor-plan',resourceKind:'room',resourceId:id,action:''};publishRoute();});
     wrap('openInventoryCategoryEditor',name=>{if(name){routeState={...routeState,page:'settings',section:'categories',resourceKind:'category',resourceId:name,action:''};publishRoute();}});
     wrap('selectDepartmentSettings',id=>{if(id){routeState={...routeState,page:'settings',section:'departments',resourceKind:'department',resourceId:id,action:''};publishRoute();}});
-    wrap('openMenuPageMenu',id=>{if(id&&id!=='__all__'){routeState={...routeState,page:'menu',resourceKind:'menu',resourceId:id,action:''};publishRoute();}else{routeState={...routeState,page:'menu',resourceKind:'',resourceId:'',action:''};publishRoute();}});
+    wrap('openMenuPageMenu',id=>{if(id&&id!=='__all_items__'){routeState={...routeState,page:'menu',resourceKind:'menu',resourceId:id,action:''};publishRoute();}else{routeState={...routeState,page:'menu',resourceKind:'',resourceId:'',action:''};publishRoute();}});
     wrap('showMenuPagePicker',()=>{routeState={...routeState,page:'menu',resourceKind:'',resourceId:'',action:''};publishRoute();});
     wrap('openModal',id=>{if(id==='modal-usage-upload'){routeState={...routeState,page:'usage',resourceKind:'',resourceId:'',action:'import'};publishRoute();}});
-    wrap('closeModal',id=>{if(BASE_ROUTE_BY_MODAL[id]){routeState.page=BASE_ROUTE_BY_MODAL[id];if(id==='modal-floor-plan-room')routeState.section='floor-plan';if(id==='modal-category-editor')routeState.section='categories';resetDetail();if(id==='modal-menu-item-view'&&menuPageMenuId&&menuPageMenuId!=='__all__'){routeState.resourceKind='menu';routeState.resourceId=menuPageMenuId;}publishRoute();}});
+    wrap('closeModal',id=>{if(BASE_ROUTE_BY_MODAL[id]){routeState.page=BASE_ROUTE_BY_MODAL[id];if(id==='modal-floor-plan-room')routeState.section='floor-plan';if(id==='modal-category-editor')routeState.section='categories';resetDetail();if(id==='modal-menu-item-view'&&menuPageMenuId&&menuPageMenuId!=='__all_items__'){routeState.resourceKind='menu';routeState.resourceId=menuPageMenuId;}publishRoute();}});
   }
 
   window.addEventListener('message',event=>{
