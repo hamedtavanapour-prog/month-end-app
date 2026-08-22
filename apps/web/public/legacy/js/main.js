@@ -38,6 +38,7 @@ async function init(){
   // the legacy category ordering report a change and schedule a full workspace
   // write on every page load.
   if(typeof refreshCategorySelects==='function')refreshCategorySelects();
+  if(typeof restoreMenuPageItemView==='function')restoreMenuPageItemView();
   const activePage=document.querySelector('.page.active')?.id?.replace('page-','')||'dashboard';
   if(typeof handleInviteFromUrl==='function')handleInviteFromUrl();
   if(activePage==='dashboard')renderDashboard();

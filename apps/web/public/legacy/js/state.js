@@ -58,6 +58,7 @@ let productCatalogView='products';
 let productDepartmentView='bar';
 let menuPageDepartment='all';
 let menuPageMenuId='';
+let menuPageItemView='list';
 let menuPageEditingMenuId='';
 let menuItemEditingMenuId='';
 let menuItemEditDraft=null;

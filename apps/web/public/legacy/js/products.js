@@ -1273,6 +1273,22 @@ function openMenuPageMenu(menuId){
 
 function showMenuPagePicker(){menuPageMenuId='';const search=document.getElementById('menu-page-search');if(search)search.value='';renderMenuPage();}
 function setMenuPageMenu(menuId){menuId?openMenuPageMenu(menuId):showMenuPagePicker();}
+function setMenuPageItemView(view){
+  menuPageItemView=view==='cards'?'cards':'list';
+  try{localStorage.setItem('month_end_menu_item_view',menuPageItemView);}catch(error){}
+  renderMenuPage();
+}
+function restoreMenuPageItemView(){
+  try{menuPageItemView=localStorage.getItem('month_end_menu_item_view')==='cards'?'cards':'list';}catch(error){menuPageItemView='list';}
+}
+function menuPageViewToggleHtml(){
+  return`<div class="menu-item-view-toggle" role="group" aria-label="Menu item view"><button class="${menuPageItemView==='list'?'active':''}" type="button" aria-pressed="${menuPageItemView==='list'}" onclick="setMenuPageItemView('list')" title="List view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"></path><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle></svg><span>List</span></button><button class="${menuPageItemView==='cards'?'active':''}" type="button" aria-pressed="${menuPageItemView==='cards'}" onclick="setMenuPageItemView('cards')" title="Card view"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span>Cards</span></button></div>`;
+}
+function menuItemCardImageHtml(item){
+  const imageUrl=String(item?.imageUrl||'').trim();
+  const fallback=`<span class="menu-item-card-image-fallback" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3h8l-1 5a5 5 0 0 1-3 3 5 5 0 0 1-3-3L8 3Z"></path><path d="M12 11v8M8 21h8"></path></svg><small>${escapeHtml(item?.category||'Menu item')}</small></span>`;
+  return`<span class="menu-item-card-image ${imageUrl?'has-image':''}">${fallback}${imageUrl?`<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.hidden=true;this.parentElement.classList.remove('has-image')">`:''}</span>`;
+}
 
 function renderMenuPage(){
   ensureMenuLibrary();ensurePrepItems();
@@ -1304,10 +1320,10 @@ function renderMenuPage(){
   const uniqueItems=[];
   const seen=new Set();
   records.forEach(record=>{const key=`${record.item.name.toLowerCase()}|${record.item.recipe.toLowerCase()}`;if(!seen.has(key)){seen.add(key);uniqueItems.push(record);}});
-  if(summary)summary.innerHTML=`<div class="menu-selected-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="showMenuPagePicker()">← Menus</button><div><span class="detail-eyebrow">${browsingAllItems?'Item library':escapeHtml(menuDepartmentLabel(selectedMenu))}</span><h3>${browsingAllItems?'All Menu Items':escapeHtml(selectedMenu?.name||'Menu')}</h3><p>${browsingAllItems?'Every item from every active menu, together in one searchable view.':escapeHtml(selectedMenu?.description||`${uniqueItems.length} menu items`)}</p></div>${selectedMenu?`<button class="btn btn-primary btn-sm" type="button" onclick="addPageMenuItem('${selectedMenu.id}')">＋ Add Item</button>`:''}</div>`;
-  grid.className='menu-page-grid menu-item-row-list';
+  if(summary)summary.innerHTML=`<div class="menu-selected-heading"><button class="btn btn-secondary btn-sm" type="button" onclick="showMenuPagePicker()">← Menus</button><div><span class="detail-eyebrow">${browsingAllItems?'Item library':escapeHtml(menuDepartmentLabel(selectedMenu))}</span><h3>${browsingAllItems?'All Menu Items':escapeHtml(selectedMenu?.name||'Menu')}</h3><p>${browsingAllItems?'Every item from every active menu, together in one searchable view.':escapeHtml(selectedMenu?.description||`${uniqueItems.length} menu items`)}</p></div><div class="menu-selected-actions">${menuPageViewToggleHtml()}${selectedMenu?`<button class="btn btn-primary btn-sm" type="button" onclick="addPageMenuItem('${selectedMenu.id}')">＋ Add Item</button>`:''}</div></div>`;
+  grid.className=`menu-page-grid ${menuPageItemView==='cards'?'menu-item-card-grid':'menu-item-row-list'}`;
   if(!uniqueItems.length){grid.innerHTML=`<div class="menu-page-empty"><strong>${query?'No menu items match this search':'No active menu items yet'}</strong><span>${query?'Try a different item, section, or ingredient.':'Create or activate a menu in Manage Menus.'}</span>${query?'':'<button class="btn btn-primary" type="button" onclick="toggleMenuManager()">Manage Menus</button>'}</div>`;return;}
-  grid.innerHTML=uniqueItems.map(({menu,item})=>`<button class="menu-item-row" type="button" onclick="openMenuItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml([item.category,browsingAllItems?menu.name:''].filter(Boolean).join(' · ')||menu.name)}</small></span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}<span class="menu-item-row-arrow">›</span></button>`).join('');
+  grid.innerHTML=uniqueItems.map(({menu,item})=>menuPageItemView==='cards'?`<button class="menu-item-card" type="button" onclick="openMenuItemView('${item.id}')">${menuItemCardImageHtml(item)}<span class="menu-item-card-copy"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.category||'Uncategorized')}</small>${browsingAllItems?`<em>${escapeHtml(menu.name)}</em>`:''}</span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}</button>`:`<button class="menu-item-row" type="button" onclick="openMenuItemView('${item.id}')"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml([item.category,browsingAllItems?menu.name:''].filter(Boolean).join(' · ')||menu.name)}</small></span>${item.price?`<b>$${escapeHtml(item.price)}</b>`:''}<span class="menu-item-row-arrow">›</span></button>`).join('');
 }
 
 function toggleMenuManager(forceOpen=false){
