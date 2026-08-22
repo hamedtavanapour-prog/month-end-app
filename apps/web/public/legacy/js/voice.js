@@ -20,7 +20,7 @@ const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 function voiceHints(){
   return{
     products:'Say product name + par: "Disaronno 2, Jameson 4"',
-    inventory:'Say product + count: "Absolut 3, goose 2, tank 4"',
+    inventory:'Set with “Absolut 2,” add with “add 3 Absolut,” or deduct with “remove 1 Absolut.”',
     recount:'Call out product names: "Absolut, goose, Jameson"',
     orders:'Say product + qty: "Absolut 6, Heineken 2"'
   };
@@ -371,30 +371,9 @@ function applyVoiceTranscript(text){
   else if(voiceContext==='orders')applyVoiceOrders(parsed);
 }
 
-const NUMS={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,a:1,an:1,half:0.5};
-function w2n(s){if(!s)return null;s=s.trim();const d=parseFloat(s);if(!isNaN(d))return d;const low=s.toLowerCase();if(low.includes('half'))return 0.5;if(low.includes('quarter'))return 0.25;const ws=low.split(/\s+/);let t=0,c=0;for(const w of ws){const n=NUMS[w];if(n===undefined)continue;if(w==='hundred')c=(c||1)*100;else c+=n;}return(t+c)||null;}
-function parseVoice(text){
-  const qtyWord='[\\d.]+|a|an|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|half|quarter';
-  const chunks=text.replace(/\band then\b/gi,',').replace(/\bthen\b/gi,',').replace(/[,;]+/g,',').replace(/\s{2,}/g,' ').trim().split(',').map(s=>s.trim()).filter(Boolean);
-  const res=[];
-  for(const chunk of chunks){
-    const sn=chunk.match(new RegExp(`^(${qtyWord})\\s+(.+)$`,'i'));
-    const en=chunk.match(new RegExp(`^(.+?)\\s+(${qtyWord})$`,'i'));
-    let ns=null,qs='1';
-    if(sn){
-      ns=sn[2];
-      qs=sn[1];
-    }else if(en){
-      ns=en[1];
-      qs=en[2];
-    }else ns=chunk;
-    ns=(ns||'').replace(/\bpar\b/gi,'').trim();
-    if(!ns)continue;
-    const qty=w2n(qs);
-    res.push({nameStr:ns,qty:qty!==null?qty:1});
-  }
-  return res;
-}
+const NUMS=window.MonthEndVoiceCommands.NUMS;
+const w2n=window.MonthEndVoiceCommands.wordsToNumber;
+const parseVoice=window.MonthEndVoiceCommands.parseVoice;
 function normStr(s){return s.toLowerCase().replace(/[''`]/g,'').replace(/[éèê]/g,'e').replace(/[àâ]/g,'a').replace(/[ôö]/g,'o').replace(/[üùû]/g,'u').replace(/[ç]/g,'c').replace(/[ñ]/g,'n').replace(/\byr\b/g,'').replace(/\byear\b/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();}
 function normalizeVoiceNumberWords(value){
   const words=normStr(value).split(' ').filter(Boolean);
@@ -477,12 +456,17 @@ function applyVoiceInventory(parsed){
   let matched=0;
   const unmatched=[],ambiguous=[],updated=[],applied=[];
   const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
-  parsed.forEach(({nameStr,qty})=>{
+  parsed.forEach(({nameStr,qty,operation='set'})=>{
     const result=voiceProductMatch(nameStr,products);
     if(result&&!result.ambiguous){
-      liveInvCounts[result.product.id]=qty;
+      const previous=Number.parseFloat(liveInvCounts[result.product.id]);
+      const current=Number.isFinite(previous)?previous:0;
+      const next=window.MonthEndVoiceCommands.applyCountOperation(current,qty,operation);
+      liveInvCounts[result.product.id]=next;
       updated.push(result.product.id);
-      applied.push(`${result.product.name}: ${qty}`);
+      if(operation==='add')applied.push(`${result.product.name}: ${current} + ${qty} = ${next}`);
+      else if(operation==='subtract')applied.push(`${result.product.name}: ${current} − ${qty} = ${next}`);
+      else applied.push(`${result.product.name}: ${next}`);
       matched++;
     }else if(result?.ambiguous){
       ambiguous.push(`${nameStr}: ${result.candidates.map(candidate=>candidate.product.name).join(' / ')}`);
@@ -498,7 +482,7 @@ function applyVoiceInventory(parsed){
       if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}
     });
     document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});
-    toast(`Voice: ${matched} count${matched>1?'s':''} filled.`);
+    toast(`Voice: ${matched} count adjustment${matched>1?'s':''} applied.`);
   }else updateInvProgress();
   if(ambiguous.length)setTimeout(()=>toast('Ambiguous: '+ambiguous.join(', '),true),700);
   else if(unmatched.length)setTimeout(()=>toast('No match: '+unmatched.join(', '),true),700);

@@ -1247,6 +1247,16 @@ function addCountExtraProduct(productId){
   setTimeout(()=>document.getElementById('invq-'+product.id)?.focus(),0);
   toast(`${product.inventoryName||product.name} added to ${room.name} for this count only.`);
 }
+function removeCountExtraProduct(productId){
+  const room=currentInventoryRoom();
+  const product=state.products.find(item=>item.id===productId);
+  if(!room||!(room.extraProductIds||[]).includes(productId)||currentInvMergedView)return;
+  room.extraProductIds=(room.extraProductIds||[]).filter(id=>id!==productId);
+  delete liveInvCounts[productId];
+  dirtyInventoryRoomIds.add(room.id);
+  renderInvRows();
+  toast(`${product?.inventoryName||product?.name||'Item'} removed from this count.`);
+}
 function openInventoryFilterSheet(){
   closeAllMenus();
   const sheet=document.getElementById('inv-filter-sheet');
@@ -1311,7 +1321,7 @@ function renderInvRows(skipCapture=false){
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
   const extraIds=new Set(currentInventoryRoom()?.extraProductIds||[]);
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span style="font-size:0.74rem;color:var(--text-muted);">${p.unit}</span></div>`;};
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!expandedInventorySections.has(sectionToken);
@@ -1406,12 +1416,11 @@ function inventoryListSummary(inv){
   return{...inv,counted,missing:Math.max(expected.size-counted,0),roomsCount:inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length,value:total};
 }
 function inventorySearchText(inv){
-  const productNames=Object.keys(inv.items||{}).map(id=>getProduct(id)?.name||'');
   const historyActors=(inv.history||[]).flatMap(event=>[event?.actor?.name,event?.actor?.role]);
   return[
     inv.label,inv.date,fmtDate(inv.date),inventoryStatusLabel(inv),inv.recordType==='recount'?'recount':'count',
     inv.archived?'archived':'current',inv.recountNumber,inv.createdBy?.name,inv.createdBy?.role,inv.createdBy?.email,
-    inv.updatedBy?.name,inv.updatedBy?.role,inv.updatedBy?.email,...(inv.rooms||[]).map(room=>room.name),...productNames,...historyActors
+    inv.updatedBy?.name,inv.updatedBy?.role,inv.updatedBy?.email,...historyActors
   ].filter(Boolean).join(' ').toLowerCase();
 }
 function inventoryMatchesSearch(inv,query){
@@ -1473,14 +1482,14 @@ function renderInventoryTable(){
   const sortedRoots=sortArr(families.map(family=>family.root),sortState.inventories.col,sortState.inventories.dir);
   const familyById=new Map(families.map(family=>[family.root.id,family]));
   families=sortedRoots.map(root=>familyById.get(root.id)).filter(Boolean);
-  const matchedRecords=families.reduce((total,family)=>total+1+family.recounts.length,0);
+  const matchedRecords=families.length;
   const searchCount=document.getElementById('inventory-search-count');
-  if(searchCount)searchCount.textContent=query?`${matchedRecords} matching record${matchedRecords===1?'':'s'}`:'';
+  if(searchCount)searchCount.textContent=query?`${matchedRecords} matching count${matchedRecords===1?'':'s'}`:'';
   const tbody=document.getElementById('inv-tbody');
   const mobileList=document.getElementById('inventory-mobile-list');
   if(!families.length){
     const emptyState=query
-      ?`<div class="table-empty-state"><strong>No matching counts</strong><p>Try a count name, date, creator, room, product, or status.</p></div>`
+      ?`<div class="table-empty-state"><strong>No matching counts</strong><p>Try a count name, date, creator, or status.</p></div>`
       :showArchivedInventories
       ?`<div class="table-empty-state"><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
       :`<div class="table-empty-state"><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
@@ -1489,11 +1498,11 @@ function renderInventoryTable(){
     return;
   }
   tbody.innerHTML=families.map((family,index)=>{
-    const expanded=expandedRecountFamilies.has(family.root.id)||Boolean(query&&family.recounts.length);
+    const expanded=!query&&expandedRecountFamilies.has(family.root.id);
     return inventoryTableRowHtml(family.root,`root-${index}`,family.recounts,false,expanded)+(expanded?family.recounts.map((recount,recountIndex)=>inventoryTableRowHtml(recount,`recount-${index}-${recountIndex}`,[],true,false)).join(''):'');
   }).join('');
   if(mobileList)mobileList.innerHTML=families.map((family,index)=>{
-    const expanded=expandedRecountFamilies.has(family.root.id)||Boolean(query&&family.recounts.length);
+    const expanded=!query&&expandedRecountFamilies.has(family.root.id);
     return`<section class="inventory-mobile-family">${mobileInventoryCardHtml(family.root,`root-${index}`)}${family.recounts.length?`<button class="inventory-mobile-recount-toggle" type="button" aria-expanded="${expanded}" onclick="toggleRecountFamily('${family.root.id}')"><span>${family.recounts.length} linked re-count${family.recounts.length===1?'':'s'}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button>${expanded?`<div class="inventory-mobile-recounts">${family.recounts.map((recount,recountIndex)=>mobileInventoryCardHtml(recount,`recount-${index}-${recountIndex}`,true)).join('')}</div>`:''}`:''}</section>`;
   }).join('');
 }

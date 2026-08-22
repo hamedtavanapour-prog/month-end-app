@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   form.append("model", "gpt-4o-mini-transcribe");
   form.append("language", "en");
   if (vocabulary) {
-    form.append("prompt", `Restaurant beverage inventory count. Preserve product names and quantities. Product vocabulary: ${vocabulary}`);
+    form.append("prompt", `Restaurant beverage inventory count. Preserve product names, quantities, and action words such as add, plus, increase, remove, deduct, subtract, minus, and set. Product vocabulary: ${vocabulary}`);
   }
   form.append("file", audio, audio.name || "count-recording.webm");
 

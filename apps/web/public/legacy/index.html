@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=menu-library-5"/>
+<link rel="stylesheet" href="css/styles.css?v=count-workflow-2"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -284,7 +284,7 @@
   <div class="counts-search-wrap">
     <label class="counts-search" for="inventory-search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
-      <input type="search" id="inventory-search" aria-label="Search counts" placeholder="Search counts by name, date, creator, room, item, or status…" autocomplete="off" oninput="renderInventoryTable()">
+      <input type="search" id="inventory-search" aria-label="Search counts" placeholder="Search counts by name, date, creator, or status…" autocomplete="off" oninput="renderInventoryTable()">
     </label>
     <span id="inventory-search-count" class="counts-search-count" aria-live="polite"></span>
   </div>
@@ -1224,13 +1224,14 @@
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=spring-menu-1"></script>
-<script src="js/inventory.js?v=menu-recipes-3"></script>
+<script src="js/inventory.js?v=count-workflow-2"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>
-<script src="js/voice.js?v=recount-transcription-1"></script>
+<script src="js/voice-commands.js?v=count-adjustments-1"></script>
+<script src="js/voice.js?v=count-adjustments-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=menu-library-5"></script>
 <script src="js/main.js?v=local-count-mode-1"></script>
