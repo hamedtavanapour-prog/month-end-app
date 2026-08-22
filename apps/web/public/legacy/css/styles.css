@@ -1167,7 +1167,7 @@ body.voice-ui-open{overflow:hidden;}
   .menu-item-edit-fields,.menu-item-service-fields{grid-template-columns:1fr;}
   .kitchen-editor-sections{grid-template-columns:1fr;}
   .menu-item-detail-layout.has-image{display:block;margin-top:12px;}
-  .menu-item-hero-image{position:static;margin-bottom:16px;}
+  .menu-item-hero-image{position:relative;margin-bottom:16px;}
   .menu-item-service-fields .wide{grid-column:auto;}
   .menu-item-ingredient-edit-row{grid-template-columns:1fr;}
   .menu-item-ingredient-edit-row[style]{grid-template-columns:1fr!important;}
