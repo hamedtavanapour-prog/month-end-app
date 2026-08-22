@@ -3,7 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { requireAccessContext } from "@/lib/auth/context";
+import { can, requireAccessContext } from "@/lib/auth/context";
 import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
 import { revokeInvitation } from "./actions";
@@ -108,6 +108,7 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
           <span className="active">Users & access</span>
           <Link href="/app">Departments</Link>
           <Link href="/app/activity">Activity log</Link>
+          {can(context, "integrations.pos.view") ? <Link href="/app/settings/integrations/pos">POS integrations</Link> : null}
         </nav>
         <div className="team-current-user">
           <b>{initials(context.displayName)}</b>

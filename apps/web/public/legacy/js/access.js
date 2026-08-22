@@ -79,6 +79,10 @@
       button.onclick=()=>{showPage('settings');setSettingsSection('profiles');};
       button.style.display=access.canManageUsers?'flex':'none';
     });
+    document.querySelectorAll('[data-pos-integrations-link]').forEach(button=>{
+      button.hidden=!access.canViewPosIntegrations;
+      button.style.display=access.canViewPosIntegrations?'flex':'none';
+    });
     const accountButton=document.querySelector('.settings-account');
     if(accountButton)accountButton.onclick=window.openCurrentProfileSettings;
     const myProfileButton=document.getElementById('profile-menu-my-profile');

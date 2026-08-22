@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { requireAccessContext } from "@/lib/auth/context";
+import { can, requireAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Activity log" };
@@ -23,6 +23,13 @@ const actionLabels: Record<string, string> = {
   "count.archived": "Archived a count",
   "count.restored": "Restored a count",
   "count.deleted": "Deleted a count",
+  "integration.configured": "Configured a POS integration",
+  "integration.disconnected": "Disconnected a POS integration",
+  "integration.menu_imported": "Imported a POS menu",
+  "integration.item_mapped": "Mapped a POS menu item",
+  "integration.mapping_changed": "Changed a POS menu mapping",
+  "integration.sync_triggered": "Synchronized POS tickets",
+  "integration.sync_failed": "POS synchronization failed",
 };
 
 function initials(name: string) {
@@ -44,7 +51,7 @@ export default async function ActivityPage() {
   return <main className="team-shell">
     <aside className="team-sidebar">
       <Link className="legacy-brand" href="/app"><strong>ME / Keg Bar</strong><span>Inventory Manager</span></Link>
-      <nav><Link href="/app">← Inventory workspace</Link><Link href="/app/team">Users & access</Link><Link href="/app">Departments</Link><span className="active">Activity log</span></nav>
+      <nav><Link href="/app">← Inventory workspace</Link><Link href="/app/team">Users & access</Link><Link href="/app">Departments</Link><span className="active">Activity log</span>{can(context, "integrations.pos.view") ? <Link href="/app/settings/integrations/pos">POS integrations</Link> : null}</nav>
       <div className="team-current-user"><b>{initials(context.displayName)}</b><span><strong>{context.displayName}</strong><small>{context.role}</small></span></div>
     </aside>
     <section className="team-content">

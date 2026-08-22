@@ -6,6 +6,155 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+type InsertShape<Row, RequiredKeys extends keyof Row> = Partial<Row> & Pick<Row, RequiredKeys>
+
+type PosIntegrationRow = {
+  id: string
+  organization_id: string
+  provider: string
+  integration_type: string
+  mode: string
+  status: string
+  configuration: Json
+  connected_at: string | null
+  last_sync_at: string | null
+  last_successful_sync_at: string | null
+  sync_error: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+type PosLocationRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  external_location_id: string
+  name: string
+  timezone: string | null
+  status: string
+  metadata: Json
+  last_sync_at: string | null
+  last_successful_sync_at: string | null
+  sync_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+type PosMenuItemRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  location_id: string
+  external_item_id: string
+  name: string
+  category: string | null
+  sku: string | null
+  price: number | null
+  currency: string | null
+  is_active: boolean
+  source_updated_at: string | null
+  imported_at: string
+  updated_at: string
+}
+
+type PosItemMappingRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  pos_menu_item_id: string
+  external_item_id: string
+  external_item_name: string
+  month_end_menu_item_id: string | null
+  month_end_menu_item_name: string | null
+  month_end_menu_variant_key: string | null
+  month_end_menu_variant_name: string | null
+  mapping_status: string
+  mapped_by: string | null
+  mapped_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+type PosTicketRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  location_id: string
+  external_ticket_id: string
+  ticket_number: string | null
+  status: string
+  opened_at: string | null
+  closed_at: string | null
+  source_updated_at: string | null
+  external_employee_id: string | null
+  employee_name: string | null
+  guest_count: number | null
+  subtotal: number | null
+  total: number | null
+  currency: string | null
+  content_hash: string
+  imported_at: string
+  updated_at: string
+}
+
+type PosTicketItemRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  ticket_id: string
+  pos_menu_item_id: string | null
+  external_ticket_item_id: string
+  external_menu_item_id: string | null
+  name: string
+  quantity: number
+  unit_price: number | null
+  total: number | null
+  is_voided: boolean
+  is_cancelled: boolean
+  modifiers: Json
+  created_at: string
+  updated_at: string
+}
+
+type PosSyncRunRow = {
+  id: string
+  organization_id: string
+  integration_id: string
+  location_id: string | null
+  sync_kind: string
+  trigger_type: string
+  status: string
+  range_start: string | null
+  range_end: string | null
+  records_received: number
+  records_created: number
+  records_updated: number
+  records_skipped: number
+  error: string | null
+  details: Json
+  triggered_by: string | null
+  started_at: string
+  completed_at: string | null
+}
+
+type IntegrationEventRow = {
+  id: number
+  organization_id: string
+  integration_id: string | null
+  provider: string
+  external_id: string | null
+  event_type: string
+  payload: Json
+  processing_status: string
+  attempt_count: number
+  error: string | null
+  received_at: string
+  processed_at: string | null
+  retained_until: string
+}
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -511,6 +660,54 @@ export type Database = {
           label?: string
           manager_assignable?: boolean
         }
+        Relationships: []
+      }
+      pos_integrations: {
+        Row: PosIntegrationRow
+        Insert: InsertShape<PosIntegrationRow, "organization_id" | "provider">
+        Update: Partial<PosIntegrationRow>
+        Relationships: []
+      }
+      pos_locations: {
+        Row: PosLocationRow
+        Insert: InsertShape<PosLocationRow, "organization_id" | "integration_id" | "external_location_id" | "name">
+        Update: Partial<PosLocationRow>
+        Relationships: []
+      }
+      pos_menu_items: {
+        Row: PosMenuItemRow
+        Insert: InsertShape<PosMenuItemRow, "organization_id" | "integration_id" | "location_id" | "external_item_id" | "name">
+        Update: Partial<PosMenuItemRow>
+        Relationships: []
+      }
+      pos_item_mappings: {
+        Row: PosItemMappingRow
+        Insert: InsertShape<PosItemMappingRow, "organization_id" | "integration_id" | "pos_menu_item_id" | "external_item_id" | "external_item_name">
+        Update: Partial<PosItemMappingRow>
+        Relationships: []
+      }
+      pos_tickets: {
+        Row: PosTicketRow
+        Insert: InsertShape<PosTicketRow, "organization_id" | "integration_id" | "location_id" | "external_ticket_id" | "status" | "content_hash">
+        Update: Partial<PosTicketRow>
+        Relationships: []
+      }
+      pos_ticket_items: {
+        Row: PosTicketItemRow
+        Insert: InsertShape<PosTicketItemRow, "organization_id" | "integration_id" | "ticket_id" | "external_ticket_item_id" | "name" | "quantity">
+        Update: Partial<PosTicketItemRow>
+        Relationships: []
+      }
+      pos_sync_runs: {
+        Row: PosSyncRunRow
+        Insert: InsertShape<PosSyncRunRow, "organization_id" | "integration_id" | "sync_kind" | "trigger_type">
+        Update: Partial<PosSyncRunRow>
+        Relationships: []
+      }
+      integration_events: {
+        Row: IntegrationEventRow
+        Insert: InsertShape<IntegrationEventRow, "organization_id" | "provider" | "event_type" | "payload">
+        Update: Partial<IntegrationEventRow>
         Relationships: []
       }
       profiles: {

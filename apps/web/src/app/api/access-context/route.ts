@@ -16,7 +16,7 @@ const PAGE_PERMISSIONS: Record<string, string[]> = {
   insights: ["dashboard.view", "reports.view"],
   suppliers: ["suppliers.view"],
   reports: ["reports.view"],
-  settings: ["settings.rooms", "settings.departments", "settings.users", "settings.permissions"],
+  settings: ["settings.rooms", "settings.departments", "settings.users", "settings.permissions", "integrations.pos.view"],
 };
 
 export async function GET() {
@@ -48,6 +48,7 @@ export async function GET() {
     permissions: fullAccess ? "all" : context.permissionKeys,
     pages,
     canManageUsers: fullAccess || context.role === "manager" || context.permissionKeys.includes("settings.users"),
+    canViewPosIntegrations: fullAccess || context.permissionKeys.includes("integrations.pos.view"),
     preferences: preferences?.preferences ?? {},
     managers: (managerMemberships ?? []).map((membership) => {
       const profile = (profiles ?? []).find((item) => item.id === membership.user_id);

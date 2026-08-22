@@ -16,6 +16,8 @@ Secure inventory operations for multi-department hospitality teams.
 
 Supabase provides authentication, Postgres data storage, private file storage, and row-level access control. Database changes are versioned in `supabase/migrations`.
 
+The provider-neutral POS/Omnivore foundation is documented in [docs/pos-integrations.md](docs/pos-integrations.md).
+
 ## Local development
 
 Copy `apps/web/.env.example` to `apps/web/.env.local`, fill in the Supabase project values, then run:
@@ -24,4 +26,3 @@ Copy `apps/web/.env.example` to `apps/web/.env.local`, fill in the Supabase proj
 npm install
 npm run dev
 ```
-
