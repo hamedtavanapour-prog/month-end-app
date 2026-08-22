@@ -997,7 +997,7 @@ async function createCountDraft(date,label,floorRooms=activeFloorPlanRooms()){
   const id=uid();
   const actor=window.serverAccessContext?.user||{};
   const createdBy={id:actor.id||'',name:actor.name||'Team member',role:actor.jobTitle||actor.role||'Team member'};
-  const draft={id,date,label,items:{},rooms,draft:true,status:'saved',finalised:false,recordType:'count',createdBy,createdAt:new Date().toISOString()};
+  const draft={id,date,label,items:{},rooms,draft:true,status:'saved',finalised:false,recordType:'count',createdBy,createdAt:new Date().toISOString(),history:[inventoryHistoryEvent('created',{label,date,recordType:'count'})]};
   const shared=typeof cloudCreateCountDraft==='function'?await cloudCreateCountDraft(draft):null;
   if(!shared){toast('Could not create the shared count. Try again.',true);return null;}
   state=shared.state;
@@ -1398,6 +1398,59 @@ async function saveInventory(done=false){
     setInventoryFinishSaving(false);
   }
 }
+function inventoryListSummary(inv){
+  normalizeInventoryRooms(inv);
+  const total=Object.entries(inv.items||{}).reduce((sum,[id,quantity])=>{const product=getProduct(id);return sum+(product?product.cost*quantity:0);},0);
+  const expected=expectedInventoryProductIds(inv);
+  const counted=Object.keys(inv.items||{}).filter(id=>expected.has(id)).length;
+  return{...inv,counted,missing:Math.max(expected.size-counted,0),roomsCount:inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length,value:total};
+}
+function inventorySearchText(inv){
+  const productNames=Object.keys(inv.items||{}).map(id=>getProduct(id)?.name||'');
+  const historyActors=(inv.history||[]).flatMap(event=>[event?.actor?.name,event?.actor?.role]);
+  return[
+    inv.label,inv.date,fmtDate(inv.date),inventoryStatusLabel(inv),inv.recordType==='recount'?'recount':'count',
+    inv.archived?'archived':'current',inv.recountNumber,inv.createdBy?.name,inv.createdBy?.role,inv.createdBy?.email,
+    inv.updatedBy?.name,inv.updatedBy?.role,inv.updatedBy?.email,...(inv.rooms||[]).map(room=>room.name),...productNames,...historyActors
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+function inventoryMatchesSearch(inv,query){
+  const terms=String(query||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(!terms.length)return true;
+  const text=inventorySearchText(inv);
+  return terms.every(term=>text.includes(term));
+}
+function inventoryFamilies(query=''){
+  const inventories=state.inventories||[];
+  const ids=new Set(inventories.map(inv=>inv.id));
+  const roots=inventories.filter(inv=>inv.recordType!=='recount'||!inv.parentCountId||!ids.has(inv.parentCountId));
+  return roots.map(root=>{
+    const recounts=inventories.filter(inv=>inv.recordType==='recount'&&inv.parentCountId===root.id)
+      .sort((a,b)=>Number(a.recountNumber||0)-Number(b.recountNumber||0)||String(a.createdAt||a.date||'').localeCompare(String(b.createdAt||b.date||'')));
+    return{root:inventoryListSummary(root),recounts:recounts.map(inventoryListSummary)};
+  }).filter(family=>(showArchivedInventories?!!family.root.archived:!family.root.archived)&&[family.root,...family.recounts].some(inv=>inventoryMatchesSearch(inv,query)));
+}
+function toggleRecountFamily(id){
+  if(expandedRecountFamilies.has(id))expandedRecountFamilies.delete(id);else expandedRecountFamilies.add(id);
+  renderInventoryTable();
+}
+function recountFamilyToggleHtml(inv,recounts,expanded){
+  if(!recounts.length)return'';
+  return`<button class="recount-family-toggle" type="button" aria-expanded="${expanded}" aria-label="${expanded?'Hide':'Show'} ${recounts.length} linked re-count${recounts.length===1?'':'s'}" onclick="event.stopPropagation();toggleRecountFamily('${inv.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg><span>${recounts.length} re-count${recounts.length===1?'':'s'}</span></button>`;
+}
+function inventoryTableRowHtml(inv,index,recounts=[],isRecountChild=false,expanded=false){
+  const visCols=INV_COLS.filter(column=>column.visible);
+  return`<tr class="inventory-row ${inv.archived?'archived-row':''} ${isRecountChild?'inventory-recount-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(column=>{switch(column.key){
+    case'date':return`<td>${fmtDate(inv.date)}</td>`;
+    case'label':return`<td><div class="inventory-label-cell">${isRecountChild?'<span class="recount-branch" aria-hidden="true">↳</span>':''}<div><strong>${escapeHtml(inv.label||'—')}</strong>${inv.createdBy?.name?`<small class="count-audit-line">Created by ${escapeHtml(inv.createdBy.name)} · ${escapeHtml(inv.createdBy.role||'')}</small>`:''}<div class="inventory-status-row"><span class="${inventoryIsFinalised(inv)?'filled-pill':'sub-badge'}">${inventoryStatusLabel(inv)}</span>${inv.recordType==='recount'?` <span class="sub-badge">Re-count ${inv.recountNumber||''}</span>`:''}${inv.archived?' <span class="sub-badge">Archived</span>':''}</div>${!isRecountChild?recountFamilyToggleHtml(inv,recounts,expanded):''}</div></div></td>`;
+    case'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;
+    case'counted':return`<td>${inv.counted}</td>`;
+    case'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;
+    case'value':return`<td>${fmt(inv.value)}</td>`;
+    case'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions">${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;
+    default:return'<td>—</td>';
+  }}).join('')}</tr>`;
+}
 function renderInventoryTable(){
   renderFloorPlanRooms();
   const visCols=INV_COLS.filter(c=>c.visible);
@@ -1415,25 +1468,39 @@ function renderInventoryTable(){
     listContext.innerHTML=showArchivedInventories?`<strong>Archived counts</strong><span>${archivedCount?`${archivedCount} saved count${archivedCount===1?' is':'s are'} archived. Restore one from its More menu to return it to current counts.`:'There are no archived counts yet.'}</span>`:'';
   }
   document.getElementById('inv-thead').innerHTML='<tr>'+visCols.map(c=>{if(!c.sort||c.key==='actions')return`<th>${c.label}</th>`;return sortableTableHeader(c.label,'inventories',c.sort);}).join('')+'</tr>';
-  let rows=state.inventories.filter(inv=>showArchivedInventories?!!inv.archived:!inv.archived).map(inv=>{normalizeInventoryRooms(inv);const total=Object.entries(inv.items).reduce((s,[id,q])=>{const p=getProduct(id);return s+(p?p.cost*q:0);},0);const expected=expectedInventoryProductIds(inv);const counted=Object.keys(inv.items).filter(id=>expected.has(id)).length,missing=Math.max(expected.size-counted,0);const roomsCount=inv.rooms.filter(room=>Object.keys(room.items||{}).length>0).length;return{...inv,counted,missing,roomsCount,value:total};});
-  rows=sortArr(rows,sortState.inventories.col,sortState.inventories.dir);
+  const query=(document.getElementById('inventory-search')?.value||'').trim();
+  let families=inventoryFamilies(query);
+  const sortedRoots=sortArr(families.map(family=>family.root),sortState.inventories.col,sortState.inventories.dir);
+  const familyById=new Map(families.map(family=>[family.root.id,family]));
+  families=sortedRoots.map(root=>familyById.get(root.id)).filter(Boolean);
+  const matchedRecords=families.reduce((total,family)=>total+1+family.recounts.length,0);
+  const searchCount=document.getElementById('inventory-search-count');
+  if(searchCount)searchCount.textContent=query?`${matchedRecords} matching record${matchedRecords===1?'':'s'}`:'';
   const tbody=document.getElementById('inv-tbody');
   const mobileList=document.getElementById('inventory-mobile-list');
-  if(!rows.length){
-    const emptyState=showArchivedInventories
+  if(!families.length){
+    const emptyState=query
+      ?`<div class="table-empty-state"><strong>No matching counts</strong><p>Try a count name, date, creator, room, product, or status.</p></div>`
+      :showArchivedInventories
       ?`<div class="table-empty-state"><strong>No archived counts</strong><p>Counts you archive will stay available here.</p></div>`
       :`<div class="table-empty-state"><strong>File your first inventory count</strong><p>Choose a room, enter what is on hand, and save a baseline for live inventory.</p><button class="btn btn-primary" type="button" onclick="openInventoryRoomSelect()">＋ Start first count</button></div>`;
     tbody.innerHTML=`<tr><td colspan="${visCols.length}">${emptyState}</td></tr>`;
     if(mobileList)mobileList.innerHTML=emptyState;
     return;
   }
-  tbody.innerHTML=rows.map((inv,index)=>`<tr class="inventory-row ${inv.archived?'archived-row':''}" onclick="viewInventory('${inv.id}')">${visCols.map(c=>{switch(c.key){case 'date':return`<td>${fmtDate(inv.date)}</td>`;case 'label':return`<td>${inv.label||'—'}${inv.createdBy?.name?`<small class="count-audit-line">Created by ${escapeHtml(inv.createdBy.name)} · ${escapeHtml(inv.createdBy.role||'')}</small>`:''}<div style="margin-top:4px;"><span class="${inventoryIsFinalised(inv)?'filled-pill':'sub-badge'}">${inventoryStatusLabel(inv)}</span>${inv.recordType==='recount'?` <span class="sub-badge">Re-count ${inv.recountNumber||''}</span>`:''}</div>${inv.archived?'<div style="margin-top:4px;"><span class="sub-badge">Archived</span></div>':''}</td>`;case 'rooms':return`<td><span class="filled-pill">${inv.roomsCount} room${inv.roomsCount===1?'':'s'} counted</span></td>`;case 'counted':return`<td>${inv.counted}</td>`;case 'missing':return`<td>${inv.missing>0?`<span class="missing-pill"><span class="missing-dot"></span>${inv.missing}</span>`:'<span class="filled-pill">Complete</span>'}</td>`;case 'value':return`<td>${fmt(inv.value)}</td>`;case 'actions':return`<td onclick="event.stopPropagation()"><div class="inventory-row-actions">${inventoryMenuHtml(inv,`inventory-menu-${index}`)}</div></td>`;default:return`<td>—</td>`;}}).join('')}</tr>`).join('');
-  if(mobileList)mobileList.innerHTML=rows.map((inv,index)=>mobileInventoryCardHtml(inv,index)).join('');
+  tbody.innerHTML=families.map((family,index)=>{
+    const expanded=expandedRecountFamilies.has(family.root.id)||Boolean(query&&family.recounts.length);
+    return inventoryTableRowHtml(family.root,`root-${index}`,family.recounts,false,expanded)+(expanded?family.recounts.map((recount,recountIndex)=>inventoryTableRowHtml(recount,`recount-${index}-${recountIndex}`,[],true,false)).join(''):'');
+  }).join('');
+  if(mobileList)mobileList.innerHTML=families.map((family,index)=>{
+    const expanded=expandedRecountFamilies.has(family.root.id)||Boolean(query&&family.recounts.length);
+    return`<section class="inventory-mobile-family">${mobileInventoryCardHtml(family.root,`root-${index}`)}${family.recounts.length?`<button class="inventory-mobile-recount-toggle" type="button" aria-expanded="${expanded}" onclick="toggleRecountFamily('${family.root.id}')"><span>${family.recounts.length} linked re-count${family.recounts.length===1?'':'s'}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button>${expanded?`<div class="inventory-mobile-recounts">${family.recounts.map((recount,recountIndex)=>mobileInventoryCardHtml(recount,`recount-${index}-${recountIndex}`,true)).join('')}</div>`:''}`:''}</section>`;
+  }).join('');
 }
-function mobileInventoryCardHtml(inv,index){
+function mobileInventoryCardHtml(inv,index,isRecountChild=false){
   const expanded=mobileExpandedInventoryId===inv.id;
   const label=inv.label||'Inventory Count';
-  return`<article class="inventory-mobile-card ${expanded?'expanded':''} ${inv.archived?'archived-row':''}" onclick="toggleMobileInventoryDetails('${inv.id}')" role="button" tabindex="0" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();toggleMobileInventoryDetails('${inv.id}')}" aria-label="${expanded?'Hide':'Show'} details for ${escapeHtml(label)} from ${fmtDate(inv.date)}" aria-expanded="${expanded}">
+  return`<article class="inventory-mobile-card ${expanded?'expanded':''} ${inv.archived?'archived-row':''} ${isRecountChild?'inventory-mobile-recount-card':''}" onclick="toggleMobileInventoryDetails('${inv.id}')" role="button" tabindex="0" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();toggleMobileInventoryDetails('${inv.id}')}" aria-label="${expanded?'Hide':'Show'} details for ${escapeHtml(label)} from ${fmtDate(inv.date)}" aria-expanded="${expanded}">
     <div class="inventory-mobile-card-head">
       <div class="inventory-mobile-card-title"><strong>${escapeHtml(label)}</strong><time datetime="${inv.date}">${fmtDate(inv.date)}</time></div>
       <span class="inventory-mobile-expand" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
@@ -1454,15 +1521,19 @@ function toggleMobileInventoryDetails(id){
   closeAllMenus();
   renderInventoryTable();
 }
+function canDeleteFinalisedInventory(){
+  return localOnlyMode||window.serverAccessContext?.canDeleteFinalisedCounts===true;
+}
 function inventoryMenuHtml(inv,menuId){
   const mutable=!inventoryIsFinalised(inv);
+  const canDelete=mutable||canDeleteFinalisedInventory();
   return`<div class="drop-wrap inventory-actions">
     <button class="icon-btn overflow-menu-button" type="button" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Count actions" aria-label="Count actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
     <div class="drop-menu" id="${menuId}">
       ${mutable?`<button onclick="event.stopPropagation();closeAllMenus();openCountRoomPicker('${inv.id}')">Edit</button><button onclick="event.stopPropagation();closeAllMenus();finaliseInventoryCount('${inv.id}')">Finalise</button>`:''}
       ${inventoryIsFinalised(inv)?`<button onclick="event.stopPropagation();closeAllMenus();openRecountSelector('${inv.id}')">Re-count</button>`:''}
       <button onclick="event.stopPropagation();archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore':'Archive'}</button>
-      ${mutable?`<div class="drop-divider"></div><button onclick="event.stopPropagation();deleteInventory('${inv.id}')">Delete</button>`:''}
+      ${canDelete?`<div class="drop-divider"></div><button class="danger-menu-item" onclick="event.stopPropagation();deleteInventory('${inv.id}')">Delete${mutable?'':' permanently'}</button>`:''}
     </div>
   </div>`;
 }
@@ -1551,7 +1622,8 @@ async function createRecount(){
     id:uid(),date:today(),label:`${source.label||'Inventory Count'} — Re-count ${number}`,
     items:{},rooms,draft:true,status:'saved',finalised:false,recordType:'recount',
     parentCountId:source.id,recountNumber:number,selectedProductIds:selected,
-    createdBy:{id:actor.id||'',name:actor.name||'Team member',role:actor.jobTitle||actor.role||'Team member'},createdAt:new Date().toISOString()
+    createdBy:{id:actor.id||'',name:actor.name||'Team member',role:actor.jobTitle||actor.role||'Team member'},createdAt:new Date().toISOString(),
+    history:[inventoryHistoryEvent('created',{label:`${source.label||'Inventory Count'} — Re-count ${number}`,date:today(),recordType:'recount'})]
   };
   const button=document.getElementById('recount-create-button');if(button){button.disabled=true;button.textContent='Creating…';}
   const shared=typeof cloudCreateCountDraft==='function'?await cloudCreateCountDraft(draft):null;
@@ -1565,15 +1637,17 @@ async function createRecount(){
   await openCountRoomPicker(shared.draft.id);
 }
 function toggleArchivedInventories(){showArchivedInventories=!showArchivedInventories;closeAllMenus();renderInventoryTable();}
-function archiveInventory(id,archived=true){
+async function archiveInventory(id,archived=true){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);if(!inv)return;
-  inv.archived=archived;inv.updatedBy=currentAuditStamp();inv.updatedAt=new Date().toISOString();save();renderInventoryTable();refreshLiveInventoryIfVisible();
+  const shared=typeof cloudArchiveCount==='function'?await cloudArchiveCount(id,archived):null;
+  if(!shared)return;
+  state=shared;normalizeLoadedState();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+  renderInventoryTable();refreshLiveInventoryIfVisible();
   window.recordServerEvent?.({action:archived?'count.archived':'count.restored',entityType:'count',entityId:id,details:{label:inv.label||'',date:inv.date}});
   if(viewInvId===id){
-    document.getElementById('view-inv-title').textContent=`${inv.label||'Inventory'} — ${fmtDate(inv.date)}${inv.archived?' · Archived':''}`;
-    renderViewInventoryActions(inv);
-    renderViewedInventoryHistory(inv);
+    const saved=state.inventories.find(item=>item.id===id);if(saved){document.getElementById('view-inv-title').textContent=`${saved.label||'Inventory'} — ${fmtDate(saved.date)}${saved.archived?' · Archived':''}`;renderViewInventoryActions(saved);renderViewedInventoryHistory(saved);}
   }
   toast(archived?'Count archived.':'Count restored.');
 }
@@ -1585,11 +1659,49 @@ function viewInventory(id){
   document.getElementById('view-inv-search').value='';
   renderViewInventoryActions(inv);renderViewedInventoryHistory(inv);const history=document.getElementById('view-inv-history');if(history)history.hidden=true;document.getElementById('view-inv-history-toggle')?.setAttribute('aria-expanded','false');renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
 }
-function renderViewedInventoryHistory(inv){const panel=document.getElementById('view-inv-history');if(panel)panel.innerHTML=recordHistoryMarkup(inv,'Created');}
+function inventoryHistoryEvent(action,details={}){
+  return{id:uid(),action,at:new Date().toISOString(),actor:currentAuditStamp(),details};
+}
+function inventoryHistoryActionLabel(action){
+  return({created:'Count created',room_saved:'Room saved',item_updated:'Item quantities updated',finalised:'Count finalised',archived:'Count archived',restored:'Count restored'})[action]||String(action||'Count updated').replaceAll('_',' ');
+}
+function inventoryHistoryQuantity(value){return value===null||value===undefined||value===''?'Not counted':liveQty(value);}
+function inventoryHistoryDetailsMarkup(event){
+  const details=event?.details||{};
+  const changes=Array.isArray(details.changes)?details.changes:[];
+  const room=details.roomName?escapeHtml(details.roomName):'';
+  const summary=event.action==='created'
+    ?`${details.recordType==='recount'?'Re-count':'Count'} opened${details.date?` for ${escapeHtml(fmtDate(details.date))}`:''}`
+    :event.action==='room_saved'
+      ?`${room||'Count room'} saved · ${changes.length} quantit${changes.length===1?'y':'ies'} changed`
+      :event.action==='item_updated'
+        ?`${changes.length} room quantit${changes.length===1?'y':'ies'} changed`
+        :event.action==='finalised'?'The count became read-only'
+        :event.action==='archived'?'Moved out of the current Counts list'
+        :event.action==='restored'?'Returned to the current Counts list':'';
+  const changeRows=changes.map(change=>{
+    const product=getProduct(change?.productId);
+    const productName=product?.name||'Unknown item';
+    const roomName=change?.roomName||room;
+    return`<li><span><strong>${escapeHtml(productName)}</strong>${roomName?`<small>${escapeHtml(roomName)}</small>`:''}</span><span><del>${escapeHtml(inventoryHistoryQuantity(change?.before))}</del><b aria-hidden="true">→</b><ins>${escapeHtml(inventoryHistoryQuantity(change?.after))}</ins></span></li>`;
+  }).join('');
+  return`${summary?`<p>${summary}</p>`:''}${changeRows?`<ul class="record-history-changes">${changeRows}</ul>`:''}`;
+}
+function inventoryHistoryMarkup(inv){
+  let events=Array.isArray(inv?.history)?inv.history.filter(event=>event&&typeof event==='object'):[];
+  if(!events.length){
+    events=[{id:'created',action:'created',at:inv?.createdAt,actor:inv?.createdBy,details:{date:inv?.date,recordType:inv?.recordType||'count'}}];
+    if(inv?.updatedAt)events.push({id:'updated',action:'updated',at:inv.updatedAt,actor:inv.updatedBy,details:{}});
+  }
+  events=[...events].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  return`<div class="record-history-title"><div><strong>Complete change history</strong><small>${events.length} recorded event${events.length===1?'':'s'}</small></div><small>Newest first</small></div><div class="record-history-timeline record-history-timeline-detailed">${events.map(event=>`<article class="record-history-event"><span class="record-history-dot" aria-hidden="true"></span><div><strong>${escapeHtml(inventoryHistoryActionLabel(event.action))}</strong><time>${escapeHtml(auditDateLabel(event.at))}</time><small>By ${escapeHtml(auditActorLabel(event.actor))}</small>${inventoryHistoryDetailsMarkup(event)}</div></article>`).join('')}</div>`;
+}
+function renderViewedInventoryHistory(inv){const panel=document.getElementById('view-inv-history');if(panel)panel.innerHTML=inventoryHistoryMarkup(inv);}
 function toggleViewedInventoryHistory(){const inv=state.inventories.find(item=>item.id===viewInvId);const panel=document.getElementById('view-inv-history');const toggle=document.getElementById('view-inv-history-toggle');if(!inv||!panel)return;renderViewedInventoryHistory(inv);panel.hidden=!panel.hidden;toggle?.setAttribute('aria-expanded',String(!panel.hidden));}
 function renderViewInventoryActions(inv){
   const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
-  menu.innerHTML=`${inventoryIsFinalised(inv)?`<button onclick="closeAllMenus();openRecountSelector('${inv.id}')">Re-count selected items</button>`:`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="closeAllMenus();finaliseInventoryCount('${inv.id}')">Finalise count</button>`}<button onclick="openCountReportExport('${inv.id}')">Export report</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button>${inventoryIsFinalised(inv)?'':`<button onclick="deleteInventory('${inv.id}')">Delete count</button>`}`;
+  const canDelete=!inventoryIsFinalised(inv)||canDeleteFinalisedInventory();
+  menu.innerHTML=`${inventoryIsFinalised(inv)?`<button onclick="closeAllMenus();openRecountSelector('${inv.id}')">Re-count selected items</button>`:`<button onclick="closeAllMenus();editViewedInventory()">Edit count</button><button onclick="closeAllMenus();finaliseInventoryCount('${inv.id}')">Finalise count</button>`}<button onclick="openCountReportExport('${inv.id}')">Export report</button><div class="drop-divider"></div><button onclick="archiveInventory('${inv.id}',${inv.archived?'false':'true'})">${inv.archived?'Restore count':'Archive count'}</button>${canDelete?`<button class="danger-menu-item" onclick="deleteInventory('${inv.id}')">Delete${inventoryIsFinalised(inv)?' permanently':''}</button>`:''}`;
 }
 function editViewedInventory(){const id=viewInvId;if(!id)return;const inv=state.inventories.find(item=>item.id===id);if(inventoryIsFinalised(inv)){toast('This count is finalised and can no longer be changed.',true);return;}const selectedRoom=viewInvTab!=='all'&&viewInvTab!=='missing'?viewInvTab:null;closeModal('modal-view-inv');openCountRoomPicker(id,selectedRoom);}
 function renderViewInvTabs(inv){
@@ -1631,15 +1743,21 @@ function saveViewedInventoryItem(productId,button){
   const inv=state.inventories.find(item=>item.id===viewInvId);if(!inv)return;
   if(inventoryIsFinalised(inv)){toast('This count is finalised and can no longer be changed.',true);return;}
   const detail=button?.closest('.view-inv-item-detail');if(!detail)return;
+  const changes=[];
   detail.querySelectorAll('[data-view-room-id]').forEach(input=>{
     const room=inv.rooms.find(item=>item.id===input.dataset.viewRoomId);if(!room)return;
+    const before=Object.prototype.hasOwnProperty.call(room.items||{},productId)?room.items[productId]:null;
     const value=input.value.trim();
     if(value==='')delete room.items[productId];
     else{const quantity=parseFloat(value);if(!isNaN(quantity)&&quantity>=0)room.items[productId]=quantity;}
+    const after=Object.prototype.hasOwnProperty.call(room.items||{},productId)?room.items[productId]:null;
+    if(before!==after)changes.push({productId,roomId:room.id,roomName:room.name,before,after});
   });
+  if(!changes.length){viewInvEditingProductId=null;renderViewInvTable();toast('No quantity changes to save.');return;}
   inv.items=mergeInventoryRoomItems(inv.rooms);
   inv.draft=!Object.keys(inv.items).length;
   inv.updatedBy=currentAuditStamp();inv.updatedAt=new Date().toISOString();
+  inv.history=[...(Array.isArray(inv.history)?inv.history:[]),inventoryHistoryEvent('item_updated',{productId,changes})];
   viewInvExpandedProductId=null;viewInvEditingProductId=null;
   save();renderInventoryTable();refreshLiveInventoryIfVisible();renderViewedInventoryHistory(inv);renderViewInvTable();toast('Item count updated.');
 }
@@ -1669,7 +1787,21 @@ function renderViewInvTable(){
   document.getElementById('view-inv-list').innerHTML=mobileCards||`<p class="empty-cell">${emptyText}</p>`;
   document.getElementById('view-inv-total').textContent=viewInvTab!=='missing'?`Total: ${fmt(total)}`:'';
 }
-function deleteInventory(id){closeAllMenus();const inv=state.inventories.find(i=>i.id===id);if(inventoryIsFinalised(inv)){toast('Finalised counts cannot be deleted. Archive it instead.',true);return;}if(!confirm('Delete?'))return;state.inventories=state.inventories.filter(i=>i.id!==id);save();window.recordServerEvent?.({action:'count.deleted',entityType:'count',entityId:id,details:{label:inv?.label||'',date:inv?.date||''}});closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Deleted.');}
+async function deleteInventory(id){
+  closeAllMenus();
+  const inv=state.inventories.find(item=>item.id===id);if(!inv)return;
+  if(inventoryIsFinalised(inv)&&!canDeleteFinalisedInventory()){toast('Only an owner or administrator can delete a finalised count.',true);return;}
+  const linked=inv.recordType==='recount'?[]:recountsForInventory(inv);
+  const warning=inventoryIsFinalised(inv)?'This finalised count will be permanently deleted and cannot be recovered. ':'';
+  const linkedWarning=linked.length?`Its ${linked.length} linked re-count${linked.length===1?'':'s'} will also be deleted. `:'';
+  if(!confirm(`${warning}${linkedWarning}Delete “${inv.label||'this count'}”?`))return;
+  const shared=typeof cloudDeleteCount==='function'?await cloudDeleteCount(id):null;
+  if(!shared)return;
+  state=shared;normalizeLoadedState();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+  window.recordServerEvent?.({action:'count.deleted',entityType:'count',entityId:id,details:{label:inv.label||'',date:inv.date,finalised:inventoryIsFinalised(inv),linkedRecounts:linked.length}});
+  closeModal('modal-view-inv');renderInventoryTable();refreshLiveInventoryIfVisible();toast('Count permanently deleted.');
+}
 const COUNT_REPORT_ORDER_LABELS={
   usage:'Usage order — Inventory Entry Form',
   category:'Category, subcategory, then product',

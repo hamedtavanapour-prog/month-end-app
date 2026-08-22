@@ -48,6 +48,7 @@ export async function GET() {
     permissions: fullAccess ? "all" : context.permissionKeys,
     pages,
     canManageUsers: fullAccess || context.role === "manager" || context.permissionKeys.includes("settings.users"),
+    canDeleteFinalisedCounts: fullAccess,
     canViewPosIntegrations: fullAccess || context.permissionKeys.includes("integrations.pos.view"),
     preferences: preferences?.preferences ?? {},
     managers: (managerMemberships ?? []).map((membership) => {

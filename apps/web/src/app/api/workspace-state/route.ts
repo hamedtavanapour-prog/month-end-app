@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 
 import { getAccessContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { createCountDraftInWorkspace, finaliseCountInWorkspace, isCountJsonObject, preserveFinalisedCounts, saveCountRoomInWorkspace } from "@/lib/workspace/count-state";
+import {
+  createCountDraftInWorkspace,
+  deleteCountFromWorkspace,
+  finaliseCountInWorkspace,
+  isCountJsonObject,
+  preserveFinalisedCounts,
+  saveCountRoomInWorkspace,
+  setCountArchivedInWorkspace,
+} from "@/lib/workspace/count-state";
 import { renameCategoryInWorkspace } from "@/lib/workspace/category-state";
 import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
@@ -12,6 +20,8 @@ export const dynamic = "force-dynamic";
 const MAX_STATE_BYTES = 10 * 1024 * 1024;
 
 type MembershipContext = {
+  displayName: string;
+  jobTitle: string;
   membershipId: string;
   organizationId: string;
   permissionKeys: string[];
@@ -53,6 +63,8 @@ async function getMembershipContext(): Promise<
 
   return {
     context: {
+      displayName: access.displayName,
+      jobTitle: access.jobTitle,
       membershipId: access.membershipId,
       organizationId: access.organizationId,
       permissionKeys: access.permissionKeys,
@@ -203,14 +215,16 @@ export async function PATCH(request: Request) {
   if (!isJsonObject(body)) return jsonResponse({ error: "A workspace update is required" }, 400);
 
   const categoryRename = isJsonObject(body.categoryRename) ? body.categoryRename : null;
+  const countArchive = isJsonObject(body.countArchive) ? body.countArchive : null;
+  const countDelete = isJsonObject(body.countDelete) ? body.countDelete : null;
   const countDraft = isJsonObject(body.countDraft) ? body.countDraft : null;
   const countRoomSave = isJsonObject(body.countRoomSave) ? body.countRoomSave : null;
   const countFinalise = isJsonObject(body.countFinalise) ? body.countFinalise : null;
   const product = isJsonObject(body.product) ? body.product : null;
-  if (!categoryRename && !countDraft && !countRoomSave && !countFinalise && !product) {
+  if (!categoryRename && !countArchive && !countDelete && !countDraft && !countRoomSave && !countFinalise && !product) {
     return jsonResponse({ error: "A supported workspace update is required" }, 400);
   }
-  const requiredPermission = countFinalise ? "counts.finish" : countDraft || countRoomSave ? "counts.create" : "products.manage";
+  const requiredPermission = countFinalise ? "counts.finish" : countArchive || countDelete || countDraft || countRoomSave ? "counts.create" : "products.manage";
   if (!isAllowed(context, new Set([requiredPermission]))) {
     return jsonResponse({ error: "You do not have permission to make this change" }, 403);
   }
@@ -232,6 +246,20 @@ export async function PATCH(request: Request) {
     const uniqueSubcategories = [...new Set(subcategories)];
     buildNextData = (data) => renameCategoryInWorkspace(data, previousName, name, uniqueSubcategories);
     entityLabel = "category";
+  } else if (countArchive) {
+    const countId = typeof countArchive.countId === "string" ? countArchive.countId.trim() : "";
+    if (!countId || countId.length > 100 || typeof countArchive.archived !== "boolean") {
+      return jsonResponse({ error: "A valid count archive update is required" }, 400);
+    }
+    const actor = { id: context.userId, name: context.displayName, role: context.jobTitle || context.role };
+    buildNextData = (data) => setCountArchivedInWorkspace(data, countId, countArchive.archived === true, actor);
+    entityLabel = countArchive.archived ? "archived count" : "restored count";
+  } else if (countDelete) {
+    const countId = typeof countDelete.countId === "string" ? countDelete.countId.trim() : "";
+    if (!countId || countId.length > 100) return jsonResponse({ error: "A valid count is required" }, 400);
+    const canDeleteFinalised = context.role === "owner" || context.role === "admin";
+    buildNextData = (data) => deleteCountFromWorkspace(data, countId, canDeleteFinalised);
+    entityLabel = "deleted count";
   } else if (countDraft) {
     const id = typeof countDraft.id === "string" ? countDraft.id.trim() : "";
     const date = typeof countDraft.date === "string" ? countDraft.date.trim() : "";
@@ -250,10 +278,8 @@ export async function PATCH(request: Request) {
     if (!safeRooms.length) return jsonResponse({ error: "At least one valid room is required" }, 400);
     const actor = {
       id: context.userId,
-      name: typeof countDraft.createdBy === "object" && countDraft.createdBy && !Array.isArray(countDraft.createdBy)
-        && typeof countDraft.createdBy.name === "string" ? countDraft.createdBy.name.slice(0, 160) : "Team member",
-      role: typeof countDraft.createdBy === "object" && countDraft.createdBy && !Array.isArray(countDraft.createdBy)
-        && typeof countDraft.createdBy.role === "string" ? countDraft.createdBy.role.slice(0, 80) : "Team member",
+      name: context.displayName.slice(0, 160),
+      role: (context.jobTitle || context.role).slice(0, 80),
     };
     const selectedProductIds = Array.isArray(countDraft.selectedProductIds)
       ? [...new Set(countDraft.selectedProductIds.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
@@ -306,13 +332,13 @@ export async function PATCH(request: Request) {
       .maybeSingle();
     if (lockError) return jsonResponse({ error: "Could not verify the room reservation" }, 500);
     if (!ownedLock) return jsonResponse({ error: "This room is no longer reserved for you" }, 409);
-    const actor = { userId: context.userId };
+    const actor = { id: context.userId, name: context.displayName, role: context.jobTitle || context.role };
     buildNextData = (data) => saveCountRoomInWorkspace(data, countId, roomId, safeItems, [...new Set(extraProductIds)], actor);
     entityLabel = "count room";
   } else if (countFinalise) {
     const countId = typeof countFinalise.countId === "string" ? countFinalise.countId.trim() : "";
     if (!countId || countId.length > 100) return jsonResponse({ error: "A valid count is required" }, 400);
-    const actor = { userId: context.userId };
+    const actor = { id: context.userId, name: context.displayName, role: context.jobTitle || context.role };
     buildNextData = (data) => finaliseCountInWorkspace(data, countId, actor);
     entityLabel = "finalised count";
   } else {
@@ -347,6 +373,9 @@ export async function PATCH(request: Request) {
       }
       if (error instanceof Error && error.message === "count_not_found") {
         return jsonResponse({ error: "That count no longer exists" }, 404);
+      }
+      if (error instanceof Error && error.message === "finalised_count_delete_forbidden") {
+        return jsonResponse({ error: "Only an owner or administrator can delete a finalised count" }, 403);
       }
       throw error;
     }

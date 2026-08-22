@@ -2,6 +2,13 @@ import type { Json } from "@/types/database";
 
 type JsonObject = { [key: string]: Json | undefined };
 
+type CountMutationActor = {
+  id?: Json;
+  name?: Json;
+  role?: Json;
+  userId?: Json;
+};
+
 export function isCountJsonObject(value: Json | undefined): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -19,6 +26,39 @@ function mergedRoomItems(rooms: Json[]) {
   return items;
 }
 
+function safeActor(actor: CountMutationActor): JsonObject {
+  return {
+    id: typeof actor.id === "string" ? actor.id : typeof actor.userId === "string" ? actor.userId : "",
+    name: typeof actor.name === "string" ? actor.name : "Team member",
+    role: typeof actor.role === "string" ? actor.role : "Team member",
+  };
+}
+
+function historyEntry(action: string, actor: CountMutationActor, details: JsonObject = {}): JsonObject {
+  return {
+    id: crypto.randomUUID(),
+    action,
+    at: new Date().toISOString(),
+    actor: safeActor(actor),
+    details,
+  };
+}
+
+function appendCountHistory(count: JsonObject, entry: JsonObject): JsonObject {
+  const history = Array.isArray(count.history) ? count.history : [];
+  return { ...count, history: [...history, entry] };
+}
+
+function roomQuantityChanges(before: JsonObject, after: JsonObject) {
+  const productIds = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return [...productIds].flatMap((productId) => {
+    const previous = before[productId];
+    const next = after[productId];
+    if (previous === next) return [];
+    return [{ productId, before: previous ?? null, after: next ?? null }];
+  });
+}
+
 export function createCountDraftInWorkspace(data: Json, draft: JsonObject): JsonObject {
   const workspace = isCountJsonObject(data) ? data : {};
   const inventories = Array.isArray(workspace.inventories) ? [...workspace.inventories] : [];
@@ -29,7 +69,17 @@ export function createCountDraftInWorkspace(data: Json, draft: JsonObject): Json
     candidate.id === draftId
     || (candidate.date === draftDate && String(candidate.label ?? "").trim().toLowerCase() === draftLabel)
   ));
-  if (!existing) inventories.push(draft);
+  if (!existing) {
+    const createdBy = isCountJsonObject(draft.createdBy) ? draft.createdBy : {};
+    const storedDraft = Array.isArray(draft.history)
+      ? draft
+      : appendCountHistory(draft, historyEntry("created", createdBy, {
+        label: typeof draft.label === "string" ? draft.label : "Inventory Count",
+        date: typeof draft.date === "string" ? draft.date : "",
+        recordType: draft.recordType === "recount" ? "recount" : "count",
+      }));
+    inventories.push(storedDraft);
+  }
   inventories.sort((left, right) => {
     const leftDate = isCountJsonObject(left) ? String(left.date ?? "") : "";
     const rightDate = isCountJsonObject(right) ? String(right.date ?? "") : "";
@@ -44,7 +94,7 @@ export function saveCountRoomInWorkspace(
   roomId: string,
   roomItems: JsonObject,
   extraProductIds: string[],
-  actor: JsonObject,
+  actor: CountMutationActor,
 ): JsonObject {
   const workspace = isCountJsonObject(data) ? data : {};
   const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
@@ -63,26 +113,36 @@ export function saveCountRoomInWorkspace(
       throw new Error("count_finalised");
     }
     const rooms = Array.isArray(candidate.rooms) ? candidate.rooms : [];
+    let changedRoomName = "Room";
+    let changes: Json[] = [];
     const nextRooms = rooms.map((room) => {
       if (!isCountJsonObject(room) || room.id !== roomId) return room;
       foundRoom = true;
+      changedRoomName = typeof room.name === "string" ? room.name : "Room";
+      changes = roomQuantityChanges(isCountJsonObject(room.items) ? room.items : {}, roomItems);
       return { ...room, items: roomItems, extraProductIds: safeExtraProductIds };
     });
     const items = mergedRoomItems(nextRooms);
-    return {
+    const updatedAt = new Date().toISOString();
+    return appendCountHistory({
       ...candidate,
       rooms: nextRooms,
       items,
       draft: Object.keys(items).length === 0,
-      updatedBy: actor,
-      updatedAt: new Date().toISOString(),
-    };
+      updatedBy: safeActor(actor),
+      updatedAt,
+    }, historyEntry("room_saved", actor, {
+      roomId,
+      roomName: changedRoomName,
+      changes,
+      changedItems: changes.length,
+    }));
   });
   if (!foundCount || !foundRoom) throw new Error("count_room_not_found");
   return { ...workspace, inventories: nextInventories };
 }
 
-export function finaliseCountInWorkspace(data: Json, countId: string, actor: JsonObject): JsonObject {
+export function finaliseCountInWorkspace(data: Json, countId: string, actor: CountMutationActor): JsonObject {
   const workspace = isCountJsonObject(data) ? data : {};
   const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
   let foundCount = false;
@@ -90,18 +150,64 @@ export function finaliseCountInWorkspace(data: Json, countId: string, actor: Jso
   const nextInventories = inventories.map((candidate) => {
     if (!isCountJsonObject(candidate) || candidate.id !== countId) return candidate;
     foundCount = true;
-    return {
+    return appendCountHistory({
       ...candidate,
       draft: false,
       status: "finalised",
       finalised: true,
-      finalisedBy: actor,
+      finalisedBy: safeActor(actor),
       finalisedAt,
-      updatedBy: actor,
+      updatedBy: safeActor(actor),
       updatedAt: finalisedAt,
-    };
+    }, historyEntry("finalised", actor));
   });
   if (!foundCount) throw new Error("count_not_found");
+  return { ...workspace, inventories: nextInventories };
+}
+
+export function setCountArchivedInWorkspace(
+  data: Json,
+  countId: string,
+  archived: boolean,
+  actor: CountMutationActor,
+): JsonObject {
+  const workspace = isCountJsonObject(data) ? data : {};
+  const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
+  let foundCount = false;
+  const updatedAt = new Date().toISOString();
+  const nextInventories = inventories.map((candidate) => {
+    if (!isCountJsonObject(candidate) || candidate.id !== countId) return candidate;
+    foundCount = true;
+    return appendCountHistory({
+      ...candidate,
+      archived,
+      updatedBy: safeActor(actor),
+      updatedAt,
+    }, historyEntry(archived ? "archived" : "restored", actor));
+  });
+  if (!foundCount) throw new Error("count_not_found");
+  return { ...workspace, inventories: nextInventories };
+}
+
+export function deleteCountFromWorkspace(data: Json, countId: string, allowFinalised: boolean): JsonObject {
+  const workspace = isCountJsonObject(data) ? data : {};
+  const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
+  const target = inventories.find((candidate) => isCountJsonObject(candidate) && candidate.id === countId);
+  if (!target || !isCountJsonObject(target)) throw new Error("count_not_found");
+  const deletingRoot = target.recordType !== "recount";
+  const deletedCounts = inventories.filter((candidate) => isCountJsonObject(candidate) && (
+    candidate.id === countId
+    || (deletingRoot && candidate.recordType === "recount" && candidate.parentCountId === countId)
+  ));
+  if (!allowFinalised && deletedCounts.some((candidate) => isCountJsonObject(candidate)
+    && (candidate.status === "finalised" || candidate.finalised === true))) {
+    throw new Error("finalised_count_delete_forbidden");
+  }
+  const nextInventories = inventories.filter((candidate) => {
+    if (!isCountJsonObject(candidate)) return true;
+    if (candidate.id === countId) return false;
+    return !(deletingRoot && candidate.recordType === "recount" && candidate.parentCountId === countId);
+  });
   return { ...workspace, inventories: nextInventories };
 }
 

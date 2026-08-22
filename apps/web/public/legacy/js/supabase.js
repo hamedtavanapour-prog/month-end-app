@@ -145,6 +145,7 @@ async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
       if(!inv||inventoryIsFinalised(inv))return null;
       const room=(inv.rooms||[]).find(item=>item.id===roomId);
       if(!room)return null;
+      const previousItems={...(room.items||{})};
       room.items={...items};
       room.extraProductIds=[...extraProductIds];
       inv.items={};
@@ -152,6 +153,8 @@ async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
       inv.draft=!Object.keys(inv.items).length;
       inv.status='saved';
       inv.updatedAt=new Date().toISOString();
+      const changes=[...new Set([...Object.keys(previousItems),...Object.keys(items)])].filter(productId=>previousItems[productId]!==items[productId]).map(productId=>({productId,before:previousItems[productId]??null,after:items[productId]??null}));
+      if(typeof inventoryHistoryEvent==='function')inv.history=[...(Array.isArray(inv.history)?inv.history:[]),inventoryHistoryEvent('room_saved',{roomId,roomName:room.name,changes,changedItems:changes.length})];
       if(!persistLocalOnlyState())return null;
       return state;
     }
@@ -178,6 +181,7 @@ async function cloudFinaliseCount(countId){
       const inv=(state.inventories||[]).find(item=>item.id===countId);
       if(!inv||!Object.keys(inv.items||{}).length)return null;
       inv.draft=false;inv.status='finalised';inv.finalised=true;inv.finalisedAt=new Date().toISOString();inv.updatedAt=inv.finalisedAt;
+      if(typeof inventoryHistoryEvent==='function')inv.history=[...(Array.isArray(inv.history)?inv.history:[]),inventoryHistoryEvent('finalised')];
       if(!persistLocalOnlyState())return null;
       return state;
     }
@@ -194,6 +198,56 @@ async function cloudFinaliseCount(countId){
     return payload.data||null;
   }catch(error){
     console.error('Shared count finalise failed:',error);
+    return null;
+  }
+}
+
+async function cloudArchiveCount(countId,archived){
+  try{
+    if(localOnlyMode){
+      const inv=(state.inventories||[]).find(item=>item.id===countId);if(!inv)return null;
+      inv.archived=!!archived;inv.updatedAt=new Date().toISOString();
+      if(typeof inventoryHistoryEvent==='function')inv.history=[...(Array.isArray(inv.history)?inv.history:[]),inventoryHistoryEvent(archived?'archived':'restored')];
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countArchive:{countId,archived:!!archived}})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared count archive update failed:',error);
+    toast(error.message||'The count could not be updated.',true);
+    return null;
+  }
+}
+
+async function cloudDeleteCount(countId){
+  try{
+    if(localOnlyMode){
+      const target=(state.inventories||[]).find(item=>item.id===countId);if(!target)return null;
+      const deletingRoot=target.recordType!=='recount';
+      state.inventories=(state.inventories||[]).filter(item=>item.id!==countId&&!(deletingRoot&&item.recordType==='recount'&&item.parentCountId===countId));
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countDelete:{countId}})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){
+    console.error('Shared count deletion failed:',error);
+    toast(error.message||'The count could not be deleted.',true);
     return null;
   }
 }

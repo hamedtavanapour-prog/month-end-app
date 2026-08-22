@@ -5,6 +5,7 @@ let editingProductId=null,editingOrderId=null,editingSupId=null;
 let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
 let countReportInventoryId=null;
 let mobileExpandedInventoryId=null;
+let expandedRecountFamilies=new Set();
 let showArchivedInventories=false;
 let currentInvRoomId=null;
 let currentInvMergedView=false;

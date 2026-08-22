@@ -272,7 +272,6 @@
   <div class="page-header">
     <div class="page-header-text"><h2>Counts</h2><p>File and review count logs. New counts reset the live inventory baseline.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <div class="col-wrap"><button class="btn btn-secondary btn-sm" onclick="toggleMenu('inv-col-menu')"> Columns ▾</button><div class="col-menu" id="inv-col-menu"><h4>Visible Columns</h4><div id="inv-col-checks"></div></div></div>
       <button class="btn btn-secondary btn-sm" id="inv-archive-toggle" onclick="toggleArchivedInventories()">Archived (0)</button>
       <button class="btn btn-primary count-new-button" onclick="openInventoryRoomSelect()">＋ New Count</button>
       <div class="drop-wrap counts-mobile-more">
@@ -282,6 +281,13 @@
     </div>
   </div>
   <div class="inventory-list-context" id="inventory-list-context" hidden></div>
+  <div class="counts-search-wrap">
+    <label class="counts-search" for="inventory-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+      <input type="search" id="inventory-search" aria-label="Search counts" placeholder="Search counts by name, date, creator, room, item, or status…" autocomplete="off" oninput="renderInventoryTable()">
+    </label>
+    <span id="inventory-search-count" class="counts-search-count" aria-live="polite"></span>
+  </div>
   <div class="card inventory-table-card">
     <div class="table-wrap inventory-table-desktop"><table><thead id="inv-thead"><tr></tr></thead><tbody id="inv-tbody"></tbody></table></div>
     <div class="inventory-mobile-list" id="inventory-mobile-list"></div>
