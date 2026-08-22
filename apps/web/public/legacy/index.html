@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=count-workflow-2"/>
+<link rel="stylesheet" href="css/styles.css?v=count-history-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -894,7 +894,7 @@
   <div class="view-inv-heading">
     <div><h3 id="view-inv-title">Inventory Count</h3><p class="view-inv-attribution" id="view-inv-attribution" hidden></p></div>
     <div class="view-inv-heading-actions">
-      <button class="icon-btn record-history-toggle" id="view-inv-history-toggle" type="button" aria-label="View count history" title="History" aria-expanded="false" onclick="toggleViewedInventoryHistory()">
+      <button class="icon-btn record-history-toggle" id="view-inv-history-toggle" type="button" aria-label="View count history" title="History" aria-expanded="false" aria-pressed="false" onclick="toggleViewedInventoryHistory()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
       </button>
       <button class="icon-btn view-inv-edit-count" type="button" aria-label="Edit count" title="Edit count" onclick="editViewedInventory()">
@@ -1224,7 +1224,7 @@
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=spring-menu-1"></script>
-<script src="js/inventory.js?v=count-workflow-2"></script>
+<script src="js/inventory.js?v=count-history-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=recount-workflow-1"></script>
 <script src="js/suppliers.js"></script>

@@ -1666,7 +1666,7 @@ function viewInventory(id){
   const editButton=document.querySelector('.view-inv-edit-count');if(editButton)editButton.hidden=inventoryIsFinalised(inv);
   const attribution=document.getElementById('view-inv-attribution');if(attribution){attribution.textContent=inv.createdBy?.name?`Created by ${inv.createdBy.name} · ${inv.createdBy.role||'Team member'}${inv.createdAt?` · ${new Date(inv.createdAt).toLocaleString()}`:''}`:'';attribution.hidden=!attribution.textContent;}
   document.getElementById('view-inv-search').value='';
-  renderViewInventoryActions(inv);renderViewedInventoryHistory(inv);const history=document.getElementById('view-inv-history');if(history)history.hidden=true;document.getElementById('view-inv-history-toggle')?.setAttribute('aria-expanded','false');renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
+  renderViewInventoryActions(inv);renderViewedInventoryHistory(inv);setViewedInventoryHistoryMode(false);renderViewInvTabs(inv);renderViewInvTable();openModal('modal-view-inv');
 }
 function inventoryHistoryEvent(action,details={}){
   return{id:uid(),action,at:new Date().toISOString(),actor:currentAuditStamp(),details};
@@ -1675,11 +1675,11 @@ function inventoryHistoryActionLabel(action){
   return({created:'Count created',room_saved:'Room saved',item_updated:'Item quantities updated',finalised:'Count finalised',archived:'Count archived',restored:'Count restored'})[action]||String(action||'Count updated').replaceAll('_',' ');
 }
 function inventoryHistoryQuantity(value){return value===null||value===undefined||value===''?'Not counted':liveQty(value);}
-function inventoryHistoryDetailsMarkup(event){
+function inventoryHistorySummary(event){
   const details=event?.details||{};
   const changes=Array.isArray(details.changes)?details.changes:[];
   const room=details.roomName?escapeHtml(details.roomName):'';
-  const summary=event.action==='created'
+  return event.action==='created'
     ?`${details.recordType==='recount'?'Re-count':'Count'} opened${details.date?` for ${escapeHtml(fmtDate(details.date))}`:''}`
     :event.action==='room_saved'
       ?`${room||'Count room'} saved · ${changes.length} quantit${changes.length===1?'y':'ies'} changed`
@@ -1688,13 +1688,26 @@ function inventoryHistoryDetailsMarkup(event){
         :event.action==='finalised'?'The count became read-only'
         :event.action==='archived'?'Moved out of the current Counts list'
         :event.action==='restored'?'Returned to the current Counts list':'';
+}
+function inventoryHistoryChangesMarkup(event){
+  const details=event?.details||{};
+  const changes=Array.isArray(details.changes)?details.changes:[];
+  const room=details.roomName?escapeHtml(details.roomName):'';
   const changeRows=changes.map(change=>{
     const product=getProduct(change?.productId);
     const productName=product?.name||'Unknown item';
     const roomName=change?.roomName||room;
     return`<li><span><strong>${escapeHtml(productName)}</strong>${roomName?`<small>${escapeHtml(roomName)}</small>`:''}</span><span><del>${escapeHtml(inventoryHistoryQuantity(change?.before))}</del><b aria-hidden="true">→</b><ins>${escapeHtml(inventoryHistoryQuantity(change?.after))}</ins></span></li>`;
   }).join('');
-  return`${summary?`<p>${summary}</p>`:''}${changeRows?`<ul class="record-history-changes">${changeRows}</ul>`:''}`;
+  return changeRows?`<ul class="record-history-changes">${changeRows}</ul>`:'<p class="record-history-empty-change">No item quantities changed in this update.</p>';
+}
+function inventoryHistoryDateParts(value){
+  const date=new Date(value||'');
+  if(Number.isNaN(date.getTime()))return{date:'Date unavailable',time:'Time unavailable'};
+  return{
+    date:date.toLocaleDateString(),
+    time:date.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'})
+  };
 }
 function inventoryHistoryMarkup(inv){
   let events=Array.isArray(inv?.history)?inv.history.filter(event=>event&&typeof event==='object'):[];
@@ -1703,10 +1716,30 @@ function inventoryHistoryMarkup(inv){
     if(inv?.updatedAt)events.push({id:'updated',action:'updated',at:inv.updatedAt,actor:inv.updatedBy,details:{}});
   }
   events=[...events].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
-  return`<div class="record-history-title"><div><strong>Complete change history</strong><small>${events.length} recorded event${events.length===1?'':'s'}</small></div><small>Newest first</small></div><div class="record-history-timeline record-history-timeline-detailed">${events.map(event=>`<article class="record-history-event"><span class="record-history-dot" aria-hidden="true"></span><div><strong>${escapeHtml(inventoryHistoryActionLabel(event.action))}</strong><time>${escapeHtml(auditDateLabel(event.at))}</time><small>By ${escapeHtml(auditActorLabel(event.actor))}</small>${inventoryHistoryDetailsMarkup(event)}</div></article>`).join('')}</div>`;
+  return`<div class="record-history-title"><div><strong>Complete change history</strong><small>${events.length} recorded event${events.length===1?'':'s'}</small></div><small>Newest first</small></div><div class="record-history-timeline record-history-timeline-detailed">${events.map(event=>{const when=inventoryHistoryDateParts(event.at);return`<details class="record-history-event"><summary><span class="record-history-dot" aria-hidden="true"></span><span class="record-history-event-copy"><strong>${escapeHtml(inventoryHistoryActionLabel(event.action))}</strong><span class="record-history-when"><time>${escapeHtml(when.date)}</time><time>${escapeHtml(when.time)}</time></span><small>By ${escapeHtml(auditActorLabel(event.actor))}</small><p>${inventoryHistorySummary(event)}</p></span><span class="record-history-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></span></summary><div class="record-history-event-details">${inventoryHistoryChangesMarkup(event)}</div></details>`;}).join('')}</div>`;
 }
 function renderViewedInventoryHistory(inv){const panel=document.getElementById('view-inv-history');if(panel)panel.innerHTML=inventoryHistoryMarkup(inv);}
-function toggleViewedInventoryHistory(){const inv=state.inventories.find(item=>item.id===viewInvId);const panel=document.getElementById('view-inv-history');const toggle=document.getElementById('view-inv-history-toggle');if(!inv||!panel)return;renderViewedInventoryHistory(inv);panel.hidden=!panel.hidden;toggle?.setAttribute('aria-expanded',String(!panel.hidden));}
+function setViewedInventoryHistoryMode(active){
+  const modal=document.querySelector('#modal-view-inv .view-inv-modal');
+  const panel=document.getElementById('view-inv-history');
+  const controls=document.querySelector('#modal-view-inv .view-inv-controls');
+  const countContent=document.querySelector('#modal-view-inv .view-inv-scroll');
+  const toggle=document.getElementById('view-inv-history-toggle');
+  if(!modal||!panel)return;
+  modal.classList.toggle('history-mode',active);
+  panel.hidden=!active;
+  if(controls)controls.hidden=active;
+  if(countContent)countContent.hidden=active;
+  if(toggle){toggle.classList.toggle('active',active);toggle.setAttribute('aria-expanded',String(active));toggle.setAttribute('aria-pressed',String(active));toggle.setAttribute('aria-label',active?'Return to count details':'View count history');toggle.title=active?'Count details':'History';}
+}
+function toggleViewedInventoryHistory(){
+  const inv=state.inventories.find(item=>item.id===viewInvId);
+  const modal=document.querySelector('#modal-view-inv .view-inv-modal');
+  if(!inv||!modal)return;
+  const active=!modal.classList.contains('history-mode');
+  if(active)renderViewedInventoryHistory(inv);
+  setViewedInventoryHistoryMode(active);
+}
 function renderViewInventoryActions(inv){
   const menu=document.getElementById('view-inventory-actions-menu');if(!menu)return;
   const canDelete=!inventoryIsFinalised(inv)||canDeleteFinalisedInventory();
