@@ -108,6 +108,7 @@ function compactStateForStorage(){
     coreDrinkRecipeVersion:state.coreDrinkRecipeVersion||0,
     springMenuRecipeVersion:state.springMenuRecipeVersion||0,
     springPrepRecipeVersion:state.springPrepRecipeVersion||0,
+    kitchenMenuVersion:state.kitchenMenuVersion||0,
     prepItems:state.prepItems||[],
     inventories:state.inventories||[],
     orders:state.orders||[],
