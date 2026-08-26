@@ -43,9 +43,7 @@ export async function POST(request: Request) {
   const form = new FormData();
   form.append("model", "gpt-4o-mini-transcribe");
   form.append("language", "en");
-  if (vocabulary) {
-    form.append("prompt", `Restaurant beverage inventory count. Preserve product names, quantities, and action words such as add, plus, increase, remove, deduct, subtract, minus, and set. Product vocabulary: ${vocabulary}`);
-  }
+  form.append("prompt", `Restaurant beverage inventory count. Transcribe spoken quantities as digits; in particular, the spoken number "two" must be 2, never "to" or "T O". Preserve product names and action words such as add, plus, increase, remove, deduct, subtract, minus, and set.${vocabulary ? ` Product vocabulary: ${vocabulary}` : ""}`);
   form.append("file", audio, audio.name || "count-recording.webm");
 
   const controller = new AbortController();

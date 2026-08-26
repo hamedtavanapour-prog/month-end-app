@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=image-lightbox-mobile-1"/>
+<link rel="stylesheet" href="css/styles.css?v=count-voice-workspace-2"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -795,10 +795,13 @@
   <p class="count-setup-intro" id="count-extra-product-room">Add a product to this room for this count only.</p>
   <div class="form-group">
     <label for="count-extra-product-search">Search all products</label>
-    <input type="search" id="count-extra-product-search" placeholder="Product, category, SKU…" autocomplete="off" oninput="renderCountExtraProductPicker()">
+    <div class="count-extra-search-row">
+      <input type="search" id="count-extra-product-search" placeholder="Product, category, SKU…" autocomplete="off" oninput="renderCountExtraProductPicker()">
+      <button class="voice-btn compact" id="voice-btn-count-extra" type="button" onclick="toggleVoice('count-extra')"><span class="voice-btn-mic" aria-hidden="true">🎙︎</span><span>Transcribe</span></button>
+    </div>
   </div>
   <div class="count-extra-product-list" id="count-extra-product-list" aria-live="polite"></div>
-  <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-add-item')">Cancel</button></div>
+  <div class="modal-actions count-extra-product-actions"><span id="count-extra-selected-count">0 selected</span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-add-item')">Cancel</button><button class="btn btn-primary" id="count-extra-add-selected" type="button" onclick="addSelectedCountExtraProducts()" disabled>Add Selected</button></div>
 </div>
 </div>
 
@@ -1194,7 +1197,7 @@
     <header class="voice-workspace-head">
       <span class="voice-workspace-icon" aria-hidden="true">🎙︎</span>
       <div><span class="voice-workspace-kicker">Voice workspace</span><h2 id="voice-ctx-label">Listening…</h2></div>
-      <div class="voice-item-counter" id="voice-item-counter" hidden><span>No. Items</span><strong id="voice-item-count">0</strong></div>
+      <div class="voice-item-counter" id="voice-item-counter" hidden><span id="voice-item-counter-label">Items detected</span><strong id="voice-item-count">0</strong></div>
     </header>
     <div class="voice-workspace-body">
       <div id="voice-modal-title"><span class="listening-dot" aria-hidden="true"></span><span id="voice-status-label">Microphone active</span></div>
@@ -1208,6 +1211,8 @@
     </div>
     <footer class="voice-actions">
       <button class="btn btn-secondary" id="voice-cancel" type="button" onclick="cancelVoice()">Cancel Voice</button>
+      <button class="btn btn-secondary" id="voice-redo" type="button" onclick="redoVoice()" hidden>Redo</button>
+      <button class="btn btn-secondary" id="voice-pause" type="button" onclick="toggleVoicePause()">Pause</button>
       <button class="btn btn-danger" id="voice-stop" type="button" onclick="stopVoice()">Stop &amp; Review</button>
     </footer>
   </section>
@@ -1238,14 +1243,14 @@
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=kitchen-menu-3"></script>
-<script src="js/inventory.js?v=ideal-usage-live-deduction-1"></script>
+<script src="js/inventory.js?v=ideal-usage-count-voice-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=foodtrak-pdf-upload-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>
-<script src="js/voice-commands.js?v=count-adjustments-1"></script>
-<script src="js/voice.js?v=count-adjustments-1"></script>
+<script src="js/voice-commands.js?v=count-voice-two-1"></script>
+<script src="js/voice.js?v=count-voice-workspace-2"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=menu-library-5"></script>
 <script src="js/main.js?v=menu-card-view-1"></script>

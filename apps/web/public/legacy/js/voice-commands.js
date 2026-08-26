@@ -3,9 +3,9 @@
     zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
     eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,
     twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100,
-    a:1,an:1,couple:2,half:0.5,quarter:0.25
+    a:1,an:1,couple:2,to:2,half:0.5,quarter:0.25
   };
-  const NUMBER_WORDS='a|an|couple|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|half|quarter';
+  const NUMBER_WORDS='a|an|couple|zero|one|two|to|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|half|quarter';
   const QUANTITY=`(?:[\\d.]+|(?:${NUMBER_WORDS})(?:[\\s-]+(?:${NUMBER_WORDS})){0,2})`;
 
   function wordsToNumber(value){
@@ -45,6 +45,7 @@
   function parseVoice(text){
     const operationWords='add|plus|increase|put\s+in|include|found|take\s+away|deduct|remove|subtract|minus|decrease|set|make|change';
     const chunks=String(text||'')
+      .replace(/\bt\s*\.?\s*o\b/gi,'two')
       .replace(/\band then\b/gi,',')
       .replace(/\bthen\b/gi,',')
       .replace(new RegExp(`\\band\\s+(?=(?:${operationWords})\\b)`,'gi'),',')

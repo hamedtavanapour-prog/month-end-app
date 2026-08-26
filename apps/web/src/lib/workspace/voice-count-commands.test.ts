@@ -20,6 +20,13 @@ describe("count voice commands", () => {
     expect(commands.parseVoice("Absolut 2")).toEqual([{ nameStr: "Absolut", qty: 2, operation: "set" }]);
   });
 
+  it("recovers the number two when transcription returns to or T O", () => {
+    expect(commands.parseVoice("Absolut to, Bacardi T O")).toEqual([
+      { nameStr: "Absolut", qty: 2, operation: "set" },
+      { nameStr: "Bacardi", qty: 2, operation: "set" },
+    ]);
+  });
+
   it("parses additive and subtractive commands and their synonyms", () => {
     expect(commands.parseVoice("add three Absoluts, deduct one Bacardi and plus a couple Jameson")).toEqual([
       { nameStr: "Absoluts", qty: 3, operation: "add" },

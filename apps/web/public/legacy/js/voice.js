@@ -12,6 +12,8 @@ let voiceReviewPending=false;
 let voicePreviousFocus=null;
 let voiceRecordingTimer=null;
 let voiceTranscriptionController=null;
+let voiceRecordedMs=0;
+let voiceSegmentStartedAt=0;
 let inventoryTranscribeHistory=[];
 let recountTranscribeHistory=[];
 const VOICE_MAX_RECORDING_MS=2*60*1000;
@@ -20,7 +22,8 @@ const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 function voiceHints(){
   return{
     products:'Say product name + par: "Disaronno 2, Jameson 4"',
-    inventory:'Set with “Absolut 2,” add with “add 3 Absolut,” or deduct with “remove 1 Absolut.”',
+    inventory:'Set with “Absolut 2,” add with “add 3 Absolut,” or deduct with “remove 1 Absolut.” Pause whenever you need to look around.',
+    'count-extra':'Say one or more product names to find and select them.',
     recount:'Call out product names: "Absolut, goose, Jameson"',
     orders:'Say product + qty: "Absolut 6, Heineken 2"'
   };
@@ -30,13 +33,14 @@ function voiceLabels(){
   return{
     products:'Record Par Levels',
     inventory:'Record Inventory Count',
+    'count-extra':'Find Unlisted Items',
     recount:'Select Re-count Products',
     orders:'Record Order Quantities'
   };
 }
 
 function setVoiceButtons(activeContext){
-  ['products','orders','inventory','recount'].forEach(context=>{
+  ['products','orders','inventory','recount','count-extra'].forEach(context=>{
     const button=document.getElementById('voice-btn-'+context);
     if(button)button.classList.toggle('listening',context===activeContext);
   });
@@ -58,13 +62,15 @@ function setVoiceModal(text){
 }
 
 function voiceParsedItemCount(text){
-  return['inventory','recount'].includes(voiceContext)?parseVoice(String(text||'')).length:0;
+  return['inventory','recount','count-extra'].includes(voiceContext)?parseVoice(String(text||'')).length:0;
 }
 function updateVoiceItemCount(text=document.getElementById('voice-review-text')?.value||''){
   const counter=document.getElementById('voice-item-counter');
   const value=document.getElementById('voice-item-count');
   if(!counter||!value)return;
-  counter.hidden=!['inventory','recount'].includes(voiceContext);
+  counter.hidden=!['inventory','recount','count-extra'].includes(voiceContext);
+  const label=document.getElementById('voice-item-counter-label');
+  if(label)label.textContent=document.getElementById('voice-modal')?.dataset.state==='review'?'Items ready':'Items detected';
   value.textContent=String(voiceParsedItemCount(text));
 }
 function resetInventoryTranscribeHistory(){
@@ -105,10 +111,14 @@ function setVoiceActionState(state){
   const modal=document.getElementById('voice-modal');
   const reviewField=document.getElementById('voice-review-field');
   const status=document.getElementById('voice-status-label');
+  const pause=document.getElementById('voice-pause');
+  const redo=document.getElementById('voice-redo');
   if(!stop||!cancel)return;
   modal.dataset.state=state;
   updateVoiceItemCount(state==='review'?document.getElementById('voice-review-text')?.value:'');
   if(reviewField)reviewField.hidden=state!=='review';
+  if(pause)pause.hidden=!['recording','paused'].includes(state);
+  if(redo)redo.hidden=state!=='review';
   if(state==='recording'){
     stop.textContent='Stop & Review';
     stop.className='btn btn-danger';
@@ -117,6 +127,15 @@ function setVoiceActionState(state){
     cancel.style.display='inline-flex';
     cancel.disabled=false;
     if(status)status.textContent='Microphone active';
+  }else if(state==='paused'){
+    stop.textContent='Stop & Review';
+    stop.className='btn btn-danger';
+    stop.disabled=false;
+    cancel.textContent='Cancel Voice';
+    cancel.style.display='inline-flex';
+    cancel.disabled=false;
+    if(pause)pause.textContent='Resume';
+    if(status)status.textContent='Recording paused';
   }else if(state==='transcribing'){
     stop.textContent='Transcribing...';
     stop.className='btn btn-secondary';
@@ -132,6 +151,17 @@ function setVoiceActionState(state){
     cancel.disabled=false;
     if(status)status.textContent='Ready to review';
   }
+  if(pause&&state==='recording')pause.textContent='Pause';
+}
+
+function scheduleVoiceRecordingLimit(){
+  clearTimeout(voiceRecordingTimer);
+  const remaining=Math.max(0,VOICE_MAX_RECORDING_MS-voiceRecordedMs);
+  voiceRecordingTimer=setTimeout(()=>{
+    if(!voiceActive)return;
+    toast('Two-minute recording limit reached. Preparing your review.');
+    stopVoice();
+  },remaining);
 }
 
 function preferredAudioMime(){
@@ -196,21 +226,36 @@ async function startVoice(){
     };
     voiceRecorder.onstop=transcribeVoiceRecording;
     voiceStartedAt=Date.now();
+    voiceRecordedMs=0;
+    voiceSegmentStartedAt=voiceStartedAt;
     voiceActive=true;
     voicePreviousFocus=document.activeElement;
     setVoiceButtons(voiceContext);
     setVoiceModal('Listening... Click Stop & Review when finished.');
     setVoiceActionState('recording');
     voiceRecorder.start();
-    clearTimeout(voiceRecordingTimer);
-    voiceRecordingTimer=setTimeout(()=>{
-      if(!voiceActive)return;
-      toast('Two-minute recording limit reached. Preparing your review.');
-      stopVoice();
-    },VOICE_MAX_RECORDING_MS);
+    scheduleVoiceRecordingLimit();
   }catch(error){
     toast('Microphone permission is required for voice.',true);
     resetVoiceState();
+  }
+}
+
+function toggleVoicePause(){
+  if(!voiceActive||!voiceRecorder)return;
+  if(voiceRecorder.state==='recording'){
+    voiceRecorder.pause();
+    voiceRecordedMs+=Date.now()-voiceSegmentStartedAt;
+    clearTimeout(voiceRecordingTimer);
+    voiceRecordingTimer=null;
+    setVoiceModal('Paused. Resume when you are ready to continue counting.');
+    setVoiceActionState('paused');
+  }else if(voiceRecorder.state==='paused'){
+    voiceRecorder.resume();
+    voiceSegmentStartedAt=Date.now();
+    setVoiceModal('Listening... Click Pause if you need another moment.');
+    setVoiceActionState('recording');
+    scheduleVoiceRecordingLimit();
   }
 }
 
@@ -220,6 +265,7 @@ function stopVoice(){
     return;
   }
   if(!voiceActive)return;
+  if(voiceRecorder?.state==='recording')voiceRecordedMs+=Date.now()-voiceSegmentStartedAt;
   voiceActive=false;
   clearTimeout(voiceRecordingTimer);
   voiceRecordingTimer=null;
@@ -271,6 +317,19 @@ function cancelVoice(){
   toast('Voice cancelled.');
 }
 
+async function redoVoice(){
+  if(!voiceReviewPending)return;
+  if(voiceContext==='inventory'&&voicePendingTranscript)addInventoryTranscribeHistory('unmatched','Transcription redone',voicePendingTranscript);
+  if(voiceContext==='recount'&&voicePendingTranscript)addRecountTranscribeHistory('unmatched','Transcription redone',voicePendingTranscript);
+  const previousFocus=voicePreviousFocus;
+  voicePendingTranscript='';
+  voiceReviewPending=false;
+  voiceFinal='';
+  voiceChunks=[];
+  await startVoice();
+  voicePreviousFocus=previousFocus;
+}
+
 async function transcribeVoiceRecording(){
   const chunks=voiceChunks;
   voiceChunks=[];
@@ -278,7 +337,7 @@ async function transcribeVoiceRecording(){
   voiceStream=null;
   if(stream)stream.getTracks().forEach(track=>track.stop());
 
-  if(Date.now()-voiceStartedAt<400||!chunks.length){
+  if(voiceRecordedMs<400||!chunks.length){
     resetVoiceState();
     toast('Nothing heard.',true);
     return;
@@ -290,7 +349,7 @@ async function transcribeVoiceRecording(){
     const form=new FormData();
     const extension=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';
     form.append('audio',audio,`count-recording.${extension}`);
-    const products=voiceContext==='inventory'&&typeof currentRoomProducts==='function'?currentRoomProducts():voiceContext==='recount'&&typeof recountSelectableProducts==='function'?recountSelectableProducts(recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId))):state.products;
+    const products=voiceContext==='count-extra'&&typeof currentRoomProducts==='function'?state.products.filter(product=>!product.archived&&!new Set(currentRoomProducts().map(item=>item.id)).has(product.id)):voiceContext==='recount'&&typeof recountSelectableProducts==='function'?recountSelectableProducts(recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId))):state.products;
     const vocabulary=[...new Set(products.flatMap(product=>[product.name,product.inventoryName].filter(Boolean)))].join(', ');
     form.append('vocabulary',vocabulary.slice(0,6000));
     const controller=new AbortController();
@@ -367,6 +426,7 @@ function applyVoiceTranscript(text){
   }
   if(voiceContext==='products')applyVoiceProducts(parsed);
   else if(voiceContext==='inventory')applyVoiceInventory(parsed);
+  else if(voiceContext==='count-extra')applyVoiceCountExtra(parsed);
   else if(voiceContext==='recount')applyVoiceRecount(parsed);
   else if(voiceContext==='orders')applyVoiceOrders(parsed);
 }
@@ -453,19 +513,39 @@ function voiceProductMatch(query,products){
 function fuzzyMatch(query,products){const q=normStr(query);if(!q)return null;for(const p of products){const aliases=(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean);if(aliases.includes(q))return{product:p,score:1};}for(const p of products){if(normStr(p.name)===q)return{product:p,score:1};}let best=null,bestScore=0;for(const p of products){const allNames=[normStr(p.name),...(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean)];for(const name of allNames){if(name.includes(q)||q.includes(name)){const score=Math.min(q.length,name.length)/Math.max(q.length,name.length);if(score>bestScore){bestScore=score;best=p;}}const qw=q.split(' ').filter(w=>w.length>1),nw=name.split(' ').filter(w=>w.length>1);let ov=0;for(const w of qw){if(nw.some(n=>n===w||n.startsWith(w)||w.startsWith(n)))ov++;}if(qw.length>0){const s2=ov/Math.max(qw.length,nw.length);if(s2>bestScore){bestScore=s2;best=p;}}}}return bestScore>=0.25?{product:best,score:bestScore}:null;}
 function applyVoiceProducts(parsed){let m=0;const updated=new Set(),um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r){r.product.par=qty;updated.add(r.product.id);m++;}else um.push(nameStr);});if(m){save();renderProducts();document.querySelectorAll('#prod-tbody tr[data-id]').forEach(row=>{if(updated.has(row.dataset.id)){row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});toast(`Voice: ${m} par level${m>1?'s':''} updated.`);}if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
 function applyVoiceInventory(parsed){
-  let matched=0;
+  let matched=0,changed=0;
   const unmatched=[],ambiguous=[],updated=[],applied=[];
   const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
   parsed.forEach(({nameStr,qty,operation='set'})=>{
-    const result=voiceProductMatch(nameStr,products);
+    let result=voiceProductMatch(nameStr,products);
+    if(!result){
+      const recognized=voiceProductMatch(nameStr,state.products.filter(product=>!product.archived));
+      if(recognized&&!recognized.ambiguous){
+        const roomName=currentInventoryRoom()?.name||'this room';
+        const productName=recognized.product.inventoryName||recognized.product.name;
+        if(window.confirm(`${productName} is not listed in ${roomName}, but it was recognized as a product. Add it to this room for this count only?`)){
+          addCountExtraProducts([recognized.product.id],{closePicker:false});
+          result=recognized;
+        }else{
+          unmatched.push(`${productName} (not added to ${roomName})`);
+          return;
+        }
+      }else if(recognized?.ambiguous)result=recognized;
+    }
     if(result&&!result.ambiguous){
       const previous=Number.parseFloat(liveInvCounts[result.product.id]);
       const current=Number.isFinite(previous)?previous:0;
-      const next=window.MonthEndVoiceCommands.applyCountOperation(current,qty,operation);
+      let resolvedOperation=operation;
+      if(operation==='set'&&Number.isFinite(previous)){
+        const add=window.confirm(`${result.product.inventoryName||result.product.name} already has a count of ${previous}. Select OK to add ${qty}, or Cancel to replace it with ${qty}.`);
+        resolvedOperation=add?'add':'set';
+      }
+      const next=window.MonthEndVoiceCommands.applyCountOperation(current,qty,resolvedOperation);
       liveInvCounts[result.product.id]=next;
       updated.push(result.product.id);
-      if(operation==='add')applied.push(`${result.product.name}: ${current} + ${qty} = ${next}`);
-      else if(operation==='subtract')applied.push(`${result.product.name}: ${current} − ${qty} = ${next}`);
+      if(next!==current)changed++;
+      if(resolvedOperation==='add')applied.push(`${result.product.name}: ${current} + ${qty} = ${next}`);
+      else if(resolvedOperation==='subtract')applied.push(`${result.product.name}: ${current} − ${qty} = ${next}`);
       else applied.push(`${result.product.name}: ${next}`);
       matched++;
     }else if(result?.ambiguous){
@@ -482,10 +562,31 @@ function applyVoiceInventory(parsed){
       if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}
     });
     document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});
-    toast(`Voice: ${matched} count adjustment${matched>1?'s':''} applied.`);
+    toast(`Voice: ${changed} item${changed===1?'':'s'} changed${matched!==changed?` (${matched} recognized)`:''}.`);
   }else updateInvProgress();
   if(ambiguous.length)setTimeout(()=>toast('Ambiguous: '+ambiguous.join(', '),true),700);
   else if(unmatched.length)setTimeout(()=>toast('No match: '+unmatched.join(', '),true),700);
+}
+function applyVoiceCountExtra(parsed){
+  const assigned=new Set(typeof currentRoomProducts==='function'?currentRoomProducts().map(product=>product.id):[]);
+  const products=state.products.filter(product=>!product.archived&&!assigned.has(product.id));
+  const selected=[],ambiguous=[],unmatched=[];
+  parsed.forEach(({nameStr})=>{
+    const whole=voiceProductMatch(nameStr,products);
+    const names=!whole&&/\s+and\s+/i.test(nameStr)?nameStr.split(/\s+and\s+/i).map(value=>value.trim()).filter(Boolean):[nameStr];
+    names.forEach(name=>{
+      const result=name===nameStr?whole:voiceProductMatch(name,products);
+      if(result&&!result.ambiguous){
+        countExtraSelectedProductIds.add(result.product.id);
+        expandedCountExtraCategories.add(countExtraCategoryToken(result.product.category||'Other'));
+        selected.push(result.product.inventoryName||result.product.name);
+      }else if(result?.ambiguous)ambiguous.push(`${name}: ${result.candidates.map(candidate=>candidate.product.name).join(' / ')}`);
+      else unmatched.push(name);
+    });
+  });
+  renderCountExtraProductPicker();
+  toast(selected.length?`Voice: ${selected.length} item${selected.length===1?'':'s'} selected.`:'No unlisted items were selected.',!selected.length);
+  if(ambiguous.length||unmatched.length)setTimeout(()=>toast(`${ambiguous.length+unmatched.length} item${ambiguous.length+unmatched.length===1?' needs':'s need'} review.`,true),700);
 }
 function applyVoiceRecount(parsed){
   const source=recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId));

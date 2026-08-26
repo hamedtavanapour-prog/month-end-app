@@ -4,6 +4,8 @@ let inventoryCountSaving=false;
 let countDraftSaving=false;
 let recountSourceCountId=null;
 let recountSelectedProductIds=new Set();
+let countExtraSelectedProductIds=new Set();
+let expandedCountExtraCategories=new Set();
 
 function latestInventoryCount(){
   return finalisedInventoryBaselines()[0]||null;
@@ -1217,12 +1219,55 @@ function countExtraProductCandidates(){
       .some(value=>String(value||'').toLowerCase().includes(query));
   }).sort((a,b)=>String(a.inventoryName||a.name).localeCompare(String(b.inventoryName||b.name)));
 }
+function countExtraCategoryToken(category){return encodeURIComponent(String(category||'Other'));}
+function toggleCountExtraCategory(category){
+  const token=countExtraCategoryToken(category);
+  if(expandedCountExtraCategories.has(token))expandedCountExtraCategories.delete(token);
+  else expandedCountExtraCategories.add(token);
+  renderCountExtraProductPicker();
+}
+function setCountExtraProductSelected(productId,selected){
+  if(selected)countExtraSelectedProductIds.add(productId);
+  else countExtraSelectedProductIds.delete(productId);
+  renderCountExtraProductPicker();
+}
+function setCountExtraCategorySelected(category,selected){
+  countExtraProductCandidates().filter(product=>(product.category||'Other')===category).forEach(product=>{
+    if(selected)countExtraSelectedProductIds.add(product.id);
+    else countExtraSelectedProductIds.delete(product.id);
+  });
+  expandedCountExtraCategories.add(countExtraCategoryToken(category));
+  renderCountExtraProductPicker();
+}
+function updateCountExtraSelectionSummary(){
+  const count=countExtraSelectedProductIds.size;
+  const summary=document.getElementById('count-extra-selected-count');
+  const button=document.getElementById('count-extra-add-selected');
+  if(summary)summary.textContent=`${count} selected`;
+  if(button){button.disabled=count===0;button.textContent=count?`Add ${count} Selected`:'Add Selected';}
+}
 function renderCountExtraProductPicker(){
   const list=document.getElementById('count-extra-product-list');
   if(!list)return;
   const products=countExtraProductCandidates();
-  list.innerHTML=products.slice(0,100).map(product=>`<button class="count-extra-product-card" type="button" data-product-id="${escapeHtml(product.id)}"><span><strong>${escapeHtml(product.inventoryName||product.name)}</strong><small>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''} · ${escapeHtml(product.unit||'unit')}</small></span><em>Add</em></button>`).join('')||'<div class="count-extra-product-empty">No other products match your search.</div>';
-  list.querySelectorAll('[data-product-id]').forEach(button=>button.addEventListener('click',()=>addCountExtraProduct(button.dataset.productId)));
+  const query=(document.getElementById('count-extra-product-search')?.value||'').trim();
+  const groups={};
+  products.slice(0,200).forEach(product=>{const category=product.category||'Other';(groups[category]||=([])).push(product);});
+  list.innerHTML=Object.entries(groups).map(([category,items])=>{
+    const token=countExtraCategoryToken(category);
+    const expanded=!!query||expandedCountExtraCategories.has(token);
+    const selectedCount=items.filter(product=>countExtraSelectedProductIds.has(product.id)).length;
+    const allSelected=items.length>0&&selectedCount===items.length;
+    return`<section class="count-extra-category ${expanded?'':'collapsed'}">
+      <div class="count-extra-category-head">
+        <button type="button" class="count-extra-category-toggle" aria-expanded="${expanded}" onclick="toggleCountExtraCategory(decodeURIComponent('${token}'))"><span>${catBadge(category)} <strong>${items.length} item${items.length===1?'':'s'}</strong></span><span class="inv-section-chevron" aria-hidden="true">⌄</span></button>
+        <label class="count-extra-category-select"><input type="checkbox" ${allSelected?'checked':''} ${selectedCount&&!allSelected?'data-partial="true"':''} onchange="setCountExtraCategorySelected(decodeURIComponent('${token}'),this.checked)"><span>Select category</span></label>
+      </div>
+      <div class="count-extra-category-items" ${expanded?'':'hidden'}>${items.map(product=>`<label class="count-extra-product-card ${countExtraSelectedProductIds.has(product.id)?'selected':''}"><input type="checkbox" ${countExtraSelectedProductIds.has(product.id)?'checked':''} onchange="setCountExtraProductSelected('${escapeHtml(product.id)}',this.checked)"><span><strong>${escapeHtml(product.inventoryName||product.name)}</strong><small>${product.subcategory?`${escapeHtml(product.subcategory)} · `:''}${escapeHtml(product.unit||'unit')}</small></span></label>`).join('')}</div>
+    </section>`;
+  }).join('')||'<div class="count-extra-product-empty">No other products match your search.</div>';
+  list.querySelectorAll('input[data-partial="true"]').forEach(input=>{input.indeterminate=true;});
+  updateCountExtraSelectionSummary();
 }
 function openCountExtraProductPicker(){
   if(!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==currentInvRoomId){toast('This room is not reserved for you.',true);return;}
@@ -1230,27 +1275,35 @@ function openCountExtraProductPicker(){
   document.getElementById('count-extra-product-room').textContent=`Add a product to ${room?.name||'this room'} for this count only. Room Settings and future counts will not change.`;
   const search=document.getElementById('count-extra-product-search');
   if(search)search.value='';
+  countExtraSelectedProductIds=new Set();
+  expandedCountExtraCategories=new Set();
   renderCountExtraProductPicker();
   openModal('modal-count-add-item');
   setTimeout(()=>search?.focus(),0);
 }
-function addCountExtraProduct(productId){
+function addCountExtraProducts(productIds,{closePicker=true,focusProductId=null}={}){
   const room=currentInventoryRoom();
-  const product=state.products.find(item=>item.id===productId&&!item.archived);
-  if(!room||!product||!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==room.id){toast('This room is no longer reserved for you.',true);return;}
-  room.extraProductIds=[...new Set([...(room.extraProductIds||[]),product.id])];
-  liveInvCounts[product.id]=room.items?.[product.id]??'';
+  const products=productIds.map(productId=>state.products.find(item=>item.id===productId&&!item.archived)).filter(Boolean);
+  if(!room||!products.length||!currentCountRoomLock||currentCountRoomLock.countId!==currentInvEdit||currentCountRoomLock.roomId!==room.id){toast('This room is no longer reserved for you.',true);return[];}
+  room.extraProductIds=[...new Set([...(room.extraProductIds||[]),...products.map(product=>product.id)])];
+  products.forEach(product=>{liveInvCounts[product.id]=room.items?.[product.id]??liveInvCounts[product.id]??'';});
   dirtyInventoryRoomIds.add(room.id);
-  closeModal('modal-count-add-item');
+  if(closePicker)closeModal('modal-count-add-item');
   document.getElementById('inv-search').value='';
   document.getElementById('inv-cat-f').value='';
   document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';
   document.getElementById('inv-show-f').value='all';
-  const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${product.category}|||${product.subcategory||'Other'}`);
-  expandedInventorySections.add(sectionToken);
+  products.forEach(product=>expandedInventorySections.add(encodeURIComponent(`${currentInvRoomId||''}|||${product.category}|||${product.subcategory||'Other'}`)));
   renderInvRows();
-  setTimeout(()=>document.getElementById('invq-'+product.id)?.focus(),0);
-  toast(`${product.inventoryName||product.name} added to ${room.name} for this count only.`);
+  const focusId=focusProductId||products[0]?.id;
+  if(focusId)setTimeout(()=>document.getElementById('invq-'+focusId)?.focus(),0);
+  toast(`${products.length} item${products.length===1?'':'s'} added to ${room.name} for this count only.`);
+  return products;
+}
+function addCountExtraProduct(productId){return addCountExtraProducts([productId]);}
+function addSelectedCountExtraProducts(){
+  const added=addCountExtraProducts([...countExtraSelectedProductIds]);
+  if(added.length)countExtraSelectedProductIds=new Set();
 }
 function removeCountExtraProduct(productId){
   const room=currentInventoryRoom();
@@ -1316,9 +1369,9 @@ function setInventoryFinishSaving(saving){
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentCountProducts();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
-  const search=document.getElementById('inv-search').value.toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
+  const search=document.getElementById('inv-search').value.trim().toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
   updateInventoryFilterSummary();
-  let prods=roomScopedProducts.filter(p=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!search||p.name.toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||(p.subcategory||'').toLowerCase().includes(search)));
+  let prods=roomScopedProducts.filter(p=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!search||p.name.toLowerCase().includes(search)||(p.inventoryName||'').toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||(p.category||'').toLowerCase().includes(search)||(p.subcategory||'').toLowerCase().includes(search)));
   if(show==='missing')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v===''||v===null||v===undefined;});
   if(show==='filled')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v!==''&&v!==null&&v!==undefined;});
   prods=sortedInventoryProducts(prods,sortMode);
@@ -1329,18 +1382,19 @@ function renderInvRows(skipCapture=false){
   const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
-    const collapsed=!expandedInventorySections.has(sectionToken);
+    const collapsed=!search&&!expandedInventorySections.has(sectionToken);
     const progress=inventorySectionProgress(g.cat,g.sub);
     html+=`<section class="inv-count-section ${collapsed?'collapsed':''} ${progress.complete?'complete':''}" data-section-token="${sectionToken}">
       <button class="inv-section-header" type="button" aria-expanded="${!collapsed}" onclick="toggleInventorySection('${sectionToken}')">
         <span class="inv-section-title">${catBadge(g.cat)} <span>${escapeHtml(g.sub)}</span></span>
-        <span class="inv-section-summary"><span class="inv-section-complete-mark" aria-label="Complete" title="All items counted">✓</span><span class="inv-section-summary-count">${progress.filled}/${progress.total}</span><span class="inv-section-chevron" aria-hidden="true">⌄</span></span>
+        <span class="inv-section-summary"><span class="inv-section-complete-mark" aria-label="Complete" title="All items counted">✓</span>${search?'':`<span class="inv-section-summary-count">${progress.filled}/${progress.total}</span>`}<span class="inv-section-chevron" aria-hidden="true">⌄</span></span>
       </button>
       <div class="inv-section-items" ${collapsed?'hidden':''}>${g.items.map(renderProduct).join('')}</div>
     </section>`;
   });
   else html=prods.map(renderProduct).join('');
   document.getElementById('inv-rows').innerHTML=html;
+  if(search)requestAnimationFrame(()=>document.querySelector('#inv-rows .inv-count-row')?.scrollIntoView({behavior:'smooth',block:'nearest'}));
   const renderedInputs=invQtyInputs();
   renderedInputs.forEach(input=>input.setAttribute('enterkeyhint','next'));
   renderedInputs.at(-1)?.setAttribute('enterkeyhint','done');
