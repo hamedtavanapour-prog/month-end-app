@@ -262,19 +262,23 @@ const FOODTRAK_USAGE_SUBHEADINGS=new Set([
   'Draft','Bottled Beer','Coolers Wine Liqour Malt','Inventoried Supplies','Deposits','Local Marketing'
 ]);
 
-function foodtrakUsageHeading(row){
-  const text=(row||[]).map(cell=>String(cell||'').replace(/\s+/g,' ').trim()).filter(Boolean).join(' ').trim();
+function foodtrakUsageHeading(row,columns=FOODTRAK_USAGE_COLUMNS){
+  const name=foodtrakUsageText(row?.[columns.name]);
+  if(FOODTRAK_USAGE_MAIN_HEADINGS.has(name))return{level:'main',name};
+  if(FOODTRAK_USAGE_SUBHEADINGS.has(name))return{level:'sub',name};
+  const text=(row||[]).map(foodtrakUsageText).filter(Boolean).join(' ').trim();
   if(FOODTRAK_USAGE_MAIN_HEADINGS.has(text))return{level:'main',name:text};
   if(FOODTRAK_USAGE_SUBHEADINGS.has(text))return{level:'sub',name:text};
   return null;
 }
 
 const FOODTRAK_USAGE_COLUMNS={
-  name:0,unit:3,actualUsage:5,actualPercentSales:6,idealUsage:7,idealPercentSales:9,
+  name:1,unit:3,actualUsage:5,actualPercentSales:6,idealUsage:7,idealPercentSales:9,
   varianceUsage:10,variancePercentSales:11,estimatedCostVariance:12,begin:14,
-  purchases:16,transferIn:17,transferOut:20,production:22,end:25
+  purchases:16,transferIn:17,transferOut:19,production:21,end:24
 };
-const FOODTRAK_USAGE_NUMERIC_COLUMNS=Object.values(FOODTRAK_USAGE_COLUMNS).filter(index=>index!==FOODTRAK_USAGE_COLUMNS.name&&index!==FOODTRAK_USAGE_COLUMNS.unit);
+const FOODTRAK_USAGE_COLUMN_ORDER=Object.keys(FOODTRAK_USAGE_COLUMNS);
+const FOODTRAK_USAGE_TEXT_COLUMNS=new Set(['name','unit']);
 
 function foodtrakUsageText(value){
   return String(value??'').replace(/\s+/g,' ').trim();
@@ -294,17 +298,97 @@ function foodtrakUsagePercent(value){
   return foodtrakUsageRound(normalized,4);
 }
 
-function foodtrakUsageStructureRow(row){
-  const name=foodtrakUsageText(row?.[FOODTRAK_USAGE_COLUMNS.name]);
+function findFoodtrakUsageHeaderRow(rows){
+  let bestIndex=-1;
+  let bestScore=0;
+  rows.slice(0,30).forEach((row,index)=>{
+    const headers=(row||[]).map(compactUsageHeader);
+    const usageCount=headers.filter(header=>header==='usage').length;
+    let score=usageCount>=3?6:usageCount;
+    ['name','unit','purch','xfrin','xfrout','prod','end'].forEach(header=>{
+      if(headers.includes(header))score++;
+    });
+    if(score>bestScore){
+      bestScore=score;
+      bestIndex=index;
+    }
+  });
+  return bestScore>=10?bestIndex:-1;
+}
+
+function foodtrakUsageHeaderColumns(header){
+  const compacted=(header||[]).map(compactUsageHeader);
+  const matching=pattern=>compacted.reduce((indices,value,index)=>{
+    if(pattern.test(value))indices.push(index);
+    return indices;
+  },[]);
+  const usages=matching(/^usage$/);
+  const percentages=matching(/^(?:sales|percent(?:sales)?)$/);
+  const first=pattern=>matching(pattern)[0];
+  return{
+    name:first(/^name$/),
+    unit:first(/^unit$/),
+    actualUsage:usages[0],
+    actualPercentSales:percentages[0],
+    idealUsage:usages[1],
+    idealPercentSales:percentages[1],
+    varianceUsage:usages[2],
+    variancePercentSales:percentages[2],
+    estimatedCostVariance:first(/^est(?:imated)?cost(?:variance)?$/),
+    begin:first(/^begin(?:ning)?$/),
+    purchases:first(/^purch(?:ase|ases)?$/),
+    transferIn:first(/^(?:xfr|transfer)in$/),
+    transferOut:first(/^(?:xfr|transfer)out$/),
+    production:first(/^(?:prod|production)$/),
+    end:first(/^(?:end|ending)$/)
+  };
+}
+
+function foodtrakUsagePopulatedColumn(rows,start,end,type,headerIndex){
+  let selected=start;
+  let selectedScore=-1;
+  for(let column=start;column<end;column++){
+    const score=rows.slice(headerIndex+1).reduce((total,row)=>{
+      const value=row?.[column];
+      return total+(type==='number'?(usageNumber(value)!==''):!!foodtrakUsageText(value));
+    },0);
+    if(score>selectedScore){
+      selected=column;
+      selectedScore=score;
+    }
+  }
+  return selected;
+}
+
+function resolveFoodtrakUsageColumns(rows){
+  const headerIndex=findFoodtrakUsageHeaderRow(rows);
+  if(headerIndex<0)return{...FOODTRAK_USAGE_COLUMNS};
+  const detected=foodtrakUsageHeaderColumns(rows[headerIndex]);
+  const anchors=FOODTRAK_USAGE_COLUMN_ORDER.map(key=>{
+    const column=detected[key];
+    return Number.isInteger(column)?column:FOODTRAK_USAGE_COLUMNS[key];
+  });
+  const width=Math.max((rows[headerIndex]||[]).length,...rows.slice(headerIndex+1).map(row=>(row||[]).length));
+  return FOODTRAK_USAGE_COLUMN_ORDER.reduce((columns,key,index)=>{
+    const start=anchors[index];
+    const nextAnchor=anchors.slice(index+1).find(column=>column>start);
+    const end=Math.max(start+1,nextAnchor??width);
+    columns[key]=foodtrakUsagePopulatedColumn(rows,start,end,FOODTRAK_USAGE_TEXT_COLUMNS.has(key)?'text':'number',headerIndex);
+    return columns;
+  },{});
+}
+
+function foodtrakUsageStructureRow(row,columns=FOODTRAK_USAGE_COLUMNS){
+  const name=foodtrakUsageText(row?.[columns.name]);
   const text=(row||[]).map(foodtrakUsageText).filter(Boolean).join(' ');
-  return !name||FOODTRAK_USAGE_MAIN_HEADINGS.has(name)||
+  return !name||!!foodtrakUsageHeading(row,columns)||
     /^(Item|Name|Profit Center:?|Values estimated using Last Cost\.?|Department Sales:?|Profit Center Sales:?|Page\s+\d+\s+of\s+\d+|Actual|Ideal|Variance|Activity)$/i.test(name)||
     /FOOD-TRAK.*(?:System|Copyright|Registered Trademark)|All Rights Reserved/i.test(text);
 }
 
-function foodtrakUsageContinuationRow(row){
-  if(foodtrakUsageStructureRow(row)||foodtrakUsageText(row?.[FOODTRAK_USAGE_COLUMNS.unit]))return false;
-  return !FOODTRAK_USAGE_NUMERIC_COLUMNS.some(column=>usageNumber(row?.[column])!=='');
+function foodtrakUsageContinuationRow(row,columns=FOODTRAK_USAGE_COLUMNS){
+  if(foodtrakUsageStructureRow(row,columns)||foodtrakUsageText(row?.[columns.unit]))return false;
+  return FOODTRAK_USAGE_COLUMN_ORDER.filter(key=>!FOODTRAK_USAGE_TEXT_COLUMNS.has(key)).every(key=>usageNumber(row?.[columns[key]])==='');
 }
 
 function joinFoodtrakUsageName(first,continuation){
@@ -314,17 +398,19 @@ function joinFoodtrakUsageName(first,continuation){
 
 function parseFoodtrakUsageRows(rows,fileName){
   const parsed=[];
-  const headerIndex=findUsageHeaderRow(rows);
+  const columns=resolveFoodtrakUsageColumns(rows);
+  const foodtrakHeaderIndex=findFoodtrakUsageHeaderRow(rows);
+  const headerIndex=foodtrakHeaderIndex>=0?foodtrakHeaderIndex:findUsageHeaderRow(rows);
   const inferredPeriod=inferUsagePeriod(rows,headerIndex);
   let reportCategory='';
   let reportSubcategory='';
 
   for(let index=0;index<rows.length;index++){
     const row=rows[index]||[];
-    const unitSize=foodtrakUsageText(row[FOODTRAK_USAGE_COLUMNS.unit]);
-    const actualUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.actualUsage]);
+    const unitSize=foodtrakUsageText(row[columns.unit]);
+    const actualUnrounded=usageNumber(row[columns.actualUsage]);
     if(!unitSize||actualUnrounded===''){
-      const heading=foodtrakUsageHeading(row);
+      const heading=foodtrakUsageHeading(row,columns);
       if(heading){
         if(heading.level==='main'){
           reportCategory=heading.name;
@@ -335,24 +421,24 @@ function parseFoodtrakUsageRows(rows,fileName){
     }
 
     const sourceStart=index+1;
-    const firstPrintedLine=foodtrakUsageText(row[FOODTRAK_USAGE_COLUMNS.name]);
+    const firstPrintedLine=foodtrakUsageText(row[columns.name]);
     const continuationLines=[];
     let fullName=firstPrintedLine;
     let sourceEnd=sourceStart;
-    while(index+1<rows.length&&foodtrakUsageContinuationRow(rows[index+1])){
+    while(index+1<rows.length&&foodtrakUsageContinuationRow(rows[index+1],columns)){
       index++;
-      const continuation=foodtrakUsageText(rows[index]?.[FOODTRAK_USAGE_COLUMNS.name]);
+      const continuation=foodtrakUsageText(rows[index]?.[columns.name]);
       fullName=joinFoodtrakUsageName(fullName,continuation);
       continuationLines.push(continuation);
       sourceEnd=index+1;
     }
 
-    const beginUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.begin])||0;
-    const purchasesUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.purchases])||0;
-    const transferInUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.transferIn])||0;
-    const transferOutUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.transferOut])||0;
-    const productionUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.production])||0;
-    const endUnrounded=usageNumber(row[FOODTRAK_USAGE_COLUMNS.end])||0;
+    const beginUnrounded=usageNumber(row[columns.begin])||0;
+    const purchasesUnrounded=usageNumber(row[columns.purchases])||0;
+    const transferInUnrounded=usageNumber(row[columns.transferIn])||0;
+    const transferOutUnrounded=usageNumber(row[columns.transferOut])||0;
+    const productionUnrounded=usageNumber(row[columns.production])||0;
+    const endUnrounded=usageNumber(row[columns.end])||0;
     const reconciledUsage=beginUnrounded+purchasesUnrounded+transferInUnrounded-transferOutUnrounded+productionUnrounded-endUnrounded;
     const reconciliationDelta=actualUnrounded-reconciledUsage;
     const tolerance=1e-7*Math.max(1,Math.abs(actualUnrounded),Math.abs(reconciledUsage));
@@ -367,18 +453,18 @@ function parseFoodtrakUsageRows(rows,fileName){
       unitSize:unitSize||match?.unit?.unitSize||match?.unit?.unit||match?.product?.unit||'',
       qty:foodtrakUsageRound(actualUnrounded),
       actualUsage:foodtrakUsageRound(actualUnrounded),
-      actualPercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.actualPercentSales]),
-      idealUsage:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.idealUsage]),
-      idealPercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.idealPercentSales]),
-      varianceUsage:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.varianceUsage]),
-      variancePercentSales:foodtrakUsagePercent(row[FOODTRAK_USAGE_COLUMNS.variancePercentSales]),
-      estimatedCostVariance:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.estimatedCostVariance]),
-      begin:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.begin]),
-      purch:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.purchases]),
-      transferIn:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.transferIn]),
-      transferOut:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.transferOut]),
-      production:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.production]),
-      end:foodtrakUsageRound(row[FOODTRAK_USAGE_COLUMNS.end]),
+      actualPercentSales:foodtrakUsagePercent(row[columns.actualPercentSales]),
+      idealUsage:foodtrakUsageRound(row[columns.idealUsage]),
+      idealPercentSales:foodtrakUsagePercent(row[columns.idealPercentSales]),
+      varianceUsage:foodtrakUsageRound(row[columns.varianceUsage]),
+      variancePercentSales:foodtrakUsagePercent(row[columns.variancePercentSales]),
+      estimatedCostVariance:foodtrakUsageRound(row[columns.estimatedCostVariance]),
+      begin:foodtrakUsageRound(row[columns.begin]),
+      purch:foodtrakUsageRound(row[columns.purchases]),
+      transferIn:foodtrakUsageRound(row[columns.transferIn]),
+      transferOut:foodtrakUsageRound(row[columns.transferOut]),
+      production:foodtrakUsageRound(row[columns.production]),
+      end:foodtrakUsageRound(row[columns.end]),
       periodStart:inferredPeriod.start,
       periodEnd:inferredPeriod.end,
       reportCategory,
