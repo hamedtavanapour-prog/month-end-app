@@ -542,6 +542,11 @@ function liveOrderQtyByProduct(baselineDate=''){
   return totals;
 }
 
+function liveUsageDeductionQty(row){
+  const ideal=typeof usageNumber==='function'?usageNumber(row?.idealUsage):parseFloat(row?.idealUsage);
+  return ideal===''||!Number.isFinite(ideal)?0:ideal;
+}
+
 function liveUsageQtyByProduct(baselineDate=''){
   const totals={};
   ensureUsageLogs().filter(log=>!log.archived).forEach(log=>{
@@ -549,7 +554,7 @@ function liveUsageQtyByProduct(baselineDate=''){
     if(!liveMovementAfterBaseline(period.end||period.start,baselineDate))return;
     usageLogRows(log).forEach(row=>{
       if(!row.matched||!row.productId)return;
-      totals[row.productId]=(totals[row.productId]||0)+usageRowQty(row);
+      totals[row.productId]=(totals[row.productId]||0)+liveUsageDeductionQty(row);
     });
   });
   return totals;
