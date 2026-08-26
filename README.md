@@ -1,7 +1,7 @@
 # Month End
 
 Secure inventory operations for multi-department hospitality teams.
- 
+
 ## Applications
 
 - `apps/web` — Next.js web application
