@@ -946,6 +946,9 @@ tr.supplier-product-highlight{background:var(--row-selected)!important;outline:2
 .inv-count-row.filled-row{background:rgba(76,175,125,0.04);}
 .inv-prod-name{font-size:0.85rem;font-weight:600;}
 .inv-prod-meta{font-size:0.71rem;color:var(--text-muted);margin-left:14px;}
+.recount-previous-room-count{display:inline-flex;align-items:center;gap:7px;margin:6px 0 0 14px;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:999px;padding:3px 8px;background:color-mix(in srgb,var(--accent) 8%,var(--surface));font-size:.68rem;}
+.recount-previous-room-count span{color:var(--text-muted);}
+.recount-previous-room-count strong{color:var(--accent);font-size:.72rem;}
 .missing-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);display:inline-block;margin-right:5px;}
 .filled-dot{width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;margin-right:5px;}
 .missing-pill{display:inline-flex;align-items:center;gap:4px;background:rgba(224,82,82,0.15);color:var(--danger);border-radius:20px;padding:2px 8px;font-size:0.72rem;font-weight:700;}

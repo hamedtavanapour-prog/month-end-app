@@ -1368,6 +1368,8 @@ function setInventoryFinishSaving(saving){
 }
 function renderInvRows(skipCapture=false){
   const roomScopedProducts=currentCountProducts();
+  const activeInventory=currentInvEdit?state.inventories.find(item=>item.id===currentInvEdit):null;
+  const activeRoom=currentInventoryRoom();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
   const search=document.getElementById('inv-search').value.trim().toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
   updateInventoryFilterSummary();
@@ -1379,7 +1381,7 @@ function renderInvRows(skipCapture=false){
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
   const extraIds=new Set(currentInventoryRoom()?.extraProductIds||[]);
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div></div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div>${recountPreviousRoomCountHtml(activeInventory,activeRoom,p.id)}</div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!search&&!expandedInventorySections.has(sectionToken);
@@ -1631,17 +1633,28 @@ function recountSourceInventory(inv){
   if(!inv)return null;
   return state.inventories.find(item=>item.id===inventoryRootId(inv))||inv;
 }
-function recountSelectableProducts(source){
-  const ids=new Set(Object.keys(source?.items||{}));
-  if(!ids.size)expectedInventoryProductIds(source).forEach(id=>ids.add(id));
-  return state.products.filter(product=>!product.archived&&ids.has(product.id)).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+function recountSelectableProducts(){
+  return state.products.filter(product=>!product.archived).sort((a,b)=>String(a.inventoryName||a.name).localeCompare(String(b.inventoryName||b.name)));
+}
+function recountPreviousRoomCount(inv,room,productId){
+  if(inv?.recordType!=='recount'||!room)return{counted:false,value:null};
+  const source=recountSourceInventory(inv);
+  const sourceRoom=inventoryRoomForFloorRoom(source,room.roomId)||(source?.rooms||[]).find(candidate=>candidate.name===room.name);
+  if(!sourceRoom||!Object.prototype.hasOwnProperty.call(sourceRoom.items||{},productId))return{counted:false,value:null};
+  return{counted:true,value:sourceRoom.items[productId]};
+}
+function recountPreviousRoomCountHtml(inv,room,productId){
+  if(inv?.recordType!=='recount')return'';
+  const previous=recountPreviousRoomCount(inv,room,productId);
+  const value=previous.counted?String(previous.value):'Not counted';
+  return`<div class="recount-previous-room-count"><span>Original in ${escapeHtml(room?.name||'this room')}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 function renderRecountProductSelector(){
   const source=recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId));
   const list=document.getElementById('recount-product-list');
   if(!source||!list)return;
   const query=(document.getElementById('recount-product-search')?.value||'').trim().toLowerCase();
-  const products=recountSelectableProducts(source).filter(product=>!query||[product.name,product.inventoryName,product.category,product.subcategory,product.aliases].some(value=>String(value||'').toLowerCase().includes(query)));
+  const products=recountSelectableProducts().filter(product=>!query||[product.name,product.inventoryName,product.category,product.subcategory,product.aliases].some(value=>String(value||'').toLowerCase().includes(query)));
   list.innerHTML=products.map(product=>`<label class="recount-product-option"><input type="checkbox" value="${escapeHtml(product.id)}" ${recountSelectedProductIds.has(product.id)?'checked':''} onchange="toggleRecountProduct('${product.id}',this.checked)"><span><strong>${escapeHtml(product.inventoryName||product.name)}</strong><small>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''}</small></span></label>`).join('')||'<p class="empty-cell">No products match.</p>';
   const count=document.getElementById('recount-selected-count');if(count)count.textContent=`${recountSelectedProductIds.size} selected`;
   const create=document.getElementById('recount-create-button');if(create)create.disabled=!recountSelectedProductIds.size;
@@ -1651,8 +1664,7 @@ function toggleRecountProduct(productId,checked){
   renderRecountProductSelector();
 }
 function setAllRecountProducts(selected){
-  const source=recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId));
-  recountSelectedProductIds=new Set(selected?recountSelectableProducts(source).map(product=>product.id):[]);
+  recountSelectedProductIds=new Set(selected?recountSelectableProducts().map(product=>product.id):[]);
   renderRecountProductSelector();
 }
 function openRecountSelector(countId,preselectedProductIds=[]){
@@ -1664,10 +1676,10 @@ function openRecountSelector(countId,preselectedProductIds=[]){
   recountSourceCountId=source.id;
   if(typeof recountTranscribeHistory!=='undefined')recountTranscribeHistory=[];
   if(typeof renderTranscribeHistory==='function')renderTranscribeHistory('recount');
-  const available=new Set(recountSelectableProducts(source).map(product=>product.id));
+  const available=new Set(recountSelectableProducts().map(product=>product.id));
   recountSelectedProductIds=new Set((preselectedProductIds||[]).filter(id=>available.has(id)));
   const context=document.getElementById('recount-source-context');
-  if(context)context.textContent=`Select only the items that need checking from ${source.label||'the original count'}. The re-count will be saved as a separate record.`;
+  if(context)context.textContent=`Choose any active product to check against ${source.label||'the original count'}. The re-count will be saved as a separate record.`;
   const search=document.getElementById('recount-product-search');if(search)search.value='';
   renderRecountProductSelector();openModal('modal-recount-select');
 }

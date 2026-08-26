@@ -349,7 +349,7 @@ async function transcribeVoiceRecording(){
     const form=new FormData();
     const extension=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';
     form.append('audio',audio,`count-recording.${extension}`);
-    const products=voiceContext==='count-extra'&&typeof currentRoomProducts==='function'?state.products.filter(product=>!product.archived&&!new Set(currentRoomProducts().map(item=>item.id)).has(product.id)):voiceContext==='recount'&&typeof recountSelectableProducts==='function'?recountSelectableProducts(recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId))):state.products;
+    const products=voiceContext==='count-extra'&&typeof currentRoomProducts==='function'?state.products.filter(product=>!product.archived&&!new Set(currentRoomProducts().map(item=>item.id)).has(product.id)):voiceContext==='recount'&&typeof recountSelectableProducts==='function'?recountSelectableProducts():state.products;
     const vocabulary=[...new Set(products.flatMap(product=>[product.name,product.inventoryName].filter(Boolean)))].join(', ');
     form.append('vocabulary',vocabulary.slice(0,6000));
     const controller=new AbortController();
@@ -589,8 +589,7 @@ function applyVoiceCountExtra(parsed){
   if(ambiguous.length||unmatched.length)setTimeout(()=>toast(`${ambiguous.length+unmatched.length} item${ambiguous.length+unmatched.length===1?' needs':'s need'} review.`,true),700);
 }
 function applyVoiceRecount(parsed){
-  const source=recountSourceInventory(state.inventories.find(item=>item.id===recountSourceCountId));
-  const products=recountSelectableProducts(source);
+  const products=recountSelectableProducts();
   const applied=[],ambiguous=[],unmatched=[];
   parsed.forEach(({nameStr})=>{
     const result=voiceProductMatch(nameStr,products);
