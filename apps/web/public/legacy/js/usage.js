@@ -491,6 +491,146 @@ function parseFoodtrakUsageRows(rows,fileName){
   return parsed;
 }
 
+const FOODTRAK_USAGE_PDF_HEADER_CELLS=new Set(['name','unit','usage','sales','estcost','begin','purch','xfrin','xfrout','prod','end']);
+const FOODTRAK_USAGE_PDF_UNIT_SUFFIX=/^(.+?)\s+((?:(?:\d+(?:\.\d+)?\s*)?(?:lt|ltr|litre|liter|kg|g|gr|ml|ozcn|oz|lb|pk|ltkg)|\d+\/\d+p|cs\/\d+|ck\d+ct|\d+#|\d{2,}|batch|bottle|can|each|floz|gal|keg|pack|piece|por|recipe|serv|skewer|slice|oz\s+prp))$/i;
+
+function foodtrakUsagePdfDataRow(row){
+  let cells=(row||[]).map(foodtrakUsageText).filter(Boolean);
+  if(cells.length>20)cells=cells.filter(cell=>!FOODTRAK_USAGE_PDF_HEADER_CELLS.has(compactUsageHeader(cell)));
+  if(cells.length<14)return null;
+  const values=cells.slice(-13);
+  if(!values.every(value=>usageNumber(value)!==''))return null;
+  const leading=cells.slice(0,-13);
+  let firstPrintedLine='';
+  let unitSize='';
+  if(leading.length>=2){
+    unitSize=leading[leading.length-1];
+    firstPrintedLine=leading.slice(0,-1).join(' ');
+  }else if(leading.length===1){
+    const merged=leading[0];
+    const unitMatch=merged.match(FOODTRAK_USAGE_PDF_UNIT_SUFFIX);
+    if(unitMatch){
+      firstPrintedLine=unitMatch[1];
+      unitSize=unitMatch[2];
+    }else{
+      const splitAt=merged.lastIndexOf(' ');
+      if(splitAt<1)return null;
+      firstPrintedLine=merged.slice(0,splitAt);
+      unitSize=merged.slice(splitAt+1);
+    }
+  }
+  if(!firstPrintedLine||!unitSize)return null;
+  return{firstPrintedLine,unitSize,values};
+}
+
+function foodtrakUsagePdfStructureRow(row){
+  const text=(row||[]).map(foodtrakUsageText).filter(Boolean).join(' ');
+  return !text||!!foodtrakUsageHeading(row,{name:0})||
+    /^(?:Keg ON|Item Usage|Values estimated using Last Cost\.?|Item\s+Actual\s+Ideal\s+Variance\s+Activity|Name\s+Unit\s+Usage|Profit Center:?|Department Sales:?|Profit Center Sales:?|Page\s+\d+\s+of\s+\d+)/i.test(text)||
+    /^\d{1,2}\/\d{1,2}\/\d{4}.*(?:Page\s+\d+\s+of\s+\d+|by Report Group)/i.test(text)||
+    /FOOD-TRAK.*(?:System|Copyright|Registered Trademark)|All Rights Reserved/i.test(text);
+}
+
+function foodtrakUsagePdfContinuationRow(row){
+  if(foodtrakUsagePdfDataRow(row)||foodtrakUsagePdfStructureRow(row))return false;
+  return true;
+}
+
+function parseFoodtrakUsagePdfRows(rows,fileName){
+  const parsed=[];
+  const inferredPeriod=inferUsagePeriod(rows,Math.min(rows.length,30));
+  let reportCategory='';
+  let reportSubcategory='';
+  let previousSignature='';
+
+  for(let index=0;index<rows.length;index++){
+    const row=rows[index]||[];
+    const data=foodtrakUsagePdfDataRow(row);
+    if(!data){
+      const heading=foodtrakUsageHeading(row,{name:0});
+      if(heading){
+        if(heading.level==='main'){
+          reportCategory=heading.name;
+          reportSubcategory='';
+        }else reportSubcategory=heading.name;
+      }
+      continue;
+    }
+
+    const sourceStart=index+1;
+    const continuationLines=[];
+    let fullName=data.firstPrintedLine;
+    let sourceEnd=sourceStart;
+    while(index+1<rows.length&&foodtrakUsagePdfContinuationRow(rows[index+1])){
+      index++;
+      const continuation=(rows[index]||[]).map(foodtrakUsageText).filter(Boolean).join(' ');
+      fullName=joinFoodtrakUsageName(fullName,continuation);
+      continuationLines.push(continuation);
+      sourceEnd=index+1;
+    }
+
+    const [actualCell,actualPercentCell,idealCell,idealPercentCell,varianceCell,variancePercentCell,costCell,beginCell,purchasesCell,transferInCell,transferOutCell,productionCell,endCell]=data.values;
+    const actualUnrounded=usageNumber(actualCell);
+    const beginUnrounded=usageNumber(beginCell)||0;
+    const purchasesUnrounded=usageNumber(purchasesCell)||0;
+    const transferInUnrounded=usageNumber(transferInCell)||0;
+    const transferOutUnrounded=usageNumber(transferOutCell)||0;
+    const productionUnrounded=usageNumber(productionCell)||0;
+    const endUnrounded=usageNumber(endCell)||0;
+    const reconciledUsage=beginUnrounded+purchasesUnrounded+transferInUnrounded-transferOutUnrounded+productionUnrounded-endUnrounded;
+    const reconciliationDelta=actualUnrounded-reconciledUsage;
+    const activityReconciles=Math.abs(reconciliationDelta)<=0.011;
+    const signature=[fullName,data.unitSize,...data.values].map(foodtrakUsageText).join('|');
+    if(signature===previousSignature)continue;
+    previousSignature=signature;
+    const match=matchUsageProduct({name:fullName,sku:'',size:data.unitSize});
+
+    parsed.push({
+      productId:match?match.product.id:null,
+      productName:fullName,
+      reportProductName:fullName,
+      sku:'',
+      unitSize:data.unitSize||match?.unit?.unitSize||match?.unit?.unit||match?.product?.unit||'',
+      qty:foodtrakUsageRound(actualUnrounded),
+      actualUsage:foodtrakUsageRound(actualUnrounded),
+      actualPercentSales:foodtrakUsagePercent(actualPercentCell),
+      idealUsage:foodtrakUsageRound(idealCell),
+      idealPercentSales:foodtrakUsagePercent(idealPercentCell),
+      varianceUsage:foodtrakUsageRound(varianceCell),
+      variancePercentSales:foodtrakUsagePercent(variancePercentCell),
+      estimatedCostVariance:foodtrakUsageRound(costCell),
+      begin:foodtrakUsageRound(beginCell),
+      purch:foodtrakUsageRound(purchasesCell),
+      transferIn:foodtrakUsageRound(transferInCell),
+      transferOut:foodtrakUsageRound(transferOutCell),
+      production:foodtrakUsageRound(productionCell),
+      end:foodtrakUsageRound(endCell),
+      periodStart:inferredPeriod.start,
+      periodEnd:inferredPeriod.end,
+      reportCategory,
+      reportSubcategory,
+      matched:!!match,
+      matchedName:match?match.product.name:null,
+      sizeMatched:match?match.sizeMatched:false,
+      sourceFile:fileName,
+      importedAt:new Date().toISOString(),
+      sourceOrder:sourceStart,
+      sourceLines:sourceEnd>sourceStart?`${sourceStart}–${sourceEnd}`:String(sourceStart),
+      sourceLineStart:sourceStart,
+      sourceLineEnd:sourceEnd,
+      firstPrintedLine:data.firstPrintedLine,
+      continuationLines,
+      nameReconstructed:continuationLines.length>0,
+      blankNameRecovered:false,
+      activityReconciles,
+      reconciliationDelta:foodtrakUsageRound(reconciliationDelta,8),
+      needsReview:!activityReconciles,
+      reviewReason:activityReconciles?'':'Rounded activity values in the PDF do not reconcile to Actual Usage.'
+    });
+  }
+  return parsed;
+}
+
 function parseUsageReportRows(rows,fileName){
   const headerIndex=findUsageHeaderRow(rows);
   const headers=rows[headerIndex]||[];
@@ -1493,6 +1633,27 @@ async function readUsageReportRows(file,arrayBuffer,options={}){
   return readUsageSpreadsheetRows(arrayBuffer,options);
 }
 
+function setUsageUploadFormat(format){
+  usageUploadFormat=format==='pdf'?'pdf':'excel';
+  const isPdf=usageUploadFormat==='pdf';
+  const zone=document.getElementById('usage-zone');
+  const zoneIcon=zone?.querySelector('.up-icon');
+  const zoneCopy=document.getElementById('usage-upload-zone-copy');
+  const input=document.getElementById('usage-file');
+  const status=document.getElementById('usage-status');
+  document.querySelectorAll('input[name="usage-upload-format"]').forEach(option=>{option.checked=option.value===usageUploadFormat;});
+  if(zone)zone.setAttribute('aria-label',isPdf?'Upload a FOOD-TRAK Item Usage PDF':'Upload a FOOD-TRAK Item Usage Excel workbook');
+  if(zoneIcon)zoneIcon.textContent=isPdf?'PDF':'XLS';
+  if(zoneCopy)zoneCopy.innerHTML=isPdf
+    ?'<strong>Click or drag & drop</strong> the original FOOD-TRAK PDF file'
+    :'<strong>Click or drag & drop</strong> the original .xls or .xlsx file';
+  if(input){
+    input.value='';
+    input.accept=isPdf?'.pdf,application/pdf':'.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  if(status)status.textContent='';
+}
+
 function openUsageUploadModal(mode='other'){
   usageUploadMode=mode==='foodtrak'?'foodtrak':'other';
   discardUsageImportReview();
@@ -1501,16 +1662,18 @@ function openUsageUploadModal(mode='other'){
   const zone=document.getElementById('usage-zone');
   const zoneCopy=document.getElementById('usage-upload-zone-copy');
   const input=document.getElementById('usage-file');
+  const formatFieldset=document.getElementById('usage-upload-format-fieldset');
   if(usageUploadMode==='foodtrak'){
     if(title)title.textContent='Upload Usage Report — From FoodTrak';
-    if(description)description.innerHTML='Upload the original FOOD-TRAK <strong>Item Usage</strong> workbook. Product names split across printed rows will be reconstructed, FOOD-TRAK’s displaced activity columns will be mapped explicitly, displayed values will be rounded permanently, and every activity row will be reconciled before review.';
-    if(zone)zone.setAttribute('aria-label','Upload a FOOD-TRAK Item Usage workbook');
-    if(zoneCopy)zoneCopy.innerHTML='<strong>Click or drag & drop</strong> the original .xls or .xlsx file';
-    if(input)input.accept='.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if(description)description.innerHTML='Choose the format first, then upload the original FOOD-TRAK <strong>Item Usage</strong> report. Excel and PDF are read with separate layout rules; product names and activity values are validated before review.';
+    if(formatFieldset)formatFieldset.hidden=false;
+    setUsageUploadFormat('excel');
   }else{
     if(title)title.textContent='Upload Usage Report — Others';
     if(description)description.innerHTML='Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Ideal Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.';
+    if(formatFieldset)formatFieldset.hidden=true;
     if(zone)zone.setAttribute('aria-label','Upload a usage report');
+    const zoneIcon=zone?.querySelector('.up-icon');if(zoneIcon)zoneIcon.textContent='DATA';
     if(zoneCopy)zoneCopy.innerHTML='<strong>Click or drag & drop</strong> an Excel / CSV / PDF file';
     if(input)input.accept='.xlsx,.xls,.csv,.pdf,application/pdf';
   }
@@ -1527,11 +1690,19 @@ function handleUsageUpload(e){
   reader.onload=async ev=>{
     try{
       const isFoodtrak=usageUploadMode==='foodtrak';
-      if(isFoodtrak&&!/\.xlsx?$/i.test(file.name))throw new Error('From FoodTrak accepts the original .xls or .xlsx Item Usage workbook. Choose Others for CSV or PDF reports.');
+      const isFoodtrakPdf=isFoodtrak&&usageUploadFormat==='pdf';
+      if(isFoodtrakPdf&&!/\.pdf$/i.test(file.name))throw new Error('PDF is selected. Choose the original .pdf report, or switch the file type to Excel.');
+      if(isFoodtrak&&!isFoodtrakPdf&&!/\.xlsx?$/i.test(file.name))throw new Error('Excel is selected. Choose the original .xls or .xlsx workbook, or switch the file type to PDF.');
       const sourceFile=usageSourceFileSnapshot(file,ev.target.result);
-      const rows=await readUsageReportRows(file,ev.target.result,{raw:isFoodtrak});
-      let matched=isFoodtrak?parseFoodtrakUsageRows(rows,file.name):parseUsageReportRows(rows,file.name);
-      if((file.type==='application/pdf'||/\.pdf$/i.test(file.name))&&!matched.some(row=>row.matched)){
+      const rows=isFoodtrakPdf
+        ?await readUsagePdfRows(ev.target.result)
+        :isFoodtrak
+          ?readUsageSpreadsheetRows(ev.target.result,{raw:true})
+          :await readUsageReportRows(file,ev.target.result);
+      let matched=isFoodtrak
+        ?(isFoodtrakPdf?parseFoodtrakUsagePdfRows(rows,file.name):parseFoodtrakUsageRows(rows,file.name))
+        :parseUsageReportRows(rows,file.name);
+      if(!isFoodtrak&&(file.type==='application/pdf'||/\.pdf$/i.test(file.name))&&!matched.some(row=>row.matched)){
         matched=parseUsagePdfTextRows(rows,file.name);
       }
       if(!matched.length){
@@ -1545,7 +1716,7 @@ function handleUsageUpload(e){
       }else{
         document.getElementById('usage-zone').hidden=true;
         status.textContent=isFoodtrak
-          ?`Validated ${file.name}: ${counts.rows} item records, ${counts.reconstructed} reconstructed names, ${counts.blankNameRecovered} blank-name rows recovered, and ${counts.reconciliationFailures} activity reconciliation failures. Review matches below; no rows were merged.`
+          ?`Validated ${file.name} with the ${isFoodtrakPdf?'PDF':'Excel'} reader: ${counts.rows} item records, ${counts.reconstructed} reconstructed names, ${counts.blankNameRecovered} blank-name rows recovered, and ${counts.reconciliationFailures} activity reconciliation failures. Review matches below; no rows were merged.`
           :`Analyzed ${file.name}: ${counts.matched} matched rows and ${counts.unmatched} unmatched rows. Review the unmatched products below; no rows were merged.`;
         renderUsageImportReview();
       }

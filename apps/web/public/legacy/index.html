@@ -1063,6 +1063,19 @@
   <button class="modal-close" type="button" aria-label="Close usage report upload" onclick="closeModal('modal-usage-upload')">&times;</button>
   <h3 id="usage-upload-title" style="margin-bottom:10px;">Upload Usage Report</h3>
   <p id="usage-upload-description" style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Accepted Excel, CSV, or text-based PDF reports with columns like <strong>Product</strong>, <strong>Size</strong>, <strong>Actual Usage</strong>, <strong>Ideal Usage</strong>, <strong>Begin</strong>, <strong>End</strong>, <strong>Purch</strong>, <strong>Start Date</strong>, and <strong>End Date</strong>. Unmatched products are reviewed before the usage log is created.</p>
+  <fieldset class="count-report-fieldset" id="usage-upload-format-fieldset" hidden>
+    <legend>Choose the file you are uploading</legend>
+    <div class="count-report-format-options">
+      <label class="count-report-format-option">
+        <input type="radio" name="usage-upload-format" value="excel" checked onchange="setUsageUploadFormat(this.value)">
+        <span><strong>Excel</strong><small>FOOD-TRAK workbook in .xls or .xlsx format</small></span>
+      </label>
+      <label class="count-report-format-option">
+        <input type="radio" name="usage-upload-format" value="pdf" onchange="setUsageUploadFormat(this.value)">
+        <span><strong>PDF</strong><small>FOOD-TRAK print report with its own PDF layout reader</small></span>
+      </label>
+    </div>
+  </fieldset>
   <div class="upload-zone" id="usage-zone" role="button" tabindex="0" aria-label="Upload a usage report" onclick="document.getElementById('usage-file').click()" onkeydown="activateFilePicker(event,'usage-file')">
     <div class="up-icon">DATA</div>
     <p id="usage-upload-zone-copy"><strong>Click or drag & drop</strong> an Excel / CSV / PDF file</p>
@@ -1218,7 +1231,7 @@
 <script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-2"></script>
 <script src="js/data/spring-drinks-2026.js?v=spring-drinks-2026-1"></script>
 <script src="js/data/kitchen-menu-may-2026.js?v=kitchen-menu-may-2026-3"></script>
-<script src="js/state.js?v=menu-card-view-1"></script>
+<script src="js/state.js?v=foodtrak-pdf-upload-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=spring-menu-1"></script>
@@ -1227,7 +1240,7 @@
 <script src="js/products.js?v=kitchen-menu-3"></script>
 <script src="js/inventory.js?v=count-history-1"></script>
 <script src="js/orders.js"></script>
-<script src="js/usage.js?v=recount-workflow-1"></script>
+<script src="js/usage.js?v=foodtrak-pdf-upload-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>

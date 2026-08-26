@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 type Cell = string | number;
 type UsageRow = {
   productName: string;
+  unitSize: string;
   actualUsage: number;
   idealPercentSales: number;
   transferOut: number;
@@ -22,6 +23,7 @@ type UsageRow = {
 
 type UsageImporter = {
   parseFoodtrakUsageRows: (rows: Cell[][], fileName: string) => UsageRow[];
+  parseFoodtrakUsagePdfRows: (rows: Cell[][], fileName: string) => UsageRow[];
   resolveFoodtrakUsageColumns: (rows: Cell[][]) => Record<string, number>;
 };
 
@@ -33,7 +35,7 @@ function loadUsageImporter(): UsageImporter {
     normMatch: (value: unknown) => String(value ?? "").trim().toLowerCase(),
   };
   runInNewContext(
-    `${source}\n;globalThis.__usageImporter={parseFoodtrakUsageRows,resolveFoodtrakUsageColumns};`,
+    `${source}\n;globalThis.__usageImporter={parseFoodtrakUsageRows,parseFoodtrakUsagePdfRows,resolveFoodtrakUsageColumns};`,
     context,
   );
   return (context as typeof context & { __usageImporter: UsageImporter }).__usageImporter;
@@ -147,6 +149,125 @@ describe("FOOD-TRAK usage imports", () => {
       reportSubcategory: "Sauces",
       nameReconstructed: true,
       blankNameRecovered: true,
+      activityReconciles: true,
+    });
+  });
+
+  it("uses the PDF layout reader for merged cells, wrapped names, and repeated page-break rows", () => {
+    const values: Cell[] = [
+      "11.01",
+      "1.00%",
+      "10.00",
+      "0.90%",
+      "1.01",
+      "0.10%",
+      "$4.50",
+      "12.00",
+      "5.00",
+      "1.00",
+      "2.00",
+      "3.00",
+      "8.00",
+    ];
+    const carrotsValues: Cell[] = [
+      "117.00",
+      "0.65%",
+      "117.00",
+      "0.65%",
+      "0.00",
+      "0.00%",
+      "$0.00",
+      "0.00",
+      "0.00",
+      "0.00",
+      "0.00",
+      "117.00",
+      "0.00",
+    ];
+    const repeatedCarrotsRow: Cell[] = [
+      "Carrots and Green Beans",
+      "Name",
+      "recipe",
+      "Unit",
+      "Usage",
+      carrotsValues[0],
+      "% Sales",
+      carrotsValues[1],
+      "Usage",
+      carrotsValues[2],
+      "% Sales",
+      carrotsValues[3],
+      "Usage",
+      carrotsValues[4],
+      "% Sales",
+      carrotsValues[5],
+      "Est Cost",
+      carrotsValues[6],
+      "Begin",
+      carrotsValues[7],
+      "Purch",
+      carrotsValues[8],
+      "Xfr In",
+      carrotsValues[9],
+      "Xfr Out",
+      carrotsValues[10],
+      "Prod",
+      carrotsValues[11],
+      "End",
+      carrotsValues[12],
+    ];
+    const rows: Cell[][] = [
+      ["8/23/2026 11:59 PM - 8/24/2026 11:59 PM by Report Group"],
+      ["Name", "Unit", "Usage", "% Sales", "Usage", "% Sales", "Usage", "% Sales", "Est Cost", "Begin", "Purch", "Xfr In", "Xfr Out", "Prod", "End"],
+      ["Wine"],
+      ["Champagne/Sparkling"],
+      ["Jackson Triggs 'Grand", "750ml", ...values],
+      ["Reserve'", "Brut Sparkling 2026"],
+      ["Beer"],
+      ["Bottled Beer"],
+      ["Bellwoods Wizard Wolf (LCN) can", ...values],
+      ["Bench Lager", "(LCN)", "can", ...values],
+      ["Not Applicable"],
+      ["Carrots and Green Beans", "recipe", ...carrotsValues],
+      ["Plate Vegetable"],
+      ["FOOD-TRAK System Copyright 2026 All Rights Reserved"],
+      ["Item", "Actual", "Ideal", "Variance", "Activity"],
+      repeatedCarrotsRow,
+      ["Plate Vegetable"],
+    ];
+
+    const parsed = JSON.parse(
+      JSON.stringify(loadUsageImporter().parseFoodtrakUsagePdfRows(rows, "Item Usage.pdf")),
+    ) as UsageRow[];
+
+    expect(parsed).toHaveLength(4);
+    expect(parsed.map((item) => item.productName)).toEqual([
+      "Jackson Triggs 'Grand Reserve' Brut Sparkling 2026",
+      "Bellwoods Wizard Wolf (LCN)",
+      "Bench Lager (LCN)",
+      "Carrots and Green Beans Plate Vegetable",
+    ]);
+    expect(parsed[0]).toMatchObject({
+      unitSize: "750ml",
+      actualUsage: 11.01,
+      reportCategory: "Wine",
+      reportSubcategory: "Champagne/Sparkling",
+      nameReconstructed: true,
+      activityReconciles: true,
+    });
+    expect(parsed[1]).toMatchObject({
+      unitSize: "can",
+      reportCategory: "Beer",
+      reportSubcategory: "Bottled Beer",
+    });
+    expect(parsed[2]).toMatchObject({
+      unitSize: "can",
+      productName: "Bench Lager (LCN)",
+    });
+    expect(parsed[3]).toMatchObject({
+      unitSize: "recipe",
+      reportCategory: "Not Applicable",
+      nameReconstructed: true,
       activityReconciles: true,
     });
   });
