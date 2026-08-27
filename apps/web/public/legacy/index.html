@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=usage-matching-1"/>
+<link rel="stylesheet" href="css/styles.css?v=live-inventory-fields-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -236,7 +236,7 @@
 <!-- LIVE INVENTORY -->
 <div class="page" id="page-live-inventory">
   <div class="page-header">
-    <div class="page-header-text"><h2>Live Inventory</h2><p>Current stock from latest count, orders, and usage.</p></div>
+    <div class="page-header-text"><h2>Live Inventory</h2><p>Current stock from Begin + Purchased − Punched In (Ideal Usage).</p></div>
     <button class="btn btn-secondary btn-sm" onclick="renderLiveInventoryPage()"> Refresh</button>
   </div>
   <div class="stat-grid" id="live-inv-stats"></div>
@@ -251,7 +251,7 @@
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-cat-f">Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-sub-f">Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-status-f">Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
-          <div class="form-group" style="flex:1;min-width:130px;"><label for="live-inv-sort-f">Sort</label><select id="live-inv-sort-f" onchange="renderLiveInventoryPage()"><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="live-desc">Live quantity — highest</option><option value="live-asc">Live quantity — lowest</option><option value="base-desc">Count — highest</option><option value="base-asc">Count — lowest</option><option value="value-desc">Value — highest</option><option value="value-asc">Value — lowest</option></select></div>
+          <div class="form-group" style="flex:1;min-width:130px;"><label for="live-inv-sort-f">Sort</label><select id="live-inv-sort-f" onchange="renderLiveInventoryPage()"><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="live-desc">Live quantity — highest</option><option value="live-asc">Live quantity — lowest</option><option value="base-desc">Begin — highest</option><option value="base-asc">Begin — lowest</option><option value="belowPar-desc">Below par — highest</option><option value="belowPar-asc">Below par — lowest</option><option value="value-desc">Value — highest</option><option value="value-asc">Value — lowest</option></select></div>
           <div class="form-group live-room-group"><label>Rooms</label><div class="drop-wrap live-room-picker"><button class="btn btn-secondary live-room-picker-button" id="live-room-picker-button" type="button" onclick="toggleMenu('live-room-menu')"><span id="live-room-picker-label">All rooms</span><span aria-hidden="true">▾</span></button><div class="drop-menu live-room-menu" id="live-room-menu" onclick="event.stopPropagation()"><div class="live-room-menu-head"><strong>Select rooms</strong><button type="button" onclick="selectAllLiveInventoryRooms()">All rooms</button></div><div id="live-room-options"></div><button class="live-room-done" type="button" onclick="closeAllMenus()">Done</button></div></div></div>
         </div>
         <button class="btn btn-primary live-inv-filter-done mobile-only" type="button" onclick="closeLiveInventoryFilterSheet()">Done</button>
@@ -260,7 +260,7 @@
         <button type="button" title="List view" onclick="setLiveInventoryViewMode('list')">List</button>
         <button type="button" title="Icon view" onclick="setLiveInventoryViewMode('icons')">▦</button>
         <button type="button" title="Box view" onclick="setLiveInventoryViewMode('boxes')">▥</button>
-        <button type="button" title="Variance view" onclick="setLiveInventoryViewMode('variances')">Variances</button>
+        <button type="button" title="Detailed movement view" onclick="setLiveInventoryViewMode('variances')">Details</button>
       </div></div>
     </div>
   </div>
@@ -1290,7 +1290,7 @@
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=kitchen-menu-3"></script>
-<script src="js/inventory.js?v=count-workflow-1"></script>
+<script src="js/inventory.js?v=live-inventory-fields-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=usage-matching-1"></script>
 <script src="js/suppliers.js"></script>

@@ -633,14 +633,29 @@ function liveInventoryRows(){
     const usageQty=used[product.id]||0;
     const live=base+orderQty-usageQty;
     const par=parseFloat(product.par)||0;
+    const belowPar=par>0?Math.max(par-live,0):0;
     const value=live*(parseFloat(product.cost)||0);
-    return{product,name:product.name,category:product.category,subcategory:product.subcategory||'',unit:product.unit||'',base,ordered:orderQty,used:usageQty,live,par,value,baselineDate,roomName:roomLabel};
+    return{product,name:product.name,category:product.category,subcategory:product.subcategory||'',unit:product.unit||'',base,ordered:orderQty,used:usageQty,live,par,belowPar,value,baselineDate,roomName:roomLabel};
   });
 }
 
 function liveQty(value){
   const number=parseFloat(value)||0;
   return Number.isInteger(number)?String(number):number.toFixed(2);
+}
+
+function liveBelowParQty(row){
+  const par=parseFloat(row?.par)||0;
+  const live=parseFloat(row?.live)||0;
+  return par>0?Math.max(par-live,0):0;
+}
+
+function liveParDisplay(row){
+  return row.par>0?liveQty(row.par):'—';
+}
+
+function liveBelowParDisplay(row){
+  return row.par>0?liveQty(row.belowPar??liveBelowParQty(row)):'—';
 }
 
 function liveStatusText(row){
@@ -666,7 +681,7 @@ function setLiveInventoryViewMode(mode){
   renderLiveInventoryPage();
 }
 
-let liveVarianceSort={col:'variance',dir:'asc'};
+let liveVarianceSort={col:'belowPar',dir:'desc'};
 function sortLiveVariances(col){
   liveVarianceSort.dir=liveVarianceSort.col===col&&liveVarianceSort.dir==='asc'?'desc':'asc';
   liveVarianceSort.col=col;
@@ -677,9 +692,8 @@ function liveVarianceHeader(label,col){
   return`<th class="sortable ${active?`sort-${liveVarianceSort.dir}`:''}" aria-sort="${active?(liveVarianceSort.dir==='asc'?'ascending':'descending'):'none'}"><button class="table-sort-button" type="button" onclick="sortLiveVariances('${col}')">${label}</button></th>`;
 }
 function liveInventoryVariances(rows){
-  const varianceRows=rows.map(row=>({...row,variance:row.live-row.par}));
-  const sorted=sortArr(varianceRows,liveVarianceSort.col,liveVarianceSort.dir);
-  return`<div class="table-wrap"><table><thead><tr>${liveVarianceHeader('Product','name')}${liveVarianceHeader('Count','base')}${liveVarianceHeader('Orders','ordered')}${liveVarianceHeader('Usage','used')}${liveVarianceHeader('Live','live')}${liveVarianceHeader('Par','par')}${liveVarianceHeader('Variance','variance')}</tr></thead><tbody>${sorted.map(row=>`<tr onclick="openLiveInventoryDetail('${row.product.id}')"><td><strong>${escapeHtml(row.name)}</strong></td><td>${liveQty(row.base)}</td><td>${liveQty(row.ordered)}</td><td>${liveQty(row.used)}</td><td>${liveQty(row.live)}</td><td>${liveQty(row.par)}</td><td class="${typeof varianceClass==='function'?varianceClass(row.variance):''}">${row.variance>0?'+':''}${liveQty(row.variance)}</td></tr>`).join('')}</tbody></table></div>`;
+  const sorted=sortArr(rows,liveVarianceSort.col,liveVarianceSort.dir);
+  return`<div class="table-wrap"><table><thead><tr>${liveVarianceHeader('Product','name')}${liveVarianceHeader('Begin','base')}${liveVarianceHeader('Purchased','ordered')}${liveVarianceHeader('Punched In','used')}${liveVarianceHeader('Live','live')}${liveVarianceHeader('Par Level','par')}${liveVarianceHeader('Below Par','belowPar')}</tr></thead><tbody>${sorted.map(row=>`<tr onclick="openLiveInventoryDetail('${row.product.id}')"><td><strong>${escapeHtml(row.name)}</strong></td><td>${liveQty(row.base)}</td><td class="live-plus">${liveQty(row.ordered)}</td><td class="live-minus">${liveQty(row.used)}</td><td><strong>${liveQty(row.live)}</strong></td><td>${liveParDisplay(row)}</td><td class="${row.belowPar>0?'live-minus':''}">${liveBelowParDisplay(row)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 let liveInventoryFilterHome=null;
@@ -743,13 +757,25 @@ function liveInventoryEmpty(message){
   return`<div class="empty-cell" style="padding:28px;text-align:center;color:var(--text-muted);">${message}</div>`;
 }
 
+function liveInventoryMetric(label,value,className=''){
+  return`<span class="live-item-metric ${className}"><span>${label}</span><strong>${value}</strong></span>`;
+}
+
+function liveInventoryMetrics(row,includeLive=true){
+  return`${liveInventoryMetric('Begin',liveQty(row.base))}
+    ${liveInventoryMetric('Purchased',liveQty(row.ordered),'purchased')}
+    ${liveInventoryMetric('Punched In',liveQty(row.used),'punched-in')}
+    ${includeLive?liveInventoryMetric('Live',liveQty(row.live),'live'):''}
+    ${liveInventoryMetric('Par Level',liveParDisplay(row))}
+    ${liveInventoryMetric('Below Par',liveBelowParDisplay(row),row.belowPar>0?'below-par':'')}`;
+}
+
 function liveInventoryList(rows){
   return`<div class="live-inv-list">${rows.map(row=>`
     <button type="button" class="live-inv-list-row" onclick="openLiveInventoryDetail('${row.product.id}')">
       <span class="live-item-status ${liveStatusClass(row)}"><span class="live-status-dot ${liveStatusClass(row)}"></span>${liveStatusText(row)}</span>
       <span class="live-item-name">${escapeHtml(row.name)}</span>
-      <span class="live-item-count"><span>Count</span>${liveQty(row.base)}</span>
-      <span class="live-item-qty"><span>Live</span>${liveQty(row.live)}</span>
+      <span class="live-inv-metrics">${liveInventoryMetrics(row)}</span>
     </button>
   `).join('')}</div>`;
 }
@@ -760,8 +786,8 @@ function liveInventoryIcons(rows){
       <span class="live-item-status ${liveStatusClass(row)}"><span class="live-status-dot ${liveStatusClass(row)}"></span>${liveStatusText(row)}</span>
       <span class="live-inv-glyph">${escapeHtml((row.name||'?').slice(0,1).toUpperCase())}</span>
       <span class="live-item-name">${escapeHtml(row.name)}</span>
-      <span class="live-item-qty">${liveQty(row.live)}</span>
-      <span class="live-item-count">Count ${liveQty(row.base)}</span>
+      <span class="live-item-qty"><span>Live</span>${liveQty(row.live)}</span>
+      <span class="live-inv-card-metrics">${liveInventoryMetrics(row,false)}</span>
     </button>
   `).join('')}</div>`;
 }
@@ -770,9 +796,8 @@ function liveInventoryBoxes(rows){
   return`<div class="live-inv-grid boxes">${rows.map(row=>`
     <button type="button" class="live-inv-box ${liveStatusClass(row)}" onclick="openLiveInventoryDetail('${row.product.id}')">
       <span class="live-item-status ${liveStatusClass(row)}"><span class="live-status-dot ${liveStatusClass(row)}"></span>${liveStatusText(row)}</span>
-      <span class="live-item-name">${escapeHtml(row.name)}</span>
-      <span class="live-item-qty">${liveQty(row.live)}</span>
-      <span class="live-item-count">Count ${liveQty(row.base)}</span>
+      <span class="live-inv-card-head"><span class="live-item-name">${escapeHtml(row.name)}</span><span class="live-item-qty"><span>Live</span>${liveQty(row.live)}</span></span>
+      <span class="live-inv-card-metrics">${liveInventoryMetrics(row,false)}</span>
     </button>
   `).join('')}</div>`;
 }
@@ -817,7 +842,7 @@ function renderLiveInventoryPage(){
   const stats=document.getElementById('live-inv-stats');
   if(stats)stats.innerHTML=`
     <div class="stat-card"><div class="label">Rooms</div><div class="value" style="font-size:1rem;">${escapeHtml(roomLabel)}</div><div class="sub">${allRooms?'Merged inventory':`Combined count from ${selectedRooms.length} selected room${selectedRooms.length===1?'':'s'}`}</div></div>
-    <div class="stat-card"><div class="label">Baseline Count</div><div class="value" style="font-size:1rem;">${baseline?fmtDate(baseline.date):'—'}</div><div class="sub">${baseline?.label||'No count filed'}</div></div>
+    <div class="stat-card"><div class="label">Begin Source</div><div class="value" style="font-size:1rem;">${baseline?fmtDate(baseline.date):'—'}</div><div class="sub">${baseline?.label||'No count filed'}</div></div>
     <div class="stat-card"><div class="label">Visible Value</div><div class="value">${fmt(totalValue)}</div></div>
     <div class="stat-card"><div class="label">Low / At Par</div><div class="value" style="color:${lowCount?'var(--danger)':'var(--success)'}">${lowCount}</div></div>
     <div class="stat-card"><div class="label">Negative</div><div class="value" style="color:${negativeCount?'var(--danger)':'var(--success)'}">${negativeCount}</div></div>
@@ -848,10 +873,11 @@ function openLiveInventoryDetail(productId){
     </div>
     <div class="product-detail-grid">
       <div class="product-detail-field"><div class="label">Live Quantity</div><div class="value">${liveQty(row.live)}</div></div>
-      <div class="product-detail-field"><div class="label">Latest Count</div><div class="value">${liveQty(row.base)}</div></div>
-      <div class="product-detail-field"><div class="label">Orders In</div><div class="value">${row.ordered?`+${liveQty(row.ordered)}`:'—'}</div></div>
-      <div class="product-detail-field"><div class="label">Usage Out</div><div class="value">${row.used?`-${liveQty(row.used)}`:'—'}</div></div>
-      <div class="product-detail-field"><div class="label">Par</div><div class="value">${row.par||'—'}</div></div>
+      <div class="product-detail-field"><div class="label">Begin</div><div class="value">${liveQty(row.base)}</div></div>
+      <div class="product-detail-field"><div class="label">Purchased</div><div class="value live-plus">${row.ordered?`+${liveQty(row.ordered)}`:'0'}</div></div>
+      <div class="product-detail-field"><div class="label">Punched In (Ideal Usage)</div><div class="value live-minus">${row.used?`-${liveQty(row.used)}`:'0'}</div></div>
+      <div class="product-detail-field"><div class="label">Par Level</div><div class="value">${liveParDisplay(row)}</div></div>
+      <div class="product-detail-field"><div class="label">Below Par</div><div class="value ${row.belowPar>0?'live-minus':''}">${liveBelowParDisplay(row)}</div></div>
       <div class="product-detail-field"><div class="label">Value</div><div class="value">${fmt(row.value)}</div></div>
     </div>
     <div class="product-view-section"><div class="label">Baseline</div><p>${baseline?`${fmtDate(baseline.date)}${baseline.label?' · '+escapeHtml(baseline.label):''}`:'No count filed yet.'}</p></div>

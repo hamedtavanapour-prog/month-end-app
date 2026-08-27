@@ -16,6 +16,11 @@ type UsageLog = {
   rows: UsageRow[];
 };
 
+type LiveRow = {
+  live: number | string;
+  par: number | string;
+};
+
 function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
   const source = readFileSync(new URL("../../public/legacy/js/inventory.js", import.meta.url), "utf8");
   const context = {
@@ -38,7 +43,7 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
     },
   };
   runInNewContext(
-    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct};`,
+    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct,liveBelowParQty};`,
     context,
   );
   return (
@@ -46,6 +51,7 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
       __liveUsage: {
         liveUsageDeductionQty: (row: UsageRow) => number;
         liveUsageQtyByProduct: (baselineDate?: string) => Record<string, number>;
+        liveBelowParQty: (row: LiveRow) => number;
       };
     }
   ).__liveUsage;
@@ -75,5 +81,14 @@ describe("live inventory deductions from usage reports", () => {
     expect(calculator.liveUsageDeductionQty(currentRows[0])).toBe(6);
     expect(currentRows[0].actualUsage).toBe(10);
     expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ p1: 8, p2: 0 });
+  });
+
+  it("shows only the amount that live inventory is below its par level", () => {
+    const calculator = loadLiveUsageCalculator([]);
+
+    expect(calculator.liveBelowParQty({ live: 6, par: 10 })).toBe(4);
+    expect(calculator.liveBelowParQty({ live: 12, par: 10 })).toBe(0);
+    expect(calculator.liveBelowParQty({ live: -2, par: 10 })).toBe(12);
+    expect(calculator.liveBelowParQty({ live: 3, par: 0 })).toBe(0);
   });
 });
