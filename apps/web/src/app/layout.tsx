@@ -18,6 +18,13 @@ export const metadata: Metadata = {
     template: "%s · Month End",
   },
   description: "Secure inventory operations for hospitality teams.",
+  applicationName: "Month End",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Month End",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({

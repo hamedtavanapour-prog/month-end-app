@@ -1,6 +1,6 @@
 // store.js — local persistence (localStorage) and cloud-sync trigger.
 
-const CURRENT_WORKSPACE_SCHEMA_VERSION=5;
+const CURRENT_WORKSPACE_SCHEMA_VERSION=6;
 
 function compactUsageRow(row){
   return{
@@ -102,6 +102,7 @@ function compactStateForStorage(){
     workspaceSchemaVersion:CURRENT_WORKSPACE_SCHEMA_VERSION,
     products:state.products||[],
     productCatalogVersion:state.productCatalogVersion||null,
+    productParLevelVersion:state.productParLevelVersion||null,
     drinks:state.drinks||[],
     menus:state.menus||[],
     menuLibraryVersion:state.menuLibraryVersion||0,
@@ -201,6 +202,32 @@ function ensureProductCatalog(){
     added++;
   });
   return added>0;
+}
+
+function normalizeParLevelProductName(value){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+function ensureProductParLevels(){
+  if(typeof PRODUCT_PAR_LEVEL_VERSION==='undefined'||typeof PRODUCT_PAR_LEVELS==='undefined'||state.productParLevelVersion===PRODUCT_PAR_LEVEL_VERSION)return false;
+  const seedByName=new Map((typeof SEED_PRODUCTS==='undefined'?[]:SEED_PRODUCTS).map(product=>[product.name,product]));
+  Object.entries(PRODUCT_PAR_LEVELS).forEach(([name,par])=>{
+    const normalizedName=normalizeParLevelProductName(name);
+    let product=state.products.find(item=>normalizeParLevelProductName(item.name)===normalizedName);
+    if(!product){
+      const seed=seedByName.get(name);
+      const inventoryName=normalizeParLevelProductName(seed?.inventoryName);
+      const candidates=inventoryName?state.products.filter(item=>normalizeParLevelProductName(item.inventoryName)===inventoryName):[];
+      if(candidates.length===1)product=candidates[0];
+    }
+    if(!product)return;
+    const nextPar=Number(par);
+    if(Number(product.par)!==nextPar)product.par=nextPar;
+    normalizeProductUnits(product);
+    if(product.units[0]&&Number(product.units[0].par)!==nextPar)product.units[0].par=nextPar;
+  });
+  state.productParLevelVersion=PRODUCT_PAR_LEVEL_VERSION;
+  return true;
 }
 
 function supplierSeedProductIds(seedSupplier){
@@ -324,6 +351,7 @@ function normalizeLoadedState(){
     if(!Array.isArray(s.products))s.products=[];
   });
   const productsChanged=ensureProductCatalog();
+  const productParLevelsChanged=ensureProductParLevels();
   const inventoryCategoriesChanged=typeof normalizeInventoryCategories==='function'?normalizeInventoryCategories():false;
   let inventoriesChanged=false;
   state.inventories.forEach(inv=>{
@@ -346,7 +374,7 @@ function normalizeLoadedState(){
   const prepItemsChanged=typeof ensurePrepItems==='function'?ensurePrepItems():false;
   syncAllSupplierProductLinks();
   state.workspaceSchemaVersion=CURRENT_WORKSPACE_SCHEMA_VERSION;
-  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||prepItemsChanged||productsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
+  return departmentsChanged||productSchemaChanged||productMenusChanged||menusChanged||prepItemsChanged||productsChanged||productParLevelsChanged||inventoryCategoriesChanged||suppliersChanged||drinksChanged||inventoriesChanged||roomsChanged||profilesChanged||departmentAssignmentsChanged;
 }
 
 function load(){
@@ -361,6 +389,7 @@ function load(){
   }else{
     if(typeof ensureDepartments==='function')ensureDepartments();
     ensureProductCatalog();
+    ensureProductParLevels();
     ensureSupplierCatalog();
     ensureDrinkCatalog();
     if(typeof ensureMenuLibrary==='function')ensureMenuLibrary();
