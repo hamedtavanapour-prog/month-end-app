@@ -3,7 +3,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-function loadInventoryHelpers() {
+function loadInventoryHelpers(inventories: Array<Record<string, unknown>> = []) {
   const source = readFileSync(new URL("../../public/legacy/js/inventory.js", import.meta.url), "utf8");
   const products = [
     { id: "listed", name: "Listed Bottle", category: "Spirits", subcategory: "Vodka", unit: "bottle", archived: false },
@@ -13,7 +13,7 @@ function loadInventoryHelpers() {
     state: {
       products,
       rooms: [{ id: "floor-room", name: "Main Bar", archived: false, departmentId: "bar", categoryNames: ["Spirits"], manualProductIds: [] }],
-      inventories: [],
+      inventories,
       usageLogs: [],
     },
     currentInvEdit: null,
@@ -29,11 +29,12 @@ function loadInventoryHelpers() {
     liveQty: (value: unknown) => String(value),
     uid: () => "generated",
   };
-  runInNewContext(`${source}\n;globalThis.__helpers={countProductDisplayGroup,inventoryUncountedEntries,countReportRoomDetailText};`, context);
+  runInNewContext(`${source}\n;globalThis.__helpers={countProductDisplayGroup,inventoryUncountedEntries,countReportRoomDetailText,countReportRoomMatrixRows};`, context);
   return (context as typeof context & { __helpers: {
     countProductDisplayGroup: (product: typeof products[number], room: { extraProductIds: string[] }) => { category: string; subcategory: string };
     inventoryUncountedEntries: (inventory: Record<string, unknown>) => Array<{ productId: string; roomId: string }>;
     countReportRoomDetailText: (inventory: Record<string, unknown>, product: typeof products[number]) => string;
+    countReportRoomMatrixRows: (inventory: Record<string, unknown>, order?: string) => { rows: unknown[][] };
   } }).__helpers;
 }
 
@@ -66,7 +67,41 @@ describe("count workflow helpers", () => {
     ] };
     expect(helpers.countReportRoomDetailText(inventory, {
       id: "listed", name: "Listed Bottle", category: "Spirits", subcategory: "Vodka", unit: "bottle", archived: false,
-    })).toBe("Room details: Main Bar: 2 bottle · Storage: 0 bottle");
+    })).toBe("Room counts: Main Bar: 2 bottle · Storage: 0 bottle · Patio: Not counted");
+  });
+
+  it("puts every product total and every room quantity on one report sheet", () => {
+    const helpers = loadInventoryHelpers();
+    const inventory = { items: { listed: 2, extra: 3 }, rooms: [
+      { id: "main", name: "Main Bar", items: { listed: 2, extra: 1 } },
+      { id: "storage", name: "Storage", items: { listed: 0, extra: 2 } },
+      { id: "patio", name: "Patio", items: {} },
+    ] };
+
+    expect(helpers.countReportRoomMatrixRows(inventory, "alpha").rows.slice(0,3)).toEqual([
+      ["Product", "Total", "Main Bar", "Storage", "Patio", "Unit", "Category", "Subcategory", "Unit Cost", "Value"],
+      ["Extra Bottle", 3, 1, 2, "", "bottle", "Beer", "Lager", 0, 0],
+      ["Listed Bottle", 2, 2, 0, "", "bottle", "Spirits", "Vodka", 0, 0],
+    ]);
+  });
+
+  it("uses re-count room quantities while retaining rooms from the original count", () => {
+    const source = {
+      id: "source-count",
+      items: { listed: 2 },
+      rooms: [{ id: "source-room", roomId: "floor-room", name: "Main Bar", items: { listed: 2 } }],
+    };
+    const helpers = loadInventoryHelpers([source]);
+    const recount = {
+      id: "recount",
+      recordType: "recount",
+      parentCountId: "source-count",
+      rooms: [{ id: "recount-room", roomId: "floor-room", name: "Main Bar", items: { listed: 5 } }],
+    };
+
+    expect(helpers.countReportRoomDetailText(recount, {
+      id: "listed", name: "Listed Bottle", category: "Spirits", subcategory: "Vodka", unit: "bottle", archived: false,
+    })).toBe("Room counts: Main Bar: 5 bottle");
   });
 });
 

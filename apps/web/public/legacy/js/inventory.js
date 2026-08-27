@@ -2081,12 +2081,40 @@ function sortCountReportEntries(entries,order='category'){
   }
   return[...entries].sort(categoryCompare);
 }
+function countReportRoomKey(room,index=0){
+  return String(room?.roomId||room?.id||room?.name||`room-${index}`);
+}
+function countReportRooms(inv){
+  if(!inv)return[];
+  const source=inv.recordType==='recount'?recountSourceInventory(inv):null;
+  if(source&&source!==inv)normalizeInventoryRooms(source);
+  const rooms=new Map();
+  (source?.rooms||[]).forEach((room,index)=>{
+    const key=countReportRoomKey(room,index);
+    rooms.set(key,{key,name:room.name||`Room ${index+1}`,sourceRoom:room,currentRoom:null});
+  });
+  (inv.rooms||[]).forEach((room,index)=>{
+    const key=countReportRoomKey(room,index);
+    const existing=rooms.get(key);
+    rooms.set(key,{key,name:room.name||existing?.name||`Room ${index+1}`,sourceRoom:existing?.sourceRoom||null,currentRoom:room});
+  });
+  return[...rooms.values()];
+}
+function countReportRoomBreakdown(inv,product){
+  if(!inv||!product)return[];
+  return countReportRooms(inv).map(room=>{
+    const currentItems=room.currentRoom?.items||{};
+    const sourceItems=room.sourceRoom?.items||{};
+    if(Object.prototype.hasOwnProperty.call(currentItems,product.id))return{...room,counted:true,qty:parseFloat(currentItems[product.id])||0};
+    if(Object.prototype.hasOwnProperty.call(sourceItems,product.id))return{...room,counted:true,qty:parseFloat(sourceItems[product.id])||0};
+    return{...room,counted:false,qty:null};
+  });
+}
 function countReportRoomDetailText(inv,product){
-  if(!inv||!product)return'';
-  const rooms=(inv.rooms||[]).flatMap(room=>Object.prototype.hasOwnProperty.call(room.items||{},product.id)
-    ?[`${room.name}: ${liveQty(room.items[product.id])} ${product.unit||'unit'}`]
-    :[]);
-  return rooms.length?`Room details: ${rooms.join(' · ')}`:'';
+  const rooms=countReportRoomBreakdown(inv,product);
+  if(!rooms.length)return'';
+  const unit=product.unit||'unit';
+  return`Room counts: ${rooms.map(room=>`${room.name}: ${room.counted?`${liveQty(room.qty)} ${unit}`:'Not counted'}`).join(' · ')}`;
 }
 function countReportRows(items,order,inv=null,includeRoomDetails=false){
   const entries=sortCountReportEntries(countReportEntries(items),order);
@@ -2120,6 +2148,26 @@ function recountComparisonReport(inv,order='category',includeRoomDetails=false){
   return{entries,rows,total};
 }
 function inventoryExportReport(inv,order,includeRoomDetails=false){return inv.recordType==='recount'?recountComparisonReport(inv,order,includeRoomDetails):countReportRows(inv.items,order,inv,includeRoomDetails);}
+function countReportRoomMatrixRows(inv,order='category'){
+  const report=inventoryExportReport(inv,order);
+  const rooms=countReportRooms(inv);
+  const rows=[['Product','Total',...rooms.map(room=>room.name),'Unit','Category','Subcategory','Unit Cost','Value']];
+  report.entries.forEach(entry=>{
+    const roomCounts=countReportRoomBreakdown(inv,entry.product);
+    rows.push([
+      entry.product.name,
+      entry.qty,
+      ...roomCounts.map(room=>room.counted?room.qty:''),
+      entry.product.unit||'',
+      entry.product.category||'',
+      entry.product.subcategory||'',
+      entry.product.cost||0,
+      +entry.value.toFixed(2)
+    ]);
+  });
+  rows.push([...Array(rooms.length+5).fill(''),'TOTAL VALUE',+report.total.toFixed(2)]);
+  return{rooms,entries:report.entries,rows,total:report.total};
+}
 function openCountReportExport(id=viewInvId){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);
@@ -2162,11 +2210,11 @@ function updateCountReportExportPreview(){
   const source=document.getElementById('count-report-order-source');
   const button=document.getElementById('count-report-export-button');
   const printButton=document.getElementById('count-report-print-button');
-  if(previewTitle)previewTitle.textContent=`${report.entries.length} items · ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category}`;
+  if(previewTitle)previewTitle.textContent=`${report.entries.length} items${includeRoomDetails?` · ${countReportRooms(inv).length} rooms`:''} · ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category}`;
   if(previewItems)previewItems.textContent=names.length?`${names.join(' → ')}${remaining?` → ${remaining} more`:''}`:'This count has no reportable items.';
   if(source){
     const template=state.inventoryEntryTemplate;
-    const roomDetailNote=includeRoomDetails?(format==='xlsx'?' Room quantities will appear beneath each merged item.':' Room quantities will appear in small text beneath each item.'):'';
+    const roomDetailNote=includeRoomDetails?(format==='xlsx'?' The first sheet will show every product total beside every room count.':' Every room count will appear in small text beneath each item.'):'';
     source.textContent=(order==='usage'
       ?`Order source: ${template?.sourceFile||'Inventory Entry Form'}`
       :format==='xlsx'
@@ -2198,8 +2246,9 @@ function exportInventoryExcel(id,order='category',includeRoomDetails=false){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
-  const merged=inventoryExportReport(inv,order,includeRoomDetails);
-  const sheets=[{name:(`Merged ${inv.date}`).slice(0,31),rows:merged.rows}];
+  const merged=inventoryExportReport(inv,order);
+  const sheets=includeRoomDetails?[{name:'All Room Counts',rows:countReportRoomMatrixRows(inv,order).rows}]:[];
+  sheets.push({name:(`Merged ${inv.date}`).slice(0,31),rows:merged.rows});
   inv.rooms.forEach(room=>{
     const roomReport=countReportRows(room.items||{},order);
     sheets.push({name:room.name.slice(0,31)||'Room',rows:roomReport.rows});
@@ -2245,7 +2294,7 @@ function buildInventoryCountPdf(id,order='category',includeRoomDetails=false){
       liveQty(entry.qty),countReportPdfText(product.unit),product.par||'-',product.cost>0?fmt(product.cost):'-',fmt(entry.value)
     ]);
     const roomDetail=includeRoomDetails?countReportRoomDetailText(inv,product):'';
-    if(roomDetail)body.push([{content:countReportPdfText(roomDetail),colSpan:isRecount?9:8,styles:{fontSize:5.8,fontStyle:'italic',textColor:[92,103,114],fillColor:[250,251,252],cellPadding:{top:2,right:4,bottom:3,left:10}}}]);
+    if(roomDetail)body.push([{content:countReportPdfText(roomDetail),colSpan:isRecount?9:8,styles:{fontSize:5.8,fontStyle:'italic',overflow:'linebreak',textColor:[92,103,114],fillColor:[250,251,252],cellPadding:{top:2,right:4,bottom:3,left:10}}}]);
   });
   const pageWidth=doc.internal.pageSize.getWidth();
   const pageHeight=doc.internal.pageSize.getHeight();

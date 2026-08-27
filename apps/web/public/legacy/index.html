@@ -973,7 +973,7 @@
     <div class="count-report-format-options">
       <label class="count-report-format-option">
         <input type="radio" name="count-report-format" value="xlsx" checked onchange="updateCountReportExportPreview()">
-        <span><strong>Excel</strong><small>Workbook with a merged-total sheet and one sheet per room</small></span>
+        <span><strong>Excel</strong><small>Workbook with merged totals and one sheet per room</small></span>
       </label>
       <label class="count-report-format-option">
         <input type="radio" name="count-report-format" value="pdf" onchange="updateCountReportExportPreview()">
@@ -998,7 +998,7 @@
 
   <label class="count-report-detail-option">
     <input type="checkbox" id="count-report-room-details" onchange="updateCountReportExportPreview()">
-    <span><strong>Include room breakdown</strong><small>Show each room’s quantity in small text beneath every item</small></span>
+    <span><strong>Include all room counts</strong><small>Put every product total and every room quantity together in one report</small></span>
   </label>
 
   <div class="count-report-preview" aria-live="polite">
@@ -1290,7 +1290,7 @@
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=kitchen-menu-3"></script>
-<script src="js/inventory.js?v=live-inventory-fields-1"></script>
+<script src="js/inventory.js?v=count-room-report-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=usage-matching-1"></script>
 <script src="js/suppliers.js"></script>
