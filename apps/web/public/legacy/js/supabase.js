@@ -175,11 +175,14 @@ async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
   }
 }
 
-async function cloudFinaliseCount(countId){
+async function cloudFinaliseCount(countId,zeroItemsByRoom=[]){
   try{
     if(localOnlyMode){
       const inv=(state.inventories||[]).find(item=>item.id===countId);
       if(!inv||!Object.keys(inv.items||{}).length)return null;
+      const zeroByRoom=new Map(zeroItemsByRoom.map(entry=>[entry.roomId,new Set(entry.productIds||[])]));
+      (inv.rooms||[]).forEach(room=>{const productIds=zeroByRoom.get(room.id);if(!productIds)return;room.items={...(room.items||{})};productIds.forEach(productId=>{if(!Object.prototype.hasOwnProperty.call(room.items,productId))room.items[productId]=0;});});
+      inv.items=typeof mergeInventoryRoomItems==='function'?mergeInventoryRoomItems(inv.rooms):inv.items;
       inv.draft=false;inv.status='finalised';inv.finalised=true;inv.finalisedAt=new Date().toISOString();inv.updatedAt=inv.finalisedAt;
       if(typeof inventoryHistoryEvent==='function')inv.history=[...(Array.isArray(inv.history)?inv.history:[]),inventoryHistoryEvent('finalised')];
       if(!persistLocalOnlyState())return null;
@@ -188,7 +191,7 @@ async function cloudFinaliseCount(countId){
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
-      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countFinalise:{countId}})
+      method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countFinalise:{countId,zeroItemsByRoom}})
     });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);

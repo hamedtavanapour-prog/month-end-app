@@ -4,6 +4,8 @@ let state={workspaceSchemaVersion:0,products:[],productCatalogVersion:null,produ
 let editingProductId=null,editingOrderId=null,editingSupId=null;
 let currentInvEdit=null,viewInvId=null,viewInvTab='all',viewInvExpandedProductId=null,viewInvEditingProductId=null;
 let countReportInventoryId=null;
+let pendingCountFinalisationId=null;
+let pendingCountUncountedEntries=[];
 let mobileExpandedInventoryId=null;
 let expandedRecountFamilies=new Set();
 let showArchivedInventories=false;

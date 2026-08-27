@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createCountDraftInWorkspace,
   deleteCountFromWorkspace,
+  finaliseCountInWorkspace,
   saveCountRoomInWorkspace,
   setCountArchivedInWorkspace,
 } from "./count-state";
@@ -72,6 +73,31 @@ describe("count change history", () => {
     const count = (restored.inventories as Array<Record<string, unknown>>)[0];
     expect(count.archived).toBe(false);
     expect((count.history as Array<{ action: string }>).map((event) => event.action)).toEqual(["archived", "restored"]);
+  });
+
+  it("sets only still-missing requested room items to zero while finalising", () => {
+    const workspace = workspaceWithCount();
+    const result = finaliseCountInWorkspace(workspace, "count-1", actor, [{
+      roomId: "room-entry-1",
+      productIds: ["product-1", "product-2", "unknown-product"],
+    }]);
+    const count = (result.inventories as Array<Record<string, unknown>>)[0];
+    const room = (count.rooms as Array<Record<string, unknown>>)[0];
+    expect(room.items).toEqual({ "product-1": 2, "product-2": 0 });
+    expect(count.items).toEqual({ "product-1": 2, "product-2": 0 });
+    expect(count.status).toBe("finalised");
+    expect(count.history).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "finalised", details: expect.objectContaining({ zeroedItems: 1 }) }),
+    ]));
+  });
+
+  it("preserves items when finalising a legacy count without room records", () => {
+    const workspace = workspaceWithCount();
+    delete (workspace.inventories[0] as Record<string, Json | undefined>).rooms;
+    const result = finaliseCountInWorkspace(workspace, "count-1", actor);
+    const count = (result.inventories as Array<Record<string, unknown>>)[0];
+    expect(count.items).toEqual({ "product-1": 2 });
+    expect(count.status).toBe("finalised");
   });
 });
 

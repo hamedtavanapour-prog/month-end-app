@@ -9,6 +9,11 @@ type CountMutationActor = {
   userId?: Json;
 };
 
+type CountZeroRoom = {
+  roomId: string;
+  productIds: string[];
+};
+
 export function isCountJsonObject(value: Json | undefined): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -142,16 +147,47 @@ export function saveCountRoomInWorkspace(
   return { ...workspace, inventories: nextInventories };
 }
 
-export function finaliseCountInWorkspace(data: Json, countId: string, actor: CountMutationActor): JsonObject {
+export function finaliseCountInWorkspace(
+  data: Json,
+  countId: string,
+  actor: CountMutationActor,
+  zeroItemsByRoom: CountZeroRoom[] = [],
+): JsonObject {
   const workspace = isCountJsonObject(data) ? data : {};
   const inventories = Array.isArray(workspace.inventories) ? workspace.inventories : [];
+  const activeProductIds = new Set(
+    (Array.isArray(workspace.products) ? workspace.products : [])
+      .filter((product) => isCountJsonObject(product) && product.archived !== true && typeof product.id === "string")
+      .map((product) => String((product as JsonObject).id)),
+  );
+  const zeroIdsByRoom = new Map(zeroItemsByRoom.map((entry) => [
+    entry.roomId,
+    [...new Set(entry.productIds)].filter((productId) => activeProductIds.has(productId)),
+  ]));
   let foundCount = false;
   const finalisedAt = new Date().toISOString();
   const nextInventories = inventories.map((candidate) => {
     if (!isCountJsonObject(candidate) || candidate.id !== countId) return candidate;
     foundCount = true;
+    if (candidate.status === "finalised" || candidate.finalised === true) throw new Error("count_finalised");
+    let zeroedItems = 0;
+    const hasRooms = Array.isArray(candidate.rooms) && candidate.rooms.length > 0;
+    const rooms = (hasRooms ? candidate.rooms as Json[] : []).map((room) => {
+      if (!isCountJsonObject(room) || typeof room.id !== "string") return room;
+      const zeroIds = zeroIdsByRoom.get(room.id) ?? [];
+      if (!zeroIds.length) return room;
+      const items = isCountJsonObject(room.items) ? { ...room.items } : {};
+      zeroIds.forEach((productId) => {
+        if (Object.prototype.hasOwnProperty.call(items, productId)) return;
+        items[productId] = 0;
+        zeroedItems += 1;
+      });
+      return { ...room, items };
+    });
     return appendCountHistory({
       ...candidate,
+      rooms,
+      items: hasRooms ? mergedRoomItems(rooms) : candidate.items,
       draft: false,
       status: "finalised",
       finalised: true,
@@ -159,7 +195,7 @@ export function finaliseCountInWorkspace(data: Json, countId: string, actor: Cou
       finalisedAt,
       updatedBy: safeActor(actor),
       updatedAt: finalisedAt,
-    }, historyEntry("finalised", actor));
+    }, historyEntry("finalised", actor, { zeroedItems }));
   });
   if (!foundCount) throw new Error("count_not_found");
   return { ...workspace, inventories: nextInventories };

@@ -338,8 +338,21 @@ export async function PATCH(request: Request) {
   } else if (countFinalise) {
     const countId = typeof countFinalise.countId === "string" ? countFinalise.countId.trim() : "";
     if (!countId || countId.length > 100) return jsonResponse({ error: "A valid count is required" }, 400);
+    const zeroItemsByRoom = Array.isArray(countFinalise.zeroItemsByRoom)
+      ? countFinalise.zeroItemsByRoom.flatMap((candidate) => {
+        if (!isJsonObject(candidate) || typeof candidate.roomId !== "string" || !Array.isArray(candidate.productIds)) return [];
+        const roomId = candidate.roomId.trim();
+        const productIds = candidate.productIds
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.trim());
+        if (!roomId || roomId.length > 100 || productIds.length > 2000
+          || productIds.some((productId) => !productId || productId.length > 100)) return [];
+        return [{ roomId, productIds }];
+      })
+      : [];
+    if (zeroItemsByRoom.length > 100) return jsonResponse({ error: "Too many count rooms were supplied" }, 400);
     const actor = { id: context.userId, name: context.displayName, role: context.jobTitle || context.role };
-    buildNextData = (data) => finaliseCountInWorkspace(data, countId, actor);
+    buildNextData = (data) => finaliseCountInWorkspace(data, countId, actor, zeroItemsByRoom);
     entityLabel = "finalised count";
   } else {
     if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {

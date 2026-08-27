@@ -6,6 +6,8 @@ let recountSourceCountId=null;
 let recountSelectedProductIds=new Set();
 let countExtraSelectedProductIds=new Set();
 let expandedCountExtraCategories=new Set();
+const COUNT_UNLISTED_CATEGORY='Unlisted';
+const COUNT_UNLISTED_SUBCATEGORY='Added Items';
 
 function latestInventoryCount(){
   return finalisedInventoryBaselines()[0]||null;
@@ -173,6 +175,10 @@ function currentCountProducts(){
     return state.products.filter(product=>!product.archived&&expected.has(product.id));
   }
   return currentRoomProducts();
+}
+function countProductDisplayGroup(product,room=currentInventoryRoom()){
+  if((room?.extraProductIds||[]).includes(product?.id))return{category:COUNT_UNLISTED_CATEGORY,subcategory:COUNT_UNLISTED_SUBCATEGORY};
+  return{category:product?.category||'Other',subcategory:product?.subcategory||'Other'};
 }
 function roomProductSummary(room){
   const count=roomProductIds(room).length;
@@ -869,7 +875,7 @@ function initLiveCounts(ex,selectedRoomId=null){
   currentRoomProducts().forEach(p=>{liveInvCounts[p.id]='';});
 }
 function inventorySectionProgress(category,subcategory){
-  const items=currentCountProducts().filter(product=>product.category===category&&(product.subcategory||'Other')===subcategory);
+  const items=currentCountProducts().filter(product=>{const group=countProductDisplayGroup(product);return group.category===category&&group.subcategory===subcategory;});
   const filled=items.filter(product=>{const value=liveInvCounts[product.id];return value!==''&&value!==null&&value!==undefined;}).length;
   return{filled,total:items.length,complete:items.length>0&&filled===items.length};
 }
@@ -950,11 +956,12 @@ function sortedInventoryProducts(products,mode){
       return ai-bi||a.name.localeCompare(b.name);
     });
   }
-  return[...products].sort((a,b)=>
-    (a.category||'').localeCompare(b.category||'')||
-    (a.subcategory||'').localeCompare(b.subcategory||'')||
-    a.name.localeCompare(b.name)
-  );
+  return[...products].sort((a,b)=>{
+    const ag=countProductDisplayGroup(a),bg=countProductDisplayGroup(b);
+    return ag.category.localeCompare(bg.category)||
+      ag.subcategory.localeCompare(bg.subcategory)||
+      a.name.localeCompare(b.name);
+  });
 }
 function openInventoryRoomSelect(){
   document.getElementById('room-count-date').value=today();
@@ -1032,7 +1039,8 @@ function renderCountRoomPicker(){
     const lock=countRoomLockFor(room.id);
     const unavailable=lock&&!lock.mine;
     const counted=Object.keys(room.items||{}).length;
-    const detail=unavailable?`${lock.holderName||'A team member'} is counting this room right now.`:lock?.mine?'Reserved by you. Select to continue.':`${counted} item${counted===1?'':'s'} saved · Available to count`;
+    const uncounted=inventoryUncountedEntries(inv).filter(entry=>entry.roomId===room.id).length;
+    const detail=unavailable?`${lock.holderName||'A team member'} is counting this room right now.`:lock?.mine?'Reserved by you. Select to continue.':`${counted} item${counted===1?'':'s'} saved · ${uncounted} uncounted · Available to count`;
     return`<button class="count-room-picker-card ${unavailable?'is-locked':''}" type="button" ${unavailable?'disabled aria-disabled="true"':''} onclick="enterCountRoom('${room.id}')"><span class="count-room-picker-copy"><strong>${escapeHtml(room.name)}</strong><span>${escapeHtml(detail)}</span></span><em class="count-room-picker-status">${unavailable?'In use':lock?.mine?'Continue':'Open'}</em></button>`;
   }).join('')||'<div class="count-room-picker-loading">No rooms are available for your account.</div>';
 }
@@ -1293,7 +1301,7 @@ function addCountExtraProducts(productIds,{closePicker=true,focusProductId=null}
   document.getElementById('inv-cat-f').value='';
   document.getElementById('inv-sub-f').innerHTML='<option value="">All</option>';
   document.getElementById('inv-show-f').value='all';
-  products.forEach(product=>expandedInventorySections.add(encodeURIComponent(`${currentInvRoomId||''}|||${product.category}|||${product.subcategory||'Other'}`)));
+  products.forEach(product=>{const group=countProductDisplayGroup(product,room);expandedInventorySections.add(encodeURIComponent(`${currentInvRoomId||''}|||${group.category}|||${group.subcategory}`));});
   renderInvRows();
   const focusId=focusProductId||products[0]?.id;
   if(focusId)setTimeout(()=>document.getElementById('invq-'+focusId)?.focus(),0);
@@ -1366,22 +1374,37 @@ function setInventoryFinishSaving(saving){
   const saveButton=document.getElementById('inventory-count-finish');
   if(saveButton){saveButton.disabled=saving;saveButton.setAttribute('aria-busy',String(saving));saveButton.textContent=saving?'Saving…':'Save';}
 }
+function syncInventoryUnlistedCategoryOption(){
+  const select=document.getElementById('inv-cat-f');if(!select)return;
+  const existing=[...select.options].find(option=>option.value===COUNT_UNLISTED_CATEGORY);
+  const hasUnlisted=(currentInventoryRoom()?.extraProductIds||[]).length>0;
+  if(hasUnlisted&&!existing)select.add(new Option(COUNT_UNLISTED_CATEGORY,COUNT_UNLISTED_CATEGORY));
+  else if(!hasUnlisted&&existing){if(select.value===COUNT_UNLISTED_CATEGORY)select.value='';existing.remove();}
+}
+function updateInventorySubcategoryFilter(){
+  const category=document.getElementById('inv-cat-f')?.value||'';
+  const select=document.getElementById('inv-sub-f');if(!select)return;
+  const choices=category===COUNT_UNLISTED_CATEGORY?[COUNT_UNLISTED_SUBCATEGORY]:(category?(SUBCATS[category]||[]):[]);
+  select.innerHTML='<option value="">All</option>'+choices.map(value=>`<option>${escapeHtml(value)}</option>`).join('');
+  renderInvRows();
+}
 function renderInvRows(skipCapture=false){
+  syncInventoryUnlistedCategoryOption();
   const roomScopedProducts=currentCountProducts();
   const activeInventory=currentInvEdit?state.inventories.find(item=>item.id===currentInvEdit):null;
   const activeRoom=currentInventoryRoom();
   if(!skipCapture)roomScopedProducts.forEach(p=>{const el=document.getElementById('invq-'+p.id);if(el)liveInvCounts[p.id]=el.value===''?'':parseFloat(el.value);});
   const search=document.getElementById('inv-search').value.trim().toLowerCase();const cat=document.getElementById('inv-cat-f').value;const sub=document.getElementById('inv-sub-f').value;const show=document.getElementById('inv-show-f').value;const sortMode=document.getElementById('inv-sort-f')?.value||'category';
   updateInventoryFilterSummary();
-  let prods=roomScopedProducts.filter(p=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!search||p.name.toLowerCase().includes(search)||(p.inventoryName||'').toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||(p.category||'').toLowerCase().includes(search)||(p.subcategory||'').toLowerCase().includes(search)));
+  let prods=roomScopedProducts.filter(p=>{const group=countProductDisplayGroup(p,activeRoom);return(!cat||group.category===cat)&&(!sub||group.subcategory===sub)&&(!search||p.name.toLowerCase().includes(search)||(p.inventoryName||'').toLowerCase().includes(search)||(p.aliases||'').toLowerCase().includes(search)||group.category.toLowerCase().includes(search)||group.subcategory.toLowerCase().includes(search));});
   if(show==='missing')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v===''||v===null||v===undefined;});
   if(show==='filled')prods=prods.filter(p=>{const v=liveInvCounts[p.id];return v!==''&&v!==null&&v!==undefined;});
   prods=sortedInventoryProducts(prods,sortMode);
-  const groups={};prods.forEach(p=>{const k=p.category+'|||'+(p.subcategory||'Other');if(!groups[k])groups[k]={cat:p.category,sub:p.subcategory||'Other',items:[]};groups[k].items.push(p);});
+  const groups={};prods.forEach(p=>{const group=countProductDisplayGroup(p,activeRoom);const k=group.category+'|||'+group.subcategory;if(!groups[k])groups[k]={cat:group.category,sub:group.subcategory,items:[]};groups[k].items.push(p);});
   if(!prods.length){document.getElementById('inv-rows').innerHTML=`<p style="color:var(--text-muted);text-align:center;padding:24px;">No products assigned to this room match.</p>`;updateInvProgress();return;}
   let html='';
   const extraIds=new Set(currentInventoryRoom()?.extraProductIds||[]);
-  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${p.category}${p.subcategory?` · ${p.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div>${recountPreviousRoomCountHtml(activeInventory,activeRoom,p.id)}</div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
+  const renderProduct=p=>{const val=liveInvCounts[p.id];const isFilled=val!==''&&val!==null&&val!==undefined;const temporary=extraIds.has(p.id);const removable=temporary&&!currentInvMergedView;const group=countProductDisplayGroup(p,activeRoom);return`<div class="inv-count-row ${isFilled?'filled-row':'missing-row'} ${removable?'has-remove':''}" id="row-${p.id}"><div><span class="${isFilled?'filled-dot':'missing-dot'}"></span><span class="inv-prod-name">${productNameLink(p)}</span><div class="inv-prod-meta">${group.category}${group.subcategory?` · ${group.subcategory}`:''} · ${p.unit}${p.par?` · Par: ${p.par}`:''}${temporary?' · <span class="count-only-product-label">This count only</span>':''}</div>${recountPreviousRoomCountHtml(activeInventory,activeRoom,p.id)}</div><input type="number" inputmode="decimal" enterkeyhint="next" autocomplete="off" min="0" step="0.01" id="invq-${p.id}" data-count-input="true" value="${isFilled?val:''}" placeholder="qty" ${currentInvMergedView?'readonly aria-readonly="true"':''} oninput="onInvInput('${p.id}',this)" onfocus="onInvQtyFocus(this)" onkeydown="onInvQtyKey(event,this)"><span class="inv-count-unit">${p.unit}</span>${removable?`<button class="count-only-remove" type="button" aria-label="Remove ${escapeHtml(p.inventoryName||p.name)} from this count" title="Remove this count-only item" onclick="removeCountExtraProduct('${p.id}')">×</button>`:''}</div>`;};
   if(sortMode==='category')Object.values(groups).forEach(g=>{
     const sectionToken=encodeURIComponent(`${currentInvRoomId||''}|||${g.cat}|||${g.sub}`);
     const collapsed=!search&&!expandedInventorySections.has(sectionToken);
@@ -1607,24 +1630,85 @@ function inventoryMenuHtml(inv,menuId){
     </div>
   </div>`;
 }
+function inventoryUncountedEntries(inv){
+  if(!inv)return[];
+  normalizeInventoryRooms(inv);
+  const entries=[];
+  (inv.rooms||[]).forEach(room=>{
+    expectedInventoryProductIds(inv,room).forEach(productId=>{
+      if(Object.prototype.hasOwnProperty.call(room.items||{},productId))return;
+      const product=getProduct(productId);
+      if(product&&!product.archived)entries.push({roomId:room.id,roomName:room.name,productId,productName:product.inventoryName||product.name});
+    });
+  });
+  return entries;
+}
+function countFinalisationZeroItemsByRoom(entries){
+  const grouped=new Map();
+  entries.forEach(entry=>{if(!grouped.has(entry.roomId))grouped.set(entry.roomId,[]);grouped.get(entry.roomId).push(entry.productId);});
+  return[...grouped].map(([roomId,productIds])=>({roomId,productIds}));
+}
+function openCountUncountedDialog(inv,entries){
+  pendingCountFinalisationId=inv.id;
+  pendingCountUncountedEntries=entries;
+  const roomCount=new Set(entries.map(entry=>entry.roomId)).size;
+  const summary=document.getElementById('count-uncounted-summary');
+  const examples=document.getElementById('count-uncounted-examples');
+  if(summary)summary.textContent=`${entries.length} item${entries.length===1?' has':'s have'} not been counted across ${roomCount} room${roomCount===1?'':'s'}. What would you like to do?`;
+  if(examples){
+    const names=entries.slice(0,6).map(entry=>`${entry.productName} (${entry.roomName})`);
+    examples.textContent=`${names.join(' · ')}${entries.length>names.length?` · ${entries.length-names.length} more`:''}`;
+  }
+  openModal('modal-count-uncounted');
+}
+function closeCountUncountedDialog(){
+  pendingCountFinalisationId=null;
+  pendingCountUncountedEntries=[];
+  closeModal('modal-count-uncounted');
+}
+async function performInventoryFinalisation(id,zeroItemsByRoom=[]){
+  const inv=state.inventories.find(item=>item.id===id);
+  if(!inv)return false;
+  const fromPicker=countRoomPickerCountId===id;
+  const shared=typeof cloudFinaliseCount==='function'?await cloudFinaliseCount(id,zeroItemsByRoom):null;
+  if(!shared){toast('The count could not be finalised. Please try again.',true);return false;}
+  state=shared;normalizeLoadedState();
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+  renderInventoryTable();refreshLiveInventoryIfVisible();
+  window.recordServerEvent?.({action:'count.finalised',entityType:'count',entityId:id,details:{label:inv.label||'',recordType:inv.recordType||'count',zeroedItems:zeroItemsByRoom.reduce((sum,room)=>sum+room.productIds.length,0)}});
+  toast(`${inv.recordType==='recount'?'Re-count':'Count'} finalised. It is now read-only.`);
+  if(fromPicker){closeCountRoomPicker();viewInventory(id);}
+  else if(viewInvId===id)viewInventory(id);
+  return true;
+}
+async function resolveCountUncounted(action){
+  const id=pendingCountFinalisationId;
+  const entries=[...pendingCountUncountedEntries];
+  if(!id)return;
+  closeCountUncountedDialog();
+  if(action==='back'){
+    const first=entries[0];
+    await openCountRoomPicker(id,first?.roomId||null);
+    if(currentInvEdit===id&&currentInvRoomId===first?.roomId){
+      const filter=document.getElementById('inv-show-f');if(filter)filter.value='missing';
+      renderInvRows();
+      toast('Showing only the items that still need a count.');
+    }
+    return;
+  }
+  const zeroItemsByRoom=action==='zero'?countFinalisationZeroItemsByRoom(entries):[];
+  await performInventoryFinalisation(id,zeroItemsByRoom);
+}
 async function finaliseInventoryCount(id){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);
   if(!inv){toast('Count not found.',true);return false;}
   if(inventoryIsFinalised(inv)){toast('This count is already finalised.');return true;}
   if(!Object.keys(inv.items||{}).length){toast('Save at least one counted item before finalising.',true);return false;}
+  const uncounted=inventoryUncountedEntries(inv);
+  if(uncounted.length){openCountUncountedDialog(inv,uncounted);return false;}
   if(!confirm(`Finalise “${inv.label||'this count'}”? It will become read-only.`))return false;
-  const fromPicker=countRoomPickerCountId===id;
-  const shared=typeof cloudFinaliseCount==='function'?await cloudFinaliseCount(id):null;
-  if(!shared){toast('The count could not be finalised. Please try again.',true);return false;}
-  state=shared;normalizeLoadedState();
-  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
-  renderInventoryTable();refreshLiveInventoryIfVisible();
-  window.recordServerEvent?.({action:'count.finalised',entityType:'count',entityId:id,details:{label:inv.label||'',recordType:inv.recordType||'count'}});
-  toast(`${inv.recordType==='recount'?'Re-count':'Count'} finalised. It is now read-only.`);
-  if(fromPicker){closeCountRoomPicker();viewInventory(id);}
-  else if(viewInvId===id)viewInventory(id);
-  return true;
+  return performInventoryFinalisation(id);
 }
 function finaliseCountFromPicker(){
   if(countRoomPickerCountId)finaliseInventoryCount(countRoomPickerCountId);
@@ -1971,18 +2055,27 @@ function sortCountReportEntries(entries,order='category'){
   }
   return[...entries].sort(categoryCompare);
 }
-function countReportRows(items,order){
+function countReportRoomDetailText(inv,product){
+  if(!inv||!product)return'';
+  const rooms=(inv.rooms||[]).flatMap(room=>Object.prototype.hasOwnProperty.call(room.items||{},product.id)
+    ?[`${room.name}: ${liveQty(room.items[product.id])} ${product.unit||'unit'}`]
+    :[]);
+  return rooms.length?`Room details: ${rooms.join(' · ')}`:'';
+}
+function countReportRows(items,order,inv=null,includeRoomDetails=false){
   const entries=sortCountReportEntries(countReportEntries(items),order);
   const rows=[['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value']];
   let total=0;
   entries.forEach(({product,qty,value})=>{
     total+=value;
     rows.push([product.name,product.category,product.subcategory||'',qty,product.unit,product.par||0,product.cost||0,+value.toFixed(2)]);
+    const detail=includeRoomDetails?countReportRoomDetailText(inv,product):'';
+    if(detail)rows.push([detail,'','','','','','','']);
   });
   rows.push(['','','','','','','TOTAL',+total.toFixed(2)]);
   return{entries,rows,total};
 }
-function recountComparisonReport(inv,order='category'){
+function recountComparisonReport(inv,order='category',includeRoomDetails=false){
   const source=recountSourceInventory(inv);
   const productIds=new Set(Object.keys(source?.items||{}));
   expectedInventoryProductIds(source).forEach(id=>productIds.add(id));
@@ -1996,11 +2089,11 @@ function recountComparisonReport(inv,order='category'){
   }).filter(Boolean),order);
   let total=0;
   const rows=[['Product','Category','Subcategory','Original Count','Re-count','Final Count','Unit','Unit Cost','Final Value']];
-  entries.forEach(entry=>{total+=entry.value;rows.push([entry.product.name,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost||0,+entry.value.toFixed(2)]);});
+  entries.forEach(entry=>{total+=entry.value;rows.push([entry.product.name,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost||0,+entry.value.toFixed(2)]);const detail=includeRoomDetails?countReportRoomDetailText(inv,entry.product):'';if(detail)rows.push([detail,'','','','','','','','']);});
   rows.push(['','','','','','','','TOTAL',+total.toFixed(2)]);
   return{entries,rows,total};
 }
-function inventoryExportReport(inv,order){return inv.recordType==='recount'?recountComparisonReport(inv,order):countReportRows(inv.items,order);}
+function inventoryExportReport(inv,order,includeRoomDetails=false){return inv.recordType==='recount'?recountComparisonReport(inv,order,includeRoomDetails):countReportRows(inv.items,order,inv,includeRoomDetails);}
 function openCountReportExport(id=viewInvId){
   closeAllMenus();
   const inv=state.inventories.find(item=>item.id===id);
@@ -2024,6 +2117,8 @@ function openCountReportExport(id=viewInvId){
   if(orderSelect)orderSelect.value=hasInventoryEntryOrder?'usage':'category';
   const excel=document.querySelector('input[name="count-report-format"][value="xlsx"]');
   if(excel)excel.checked=true;
+  const roomDetails=document.getElementById('count-report-room-details');
+  if(roomDetails)roomDetails.checked=false;
   updateCountReportExportPreview();
   openModal('modal-count-report-export');
 }
@@ -2032,6 +2127,7 @@ function updateCountReportExportPreview(){
   if(!inv)return;
   const order=document.getElementById('count-report-order')?.value||'category';
   const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
+  const includeRoomDetails=!!document.getElementById('count-report-room-details')?.checked;
   const report=inventoryExportReport(inv,order);
   const names=report.entries.slice(0,4).map(entry=>entry.product.name);
   const remaining=Math.max(report.entries.length-names.length,0);
@@ -2044,11 +2140,12 @@ function updateCountReportExportPreview(){
   if(previewItems)previewItems.textContent=names.length?`${names.join(' → ')}${remaining?` → ${remaining} more`:''}`:'This count has no reportable items.';
   if(source){
     const template=state.inventoryEntryTemplate;
-    source.textContent=order==='usage'
+    const roomDetailNote=includeRoomDetails?(format==='xlsx'?' Room quantities will appear beneath each merged item.':' Room quantities will appear in small text beneath each item.'):'';
+    source.textContent=(order==='usage'
       ?`Order source: ${template?.sourceFile||'Inventory Entry Form'}`
       :format==='xlsx'
         ?'The selected order will be applied to the merged total and every room worksheet.'
-        :'Download saves a PDF file directly. Open / Print uses the browser print dialog.';
+        :'Download saves a PDF file directly. Open / Print uses the browser print dialog.')+roomDetailNote;
   }
   if(printButton)printButton.hidden=format!=='pdf';
   if(button)button.textContent=format==='pdf'?'Download PDF':'Download Excel report';
@@ -2057,23 +2154,25 @@ function exportConfiguredCountReport(){
   const id=countReportInventoryId;
   const order=document.getElementById('count-report-order')?.value||'category';
   const format=document.querySelector('input[name="count-report-format"]:checked')?.value||'xlsx';
+  const includeRoomDetails=!!document.getElementById('count-report-room-details')?.checked;
   if(!id){toast('Count not found.',true);return;}
   closeModal('modal-count-report-export');
-  if(format==='pdf')downloadInventoryCountPdf(id,order);
-  else exportInventoryExcel(id,order);
+  if(format==='pdf')downloadInventoryCountPdf(id,order,includeRoomDetails);
+  else exportInventoryExcel(id,order,includeRoomDetails);
 }
 function printConfiguredCountReport(){
   const id=countReportInventoryId;
   const order=document.getElementById('count-report-order')?.value||'category';
+  const includeRoomDetails=!!document.getElementById('count-report-room-details')?.checked;
   if(!id){toast('Count not found.',true);return;}
   closeModal('modal-count-report-export');
-  printInventoryCount(id,order);
+  printInventoryCount(id,order,includeRoomDetails);
 }
-function exportInventoryExcel(id,order='category'){
+function exportInventoryExcel(id,order='category',includeRoomDetails=false){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
-  const merged=inventoryExportReport(inv,order);
+  const merged=inventoryExportReport(inv,order,includeRoomDetails);
   const sheets=[{name:(`Merged ${inv.date}`).slice(0,31),rows:merged.rows}];
   inv.rooms.forEach(room=>{
     const roomReport=countReportRows(room.items||{},order);
@@ -2096,34 +2195,38 @@ function countReportPdfFileName(inv){
     .slice(0,48)||'count';
   return`${label}_${inv.date||today()}_count_report.pdf`;
 }
-function buildInventoryCountPdf(id,order='category'){
+function buildInventoryCountPdf(id,order='category',includeRoomDetails=false){
   const inv=state.inventories.find(item=>item.id===id);
   if(!inv)throw new Error('Count not found.');
   const PdfDocument=window.jspdf?.jsPDF;
   if(!PdfDocument)throw new Error('The PDF download library did not load. Refresh and try again, or use Open / Print.');
   normalizeInventoryRooms(inv);
-  const report=countReportRows(inv.items,order);
+  const report=inventoryExportReport(inv,order);
   const doc=new PdfDocument({orientation:'landscape',unit:'pt',format:'letter'});
   if(typeof doc.autoTable!=='function')throw new Error('The PDF table library did not load. Refresh and try again, or use Open / Print.');
   const title=countReportPdfText(`Count Report - ${inv.label||fmtDate(inv.date)}`);
   const roomNames=inv.rooms.map(room=>room.name).join(', ');
   const details=countReportPdfText(`Date: ${fmtDate(inv.date)} | Rooms: ${roomNames} | Order: ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category} | Merged Total: ${fmt(report.total)}`);
-  const body=report.entries.map(({product,qty,value})=>[
-    countReportPdfText(product.name),
-    countReportPdfText(product.category),
-    countReportPdfText(product.subcategory||''),
-    liveQty(qty),
-    countReportPdfText(product.unit),
-    product.par||'-',
-    product.cost>0?fmt(product.cost):'-',
-    fmt(value)
-  ]);
+  const isRecount=inv.recordType==='recount';
+  const body=[];
+  report.entries.forEach(entry=>{
+    const product=entry.product;
+    body.push(isRecount?[
+      countReportPdfText(product.name),countReportPdfText(product.category),countReportPdfText(product.subcategory||''),
+      liveQty(entry.original),entry.recount===null?'-':liveQty(entry.recount),liveQty(entry.finalQty),countReportPdfText(product.unit),product.cost>0?fmt(product.cost):'-',fmt(entry.value)
+    ]:[
+      countReportPdfText(product.name),countReportPdfText(product.category),countReportPdfText(product.subcategory||''),
+      liveQty(entry.qty),countReportPdfText(product.unit),product.par||'-',product.cost>0?fmt(product.cost):'-',fmt(entry.value)
+    ]);
+    const roomDetail=includeRoomDetails?countReportRoomDetailText(inv,product):'';
+    if(roomDetail)body.push([{content:countReportPdfText(roomDetail),colSpan:isRecount?9:8,styles:{fontSize:5.8,fontStyle:'italic',textColor:[92,103,114],fillColor:[250,251,252],cellPadding:{top:2,right:4,bottom:3,left:10}}}]);
+  });
   const pageWidth=doc.internal.pageSize.getWidth();
   const pageHeight=doc.internal.pageSize.getHeight();
   doc.autoTable({
-    head:[['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value']],
+    head:[isRecount?['Product','Category','Subcategory','Original','Re-count','Final','Unit','Unit Cost','Final Value']:['Product','Category','Subcategory','Qty','Unit','Par','Unit Cost','Value']],
     body,
-    foot:[['','','','','','','Total',fmt(report.total)]],
+    foot:[isRecount?['','','','','','','','Total',fmt(report.total)]:['','','','','','','Total',fmt(report.total)]],
     startY:78,
     margin:{top:78,right:30,bottom:34,left:30},
     theme:'striped',
@@ -2133,7 +2236,9 @@ function buildInventoryCountPdf(id,order='category'){
     headStyles:{fillColor:[38,49,61],textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
     footStyles:{fillColor:[232,236,240],textColor:[28,36,45],fontStyle:'bold'},
     alternateRowStyles:{fillColor:[246,247,248]},
-    columnStyles:{
+    columnStyles:isRecount?{
+      0:{cellWidth:175},1:{cellWidth:70},2:{cellWidth:78},3:{cellWidth:48,halign:'right'},4:{cellWidth:48,halign:'right'},5:{cellWidth:48,halign:'right'},6:{cellWidth:50},7:{cellWidth:66,halign:'right'},8:{cellWidth:76,halign:'right'}
+    }:{
       0:{cellWidth:205},
       1:{cellWidth:82},
       2:{cellWidth:96},
@@ -2166,9 +2271,9 @@ function buildInventoryCountPdf(id,order='category'){
   });
   return{doc,fileName:countReportPdfFileName(inv),report};
 }
-function downloadInventoryCountPdf(id,order='category'){
+function downloadInventoryCountPdf(id,order='category',includeRoomDetails=false){
   try{
-    const output=buildInventoryCountPdf(id,order);
+    const output=buildInventoryCountPdf(id,order,includeRoomDetails);
     output.doc.save(output.fileName);
     toast(`Downloaded: ${output.fileName}`);
   }catch(error){
@@ -2176,16 +2281,19 @@ function downloadInventoryCountPdf(id,order='category'){
     toast(error.message||'The PDF could not be downloaded.',true);
   }
 }
-function printInventoryCount(id,order='category'){
+function printInventoryCount(id,order='category',includeRoomDetails=false){
   const inv=state.inventories.find(i=>i.id===id);if(!inv){toast('Count not found.',true);return;}
   normalizeInventoryRooms(inv);
   closeAllMenus();
   const report=inventoryExportReport(inv,order);
   const isRecount=inv.recordType==='recount';
-  const bodyRows=report.entries.map(entry=>isRecount
-    ?[entry.product.name,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'—':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)]
-    :[entry.product.name,entry.product.category,entry.product.subcategory||'',entry.qty,entry.product.unit,entry.product.par||'—',entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)]
-  );
+  const bodyRows=report.entries.map(entry=>{
+    const detail=includeRoomDetails?countReportRoomDetailText(inv,entry.product):'';
+    const productCell=detail?{value:entry.product.name,detail}:entry.product.name;
+    return isRecount
+      ?[productCell,entry.product.category,entry.product.subcategory||'',entry.original,entry.recount===null?'—':entry.recount,entry.finalQty,entry.product.unit,entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)]
+      :[productCell,entry.product.category,entry.product.subcategory||'',entry.qty,entry.product.unit,entry.product.par||'—',entry.product.cost>0?fmt(entry.product.cost):'—',fmt(entry.value)];
+  });
   printTable(
     `Count Report — ${inv.label||fmtDate(inv.date)}`,
     `Date: ${fmtDate(inv.date)} · Rooms: ${inv.rooms.map(room=>room.name).join(', ')} · Order: ${COUNT_REPORT_ORDER_LABELS[order]||COUNT_REPORT_ORDER_LABELS.category} · Merged Total: ${fmt(report.total)}`,

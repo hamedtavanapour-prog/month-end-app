@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=voice-review-2"/>
+<link rel="stylesheet" href="css/styles.css?v=count-workflow-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -728,7 +728,7 @@
       <div class="inv-filter-sheet" id="inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="inv-filter-title">
         <div class="inv-filter-sheet-head mobile-only"><div><span>Count options</span><h4 id="inv-filter-title">Sort & Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeInventoryFilterSheet()">&times;</button></div>
         <div class="inv-filter-sheet-fields">
-          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateSubcatFilter('inv-sub-f','inv-cat-f');renderInvRows()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Red Wines</option><option>White Wines</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
+          <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-cat-f">Category</label><select id="inv-cat-f" onchange="updateInventorySubcategoryFilter()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Red Wines</option><option>White Wines</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-sub-f">Subcategory</label><select id="inv-sub-f" onchange="renderInvRows()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:90px;"><label for="inv-show-f">Show</label><select id="inv-show-f" onchange="renderInvRows()"><option value="all">All</option><option value="missing">Missing</option><option value="filled">Filled</option></select></div>
           <div class="form-group" style="flex:1;min-width:120px;"><label for="inv-sort-f">Sort</label><select id="inv-sort-f" onchange="renderInvRows()"><option value="category">Category</option><option value="alpha">Alphabetical</option><option value="usage">Usage Order</option></select></div>
@@ -814,6 +814,22 @@
   </div>
   <div class="count-extra-product-list" id="count-extra-product-list" aria-live="polite"></div>
   <div class="modal-actions count-extra-product-actions"><span id="count-extra-selected-count">0 selected</span><button class="btn btn-secondary" type="button" onclick="closeModal('modal-count-add-item')">Cancel</button><button class="btn btn-primary" id="count-extra-add-selected" type="button" onclick="addSelectedCountExtraProducts()" disabled>Add Selected</button></div>
+</div>
+</div>
+
+<!-- UNCOUNTED ITEMS FINALISATION MODAL -->
+<div class="modal-overlay" id="modal-count-uncounted">
+<div class="modal count-uncounted-modal" role="dialog" aria-modal="true" aria-labelledby="count-uncounted-title">
+  <button class="modal-close" type="button" aria-label="Close warning" onclick="closeCountUncountedDialog()">&times;</button>
+  <span class="count-uncounted-icon" aria-hidden="true">!</span>
+  <h3 id="count-uncounted-title">These items haven’t been counted yet</h3>
+  <p class="count-setup-intro" id="count-uncounted-summary"></p>
+  <p class="count-uncounted-examples" id="count-uncounted-examples"></p>
+  <div class="count-uncounted-choices">
+    <button class="btn btn-secondary" type="button" onclick="resolveCountUncounted('leave')"><strong>Leave uncounted</strong><small>Finalize without adding values</small></button>
+    <button class="btn btn-secondary" type="button" onclick="resolveCountUncounted('zero')"><strong>Set all to zero</strong><small>Record 0 for every missed item</small></button>
+    <button class="btn btn-primary" type="button" onclick="resolveCountUncounted('back')"><strong>Go back and count</strong><small>Open the missed items only</small></button>
+  </div>
 </div>
 </div>
 
@@ -978,6 +994,11 @@
       <option value="value-desc">Inventory value — highest first</option>
       <option value="value-asc">Inventory value — lowest first</option>
     </select>
+  </label>
+
+  <label class="count-report-detail-option">
+    <input type="checkbox" id="count-report-room-details" onchange="updateCountReportExportPreview()">
+    <span><strong>Include room breakdown</strong><small>Show each room’s quantity in small text beneath every item</small></span>
   </label>
 
   <div class="count-report-preview" aria-live="polite">
@@ -1240,7 +1261,7 @@
      Order matters: definitions first, main.js (the entry point) last.
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="js/config.js"></script>
-<script src="js/supabase.js?v=local-count-mode-1"></script>
+<script src="js/supabase.js?v=count-workflow-1"></script>
 <script src="js/data/categories.js"></script>
 <script src="js/data/seed-products.js"></script>
 <script src="js/data/par-levels-aug-2026.js?v=2026-08-26"></script>
@@ -1249,21 +1270,21 @@
 <script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-2"></script>
 <script src="js/data/spring-drinks-2026.js?v=spring-drinks-2026-1"></script>
 <script src="js/data/kitchen-menu-may-2026.js?v=kitchen-menu-may-2026-3"></script>
-<script src="js/state.js?v=par-levels-2026-08-26"></script>
+<script src="js/state.js?v=count-workflow-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=par-levels-2026-08-26"></script>
 <script src="js/ui.js?v=menu-recipes-4"></script>
 <script src="js/profile.js?v=profile-workspace-1"></script>
 <script src="js/products.js?v=kitchen-menu-3"></script>
-<script src="js/inventory.js?v=recount-room-comparison-1"></script>
+<script src="js/inventory.js?v=count-workflow-1"></script>
 <script src="js/orders.js"></script>
 <script src="js/usage.js?v=foodtrak-pdf-upload-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
-<script src="js/export-tools.js?v=count-report-export-1"></script>
+<script src="js/export-tools.js?v=count-workflow-1"></script>
 <script src="js/voice-commands.js?v=count-voice-two-1"></script>
-<script src="js/voice.js?v=voice-review-2"></script>
+<script src="js/voice.js?v=count-workflow-1"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=menu-library-5"></script>
 <script src="js/main.js?v=menu-card-view-1"></script>

@@ -81,24 +81,43 @@ function resetInventoryTranscribeHistory(){
   inventoryTranscribeHistory=[];
   renderTranscribeHistory();
 }
+function transcribeHistoryEntryCount(type,title,text){
+  if(type==='transcript')return parseVoice(String(text||'')).length;
+  if(/^Nothing transcribed|Transcription failed/i.test(String(title||'')))return 0;
+  const stated=String(title||'').match(/^(\d+)\b/);
+  if(stated)return Number(stated[1]);
+  if(/^Transcription (discarded|redone|not applied)/i.test(String(title||'')))return parseVoice(String(text||'')).length;
+  return String(text||'').trim()?String(text).split(/\n+/).filter(Boolean).length:0;
+}
 function addInventoryTranscribeHistory(type,title,text){
   if(voiceContext!=='inventory'&&!currentCountRoomLock)return;
-  inventoryTranscribeHistory.push({type,title,text:String(text||''),time:new Date()});
+  inventoryTranscribeHistory.push({type,title,text:String(text||''),itemCount:transcribeHistoryEntryCount(type,title,text),time:new Date()});
   renderTranscribeHistory();
 }
 function addRecountTranscribeHistory(type,title,text){
-  recountTranscribeHistory.push({type,title,text:String(text||''),time:new Date()});
+  recountTranscribeHistory.push({type,title,text:String(text||''),itemCount:transcribeHistoryEntryCount(type,title,text),time:new Date()});
   renderTranscribeHistory('recount');
 }
 function activeTranscribeHistory(context){return context==='recount'?recountTranscribeHistory:inventoryTranscribeHistory;}
+function transcribeHistoryTotals(history){
+  return history.reduce((totals,entry)=>{
+    const count=Number.isFinite(entry.itemCount)?entry.itemCount:transcribeHistoryEntryCount(entry.type,entry.title,entry.text);
+    if(entry.type==='transcript')totals.transcribed+=count;
+    else if(entry.type==='applied')totals.applied+=count;
+    else totals.notApplied+=count;
+    return totals;
+  },{transcribed:0,applied:0,notApplied:0});
+}
 function renderTranscribeHistory(context=voiceContext==='recount'?'recount':'inventory'){
   const history=activeTranscribeHistory(context);
+  const totals=transcribeHistoryTotals(history);
   const list=document.getElementById('transcribe-history-list');
   const button=document.getElementById(context==='recount'?'recount-transcribe-history-button':'transcribe-history-button');
-  if(button)button.textContent=`Transcribe History${history.length?` (${history.length})`:''}`;
+  if(button)button.textContent=`Transcribe History${totals.transcribed?` (${totals.transcribed})`:''}`;
   if(!list)return;
   document.getElementById('transcribe-history-title').textContent=context==='recount'?'Re-count Transcribe History':'Transcribe History';
-  list.innerHTML=history.length?history.map(entry=>`<div class="transcribe-history-entry ${entry.type}"><strong>${escapeHtml(entry.title)}</strong><p>${escapeHtml(entry.text)}</p><time>${entry.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):`<div class="empty-cell">No transcription activity ${context==='recount'?'for this re-count selection':'in this room'} yet.</div>`;
+  const summary=`<div class="transcribe-history-summary"><div><span>Transcribed</span><strong>${totals.transcribed}</strong></div><div><span>Applied</span><strong>${totals.applied}</strong></div><div><span>Not applied</span><strong>${totals.notApplied}</strong></div></div>`;
+  list.innerHTML=summary+(history.length?history.map(entry=>`<div class="transcribe-history-entry ${entry.type}"><strong>${escapeHtml(entry.title)}</strong><p>${escapeHtml(entry.text)}</p><time>${entry.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):`<div class="empty-cell">No transcription activity ${context==='recount'?'for this re-count selection':'in this room'} yet.</div>`);
 }
 function openTranscribeHistory(context='inventory'){renderTranscribeHistory(context);openModal('modal-transcribe-history');}
 
