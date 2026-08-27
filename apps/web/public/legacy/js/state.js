@@ -54,6 +54,7 @@ let floorPlanManualSearchOpen=false;
 let editingInventoryCategoryName=null;
 let pendingInventoryEntryTemplate=null;
 let pendingUsageImport=null;
+let usageImportMatchingEntryIndex=null;
 let usageUploadMode='other';
 let usageUploadFormat='excel';
 let draggedInventoryTemplateIndex=null;

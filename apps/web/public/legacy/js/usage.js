@@ -1335,13 +1335,13 @@ function renderUsageImportReview({preservePosition=false}={}){
     <summary><span>Matched products</span><strong>${matchedEntries.length} matched</strong></summary>
     <div class="inventory-template-review-list">${matchedEntries.map(entry=>`
       <div class="inventory-template-review-row usage-import-matched-row">
-        <span class="filled-pill">${entry.row.activityReconciles===false?'Review':(entry.suggestionAccepted?'Added':'Matched')}</span>
+        <span class="filled-pill">${entry.row.activityReconciles===false?'Review':entry.productCreated?'Added':entry.manualMatch?'Manual match':entry.suggestionAccepted?'Suggested match':'Matched'}</span>
         <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
-        <span class="usage-import-suggestion"><small>${entry.row.activityReconciles===false?escapeHtml(entry.row.reviewReason||'Activity review required'):'Matched to'}</small><strong>${escapeHtml(entry.row.matchedName||entry.row.productName||'Existing product')}</strong></span>
+        <span class="usage-import-suggestion"><small>${entry.row.activityReconciles===false?escapeHtml(entry.row.reviewReason||'Activity review required'):'Matched to'}</small><strong>${escapeHtml(entry.row.matchedName||entry.row.productName||'Existing product')}</strong><button class="btn btn-secondary btn-sm" type="button" onclick="openUsageImportProductMatcher(${entry.index})">Change match</button></span>
       </div>`).join('')||'<div class="inventory-template-empty">No matched products yet.</div>'}</div>
   </details>`;
   const byCategory=new Map();
-  pending.entries.filter(entry=>!entry.row.matched||!entry.row.productId||entry.suggestionAccepted).forEach(entry=>{
+  pending.entries.filter(entry=>!entry.row.matched||!entry.row.productId).forEach(entry=>{
     const category=usageImportReviewCategory(entry);
     if(!byCategory.has(category))byCategory.set(category,[]);
     byCategory.get(category).push(entry);
@@ -1350,16 +1350,11 @@ function renderUsageImportReview({preservePosition=false}={}){
     const unresolved=entries.filter(entry=>!entry.row.matched||!entry.row.productId);
     return`<details class="inventory-template-review-group" data-usage-category-group="${escapeHtml(category)}" ${openCategories.has(category)?'open':''}>
     <summary><span class="inventory-template-section-select">${unresolved.length?`<input type="checkbox" data-usage-category="${escapeHtml(category)}" aria-label="Select all ${escapeHtml(category)} unmatched products" onclick="event.stopPropagation()" onchange="toggleUsageImportCategory(this.dataset.usageCategory,this.checked)">`:''}<span>${escapeHtml(category)}</span></span><strong>${unresolved.length} unmatched</strong></summary>
-    <div class="inventory-template-review-list">${entries.map(entry=>entry.suggestionAccepted?`
-      <div class="inventory-template-review-row usage-import-added-row">
-        <span class="filled-pill">Added</span>
-        <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.category)} · ${escapeHtml(entry.subcategory)}${entry.row.reportSubcategory?` · Source: ${escapeHtml(entry.row.reportSubcategory)}`:''} · ${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
-        <span class="usage-import-suggestion"><small>Matched to ${escapeHtml(entry.row.matchedName||entry.row.productName)}</small><button class="btn btn-success btn-sm" type="button" disabled>Added</button></span>
-      </div>`:`
+    <div class="inventory-template-review-list">${entries.map(entry=>`
       <label class="inventory-template-review-row">
         <input type="checkbox" data-usage-entry="${entry.index}" ${entry.selected?'checked':''} onchange="toggleUsageImportEntry(${entry.index},this.checked)">
         <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.category)} · ${escapeHtml(entry.subcategory)}${entry.row.reportSubcategory?` · Source: ${escapeHtml(entry.row.reportSubcategory)}`:''} · ${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
-        <span class="usage-import-suggestion">${entry.suggestion?`<small>Possible match: ${escapeHtml(entry.suggestion.productName)}</small><button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();useUsageImportSuggestion(${entry.index})">Use suggested match</button>`:'<small>No confident existing-product match</small>'}</span>
+        <span class="usage-import-suggestion">${entry.suggestion?`<small>Possible match: ${escapeHtml(entry.suggestion.productName)}</small>`:'<small>No confident existing-product match</small>'}<span class="usage-import-match-actions">${entry.suggestion?`<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();useUsageImportSuggestion(${entry.index})">Use suggestion</button>`:''}<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();openUsageImportProductMatcher(${entry.index})">Find existing</button><button class="btn btn-primary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();addUsageImportEntryAsProduct(${entry.index})">Add as new</button></span></span>
       </label>`).join('')}</div>
   </details>`;}).join('')||'<div class="inventory-template-empty">All extracted rows are matched.</div>';
   syncAllUsageImportControls();
@@ -1411,6 +1406,7 @@ function selectAllUsageImportUnmatched(selected){
 }
 
 function linkUsageImportRow(entry,product){
+  if(!entry.row.reportProductName)entry.row.reportProductName=entry.row.productName||entry.row.matchedName||'';
   entry.row.productId=product.id;
   entry.row.productName=product.name;
   entry.row.matchedName=product.name;
@@ -1426,8 +1422,65 @@ function useUsageImportSuggestion(index){
   if(!entry||!product){toast('That suggested product is no longer available.',true);return;}
   linkUsageImportRow(entry,product);
   entry.suggestionAccepted=true;
+  entry.manualMatch=false;
+  entry.productCreated=false;
   renderUsageImportReview({preservePosition:true});
   toast(`Matched ${entry.row.reportProductName||entry.row.productName} to ${product.name}.`);
+}
+
+function usageImportCatalogMatches(query=''){
+  const needle=String(query||'').trim().toLowerCase();
+  return state.products.filter(product=>{
+    if(product.archived)return false;
+    if(!needle)return true;
+    return[product.name,product.inventoryName,product.aliases,product.sku,product.category,product.subcategory]
+      .some(value=>String(value||'').toLowerCase().includes(needle));
+  }).sort((a,b)=>String(a.inventoryName||a.name).localeCompare(String(b.inventoryName||b.name)));
+}
+
+function renderUsageImportProductMatcher(){
+  const entry=usageImportEntry(usageImportMatchingEntryIndex);
+  const list=document.getElementById('usage-import-product-match-list');if(!list||!entry)return;
+  const query=document.getElementById('usage-import-product-match-search')?.value||'';
+  const allMatches=usageImportCatalogMatches(query);
+  const products=allMatches.slice(0,120);
+  list.innerHTML=products.map(product=>{
+    const current=entry.row.productId===product.id;
+    return`<button class="usage-import-product-match-row ${current?'current':''}" type="button" ${current?'disabled':''} onclick="chooseUsageImportProduct('${escapeHtml(product.id)}')"><span><strong>${escapeHtml(product.inventoryName||product.name)}</strong><small>${escapeHtml(product.category||'Other')}${product.subcategory?` · ${escapeHtml(product.subcategory)}`:''}${product.sku?` · ${escapeHtml(product.sku)}`:''}</small></span><em>${current?'Current match':'Use product'}</em></button>`;
+  }).join('')||'<div class="inventory-template-empty">No catalog products match that search.</div>';
+  const count=document.getElementById('usage-import-product-match-count');
+  if(count)count.textContent=allMatches.length>products.length?`${products.length} of ${allMatches.length} products`:`${products.length} product${products.length===1?'':'s'}`;
+}
+
+function openUsageImportProductMatcher(index){
+  const entry=usageImportEntry(index);if(!entry){toast('That usage row is no longer available.',true);return;}
+  usageImportMatchingEntryIndex=index;
+  const sourceName=entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product';
+  const context=document.getElementById('usage-import-product-match-context');
+  if(context)context.textContent=`Choose any catalog product for “${sourceName}”. The report quantity and usage values will stay unchanged.`;
+  const search=document.getElementById('usage-import-product-match-search');if(search)search.value='';
+  renderUsageImportProductMatcher();
+  openModal('modal-usage-product-match');
+  setTimeout(()=>search?.focus(),0);
+}
+
+function closeUsageImportProductMatcher(){
+  usageImportMatchingEntryIndex=null;
+  closeModal('modal-usage-product-match');
+}
+
+function chooseUsageImportProduct(productId){
+  const entry=usageImportEntry(usageImportMatchingEntryIndex);
+  const product=getProduct(productId);
+  if(!entry||!product||product.archived){toast('That product is no longer available.',true);return;}
+  const sourceName=entry.row.reportProductName||entry.row.productName||'Usage row';
+  linkUsageImportRow(entry,product);
+  entry.suggestionAccepted=false;
+  entry.productCreated=false;
+  entry.manualMatch=true;
+  closeUsageImportProductMatcher();
+  renderUsageImportReview({preservePosition:true});
+  toast(`Matched ${sourceName} to ${product.name}.`);
 }
 
 function createUsageImportProduct(entry){
@@ -1441,7 +1494,20 @@ function createUsageImportProduct(entry){
   };
   state.products.push(product);
   linkUsageImportRow(entry,product);
+  entry.suggestionAccepted=false;
+  entry.manualMatch=false;
+  entry.productCreated=true;
   return product;
+}
+
+function addUsageImportEntryAsProduct(index){
+  const entry=usageImportEntry(index);
+  if(!entry||entry.row.matched&&entry.row.productId){toast('That usage row is already matched.',true);return;}
+  const product=createUsageImportProduct(entry);
+  save();
+  renderProducts();
+  renderUsageImportReview({preservePosition:true});
+  toast(`Added ${product.name} as a new product and matched this usage row.`);
 }
 
 function addSelectedUsageImportProducts(){
@@ -1456,6 +1522,7 @@ function addSelectedUsageImportProducts(){
 
 function discardUsageImportReview(){
   pendingUsageImport=null;
+  usageImportMatchingEntryIndex=null;
   const panel=document.getElementById('usage-import-review');if(panel)panel.hidden=true;
   const zone=document.getElementById('usage-zone');if(zone)zone.hidden=false;
   const status=document.getElementById('usage-status');if(status)status.textContent='';

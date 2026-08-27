@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=count-workflow-1"/>
+<link rel="stylesheet" href="css/styles.css?v=usage-matching-1"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -1121,7 +1121,7 @@
   <section class="usage-import-review" id="usage-import-review" hidden>
     <div class="inventory-template-import-summary" id="usage-import-summary"></div>
     <div id="usage-import-matched-groups"></div>
-    <div class="inventory-template-unmatched-head"><strong>Unmatched products by report category</strong><small>Categories and subcategories come from the uploaded report. Nothing is merged automatically.</small></div>
+    <div class="inventory-template-unmatched-head"><strong>Unmatched products by report category</strong><small>Use the suggestion, search the full catalog, or add the report item as a new product.</small></div>
     <div id="usage-import-unmatched-groups"></div>
     <div class="inventory-template-review-actions">
       <button class="btn btn-secondary btn-sm" type="button" onclick="selectAllUsageImportUnmatched(true)">Select all unmatched</button>
@@ -1133,6 +1133,19 @@
       <button class="btn btn-primary" id="usage-import-create-log" type="button" onclick="finalizeUsageImport()">Create Usage Log</button>
     </div>
   </section>
+</div>
+</div>
+
+<!-- USAGE PRODUCT MATCHER MODAL -->
+<div class="modal-overlay" id="modal-usage-product-match">
+<div class="modal usage-product-match-modal" role="dialog" aria-modal="true" aria-labelledby="usage-import-product-match-title">
+  <button class="modal-close" type="button" aria-label="Close product matcher" onclick="closeUsageImportProductMatcher()">&times;</button>
+  <h3 id="usage-import-product-match-title">Match to an existing product</h3>
+  <p class="count-setup-intro" id="usage-import-product-match-context"></p>
+  <label class="form-group" for="usage-import-product-match-search"><span>Search the full product catalog</span><input type="search" id="usage-import-product-match-search" placeholder="Product name, inventory name, SKU, or category…" autocomplete="off" oninput="renderUsageImportProductMatcher()"></label>
+  <div class="usage-import-product-match-head"><strong>Catalog products</strong><small id="usage-import-product-match-count"></small></div>
+  <div class="usage-import-product-match-list" id="usage-import-product-match-list"></div>
+  <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeUsageImportProductMatcher()">Cancel</button></div>
 </div>
 </div>
 
@@ -1270,7 +1283,7 @@
 <script src="js/data/core-drinks-may-2026.js?v=core-drinks-may-2026-2"></script>
 <script src="js/data/spring-drinks-2026.js?v=spring-drinks-2026-1"></script>
 <script src="js/data/kitchen-menu-may-2026.js?v=kitchen-menu-may-2026-3"></script>
-<script src="js/state.js?v=count-workflow-1"></script>
+<script src="js/state.js?v=usage-matching-1"></script>
 <script src="js/columns.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/store.js?v=par-levels-2026-08-26"></script>
@@ -1279,7 +1292,7 @@
 <script src="js/products.js?v=kitchen-menu-3"></script>
 <script src="js/inventory.js?v=count-workflow-1"></script>
 <script src="js/orders.js"></script>
-<script src="js/usage.js?v=foodtrak-pdf-upload-1"></script>
+<script src="js/usage.js?v=usage-matching-1"></script>
 <script src="js/suppliers.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-workflow-1"></script>
