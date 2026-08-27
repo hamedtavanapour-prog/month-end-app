@@ -257,6 +257,8 @@ function updateProdSelBar(){
   const n=selectedProds.size;
   document.getElementById('prod-sel-bar').classList.toggle('show',n>0);
   document.getElementById('prod-sel-count').textContent=`${n} selected`;
+  const mergeButton=document.getElementById('prod-merge-selected');
+  if(mergeButton)mergeButton.disabled=n!==2;
 }
 function prodSelectVisible(){document.querySelectorAll('#prod-tbody tr[data-id]').forEach(r=>{selectedProds.add(r.dataset.id);const cb=r.querySelector('input[type=checkbox]');if(cb)cb.checked=true;});syncHeaderCb();updateProdSelBar();}
 function prodClearSel(){selectedProds.clear();document.querySelectorAll('#prod-tbody input[type=checkbox]').forEach(c=>c.checked=false);syncHeaderCb();updateProdSelBar();}
@@ -267,6 +269,176 @@ function prodDeleteSelected(){
   state.suppliers.forEach(s=>{if(Array.isArray(s.products))s.products=s.products.filter(pid=>!selectedProds.has(pid));});
   selectedProds.clear();save();renderProducts();updateProdSelBar();
   toast(`${n} product${n>1?'s':''} deleted.`);
+}
+
+const PRODUCT_MERGE_FIELDS=[
+  {key:'name',label:'Product name'},
+  {key:'inventoryName',label:'Inventory name'},
+  {key:'category',label:'Category'},
+  {key:'subcategory',label:'Subcategory'},
+  {key:'unit',label:'Default packaging / unit'},
+  {key:'cost',label:'Cost'},
+  {key:'par',label:'Par level'},
+  {key:'lastCount',label:'Last count'},
+  {key:'sku',label:'SKU / code'},
+  {key:'aliases',label:'Alternate names'},
+  {key:'departments',label:'Departments'},
+  {key:'suppliers',label:'Suppliers'},
+  {key:'notes',label:'Notes'},
+  {key:'status',label:'Status'}
+];
+
+function productMergeDisplayValue(product,key){
+  if(key==='departments')return productDepartmentIds(product).map(departmentName).join(', ')||'—';
+  if(key==='suppliers')return(product.suppliers||[]).map(id=>state.suppliers.find(item=>item.id===id)?.name).filter(Boolean).join(', ')||'—';
+  if(key==='cost')return Number(product.cost)>0?fmt(product.cost):'—';
+  if(key==='status')return product.archived||product.status==='delisted'?'De-listed':'Active';
+  const value=product[key];
+  return value===null||value===undefined||value===''?'—':String(value);
+}
+
+function productMergeFieldConflict(left,right,key){
+  const normalize=value=>Array.isArray(value)?[...value].sort().join('|'):String(value??'').trim().toLowerCase();
+  const leftValue=key==='departments'?productDepartmentIds(left):key==='suppliers'?(left.suppliers||[]):key==='status'?(left.archived||left.status==='delisted'?'delisted':'active'):left[key];
+  const rightValue=key==='departments'?productDepartmentIds(right):key==='suppliers'?(right.suppliers||[]):key==='status'?(right.archived||right.status==='delisted'?'delisted':'active'):right[key];
+  return normalize(leftValue)!==normalize(rightValue);
+}
+
+function openProductMergeReview(){
+  const ids=[...selectedProds];
+  if(ids.length!==2){toast('Select exactly two products to merge.',true);return;}
+  const products=ids.map(getProduct).filter(Boolean);
+  if(products.length!==2){toast('One of the selected products is no longer available.',true);return;}
+  productMergeKeepId=products[0].id;
+  productMergeFieldSources=Object.fromEntries(PRODUCT_MERGE_FIELDS.map(field=>[field.key,productMergeKeepId]));
+  renderProductMergeReview(products);
+  openModal('modal-product-merge');
+}
+
+function setProductMergeKeep(productId){
+  productMergeKeepId=productId;
+  PRODUCT_MERGE_FIELDS.forEach(field=>{productMergeFieldSources[field.key]=productId;});
+  renderProductMergeReview();
+}
+
+function setProductMergeFieldSource(fieldKey,productId){
+  productMergeFieldSources[fieldKey]=productId;
+  renderProductMergeReview();
+}
+
+function renderProductMergeReview(products=null){
+  const selected=products||[...selectedProds].map(getProduct).filter(Boolean);
+  const body=document.getElementById('product-merge-body');
+  const confirmButton=document.getElementById('product-merge-confirm');
+  if(!body||selected.length!==2)return;
+  if(!selected.some(product=>product.id===productMergeKeepId))productMergeKeepId=selected[0].id;
+  PRODUCT_MERGE_FIELDS.forEach(field=>{if(!selected.some(product=>product.id===productMergeFieldSources[field.key]))productMergeFieldSources[field.key]=productMergeKeepId;});
+  const conflicts=PRODUCT_MERGE_FIELDS.filter(field=>productMergeFieldConflict(selected[0],selected[1],field.key));
+  body.innerHTML=`
+    <div class="product-merge-choice-grid">${selected.map(product=>`<label class="product-merge-choice ${product.id===productMergeKeepId?'selected':''}"><input type="radio" name="product-merge-keep" value="${escapeHtml(product.id)}" ${product.id===productMergeKeepId?'checked':''} onchange="setProductMergeKeep(this.value)"><span><small>Keep this item record</small><strong>${escapeHtml(product.name)}</strong><em>${escapeHtml(product.inventoryName||product.name)}</em></span></label>`).join('')}</div>
+    <div class="product-merge-summary"><strong>${conflicts.length} conflicting field${conflicts.length===1?'':'s'} to review</strong><span>Click either value in every row to choose exactly what the merged item keeps.</span></div>
+    <div class="table-wrap product-merge-table"><table><thead><tr><th>Field</th><th>${escapeHtml(selected[0].name)}</th><th>${escapeHtml(selected[1].name)}</th></tr></thead><tbody>${PRODUCT_MERGE_FIELDS.map(field=>{const conflict=productMergeFieldConflict(selected[0],selected[1],field.key);return`<tr class="${conflict?'has-conflict':''}"><td><strong>${escapeHtml(field.label)}</strong>${conflict?'<small>Conflict</small>':''}</td>${selected.map(product=>`<td class="${productMergeFieldSources[field.key]===product.id?'kept-value':''}"><button class="product-merge-value-choice ${productMergeFieldSources[field.key]===product.id?'selected':''}" type="button" onclick="setProductMergeFieldSource('${field.key}','${product.id}')"><span>${escapeHtml(productMergeDisplayValue(product,field.key))}</span><small>${productMergeFieldSources[field.key]===product.id?'Selected':'Use this value'}</small></button></td>`).join('')}</tr>`;}).join('')}</tbody></table></div>
+    <p class="product-merge-impact">All linked usage rows, orders, suppliers, recipes, room assignments, and count history will be reassigned to the kept product. If both products occur in one historical count, their quantities are combined.</p>`;
+  if(confirmButton){const keep=selected.find(product=>product.id===productMergeKeepId);confirmButton.textContent=`Keep ${keep?.name||'selected item'} & Merge`;}
+}
+
+function productMergeUnique(values=[]){return[...new Set(values.filter(value=>value!==null&&value!==undefined&&value!==''))];}
+function productMergeReplaceIdList(values,keepId,removeId){return productMergeUnique((Array.isArray(values)?values:[]).map(id=>id===removeId?keepId:id));}
+function productMergeQuantityMap(items,keepId,removeId){
+  if(!items||typeof items!=='object'||!Object.prototype.hasOwnProperty.call(items,removeId))return items||{};
+  const next={...items};
+  if(Object.prototype.hasOwnProperty.call(next,keepId))next[keepId]=(parseFloat(next[keepId])||0)+(parseFloat(next[removeId])||0);
+  else next[keepId]=next[removeId];
+  delete next[removeId];
+  return next;
+}
+function productMergeUnits(keep,remove){
+  const units=[...normalizeProductUnits(keep),...normalizeProductUnits(remove)];
+  const seen=new Set();
+  return units.filter(unit=>{const key=[unit.unit,unit.unitSize,unit.sku].map(value=>String(value||'').trim().toLowerCase()).join('|');if(seen.has(key))return false;seen.add(key);return true;});
+}
+
+function productMergeUsageRows(rows,keep,removeId){
+  const result=[];
+  const numericFields=['qty','actualUsage','idealUsage','begin','end','purch','transferIn','transferOut','production'];
+  (rows||[]).forEach(sourceRow=>{
+    const row=sourceRow.productId===removeId?{...sourceRow,productId:keep.id,productName:keep.name,matchedName:keep.name,matched:true}:sourceRow;
+    if(row.productId!==keep.id){result.push(row);return;}
+    const existing=result.find(candidate=>candidate.productId===keep.id);
+    if(!existing){result.push(row);return;}
+    numericFields.forEach(field=>{
+      const left=parseFloat(existing[field]);const right=parseFloat(row[field]);
+      if(Number.isFinite(left)||Number.isFinite(right))existing[field]=(Number.isFinite(left)?left:0)+(Number.isFinite(right)?right:0);
+    });
+  });
+  return result;
+}
+
+function productMergeApplySelectedFields(target,keepSource,removeSource,fieldSources={}){
+  PRODUCT_MERGE_FIELDS.forEach(({key})=>{
+    const source=fieldSources[key]===removeSource.id?removeSource:keepSource;
+    if(key==='departments'){
+      target.departments=[...productDepartmentIds(source)];
+      target.department=target.departments[0]||'';
+    }else if(key==='suppliers')target.suppliers=[...(source.suppliers||[])];
+    else if(key==='status'){
+      const delisted=!!source.archived||source.status==='delisted';
+      target.archived=delisted;
+      target.status=delisted?'delisted':'active';
+    }else target[key]=typeof structuredClone==='function'?structuredClone(source[key]):JSON.parse(JSON.stringify(source[key]??null));
+  });
+}
+
+function mergeProductState(workspace,keepId,removeId,fieldSources={}){
+  const keep=(workspace.products||[]).find(product=>product.id===keepId);
+  const remove=(workspace.products||[]).find(product=>product.id===removeId);
+  if(!keep||!remove||keepId===removeId)return false;
+  const keepSource=typeof structuredClone==='function'?structuredClone(keep):JSON.parse(JSON.stringify(keep));
+  const removeSource=typeof structuredClone==='function'?structuredClone(remove):JSON.parse(JSON.stringify(remove));
+  keep.departments=productMergeUnique([...productDepartmentIds(keep),...productDepartmentIds(remove)]);
+  keep.suppliers=productMergeUnique([...(keep.suppliers||[]),...(remove.suppliers||[])]);
+  keep.aliases=productMergeUnique([...String(keep.aliases||'').split(','),...String(remove.aliases||'').split(','),remove.name,remove.inventoryName].map(value=>String(value||'').trim()).filter(value=>value&&value.toLowerCase()!==String(keep.name||'').toLowerCase())).join(', ');
+  keep.units=productMergeUnits(keep,remove);
+  ['inventoryName','notes','sku','unit','category','subcategory'].forEach(key=>{if((keep[key]===null||keep[key]===undefined||keep[key]==='')&&remove[key]!==undefined)keep[key]=remove[key];});
+  ['cost','par','lastCount'].forEach(key=>{if((keep[key]===null||keep[key]===undefined||keep[key]===''||Number(keep[key])===0)&&Number(remove[key])!==0)keep[key]=remove[key];});
+  productMergeApplySelectedFields(keep,keepSource,removeSource,fieldSources);
+  const selectedSupplierIds=new Set(keep.suppliers||[]);
+  (workspace.suppliers||[]).forEach(supplier=>{supplier.products=productMergeUnique((supplier.products||[]).filter(id=>id!==keepId&&id!==removeId));if(selectedSupplierIds.has(supplier.id))supplier.products.push(keepId);});
+  (workspace.rooms||[]).forEach(room=>{room.productIds=Array.isArray(room.productIds)?productMergeReplaceIdList(room.productIds,keepId,removeId):room.productIds;room.manualProductIds=productMergeReplaceIdList(room.manualProductIds,keepId,removeId);});
+  (workspace.inventories||[]).forEach(inv=>{
+    inv.items=productMergeQuantityMap(inv.items,keepId,removeId);
+    (inv.rooms||[]).forEach(room=>{room.items=productMergeQuantityMap(room.items,keepId,removeId);room.extraProductIds=productMergeReplaceIdList(room.extraProductIds,keepId,removeId);});
+    inv.selectedProductIds=productMergeReplaceIdList(inv.selectedProductIds,keepId,removeId);
+  });
+  (workspace.orders||[]).forEach(order=>(order.lines||[]).forEach(line=>{if(line.productId===removeId)line.productId=keepId;}));
+  (workspace.usageLogs||[]).forEach(log=>{
+    log.rows=productMergeUsageRows(log.rows,keep,removeId);
+  });
+  workspace.uploadedUsage=productMergeUsageRows(workspace.uploadedUsage,keep,removeId);
+  if(workspace.inventoryEntryTemplate?.items){
+    workspace.inventoryEntryTemplate.items=workspace.inventoryEntryTemplate.items.map(item=>item.productId===removeId?{...item,productId:keepId,productName:keep.name}:item).filter((item,index,items)=>items.findIndex(candidate=>candidate.productId===item.productId)===index);
+  }
+  (workspace.drinks||[]).forEach(drink=>{drink.linkedProducts=productMergeReplaceIdList(drink.linkedProducts,keepId,removeId);(drink.ingredients||[]).forEach(ingredient=>{if(ingredient&&typeof ingredient==='object'&&ingredient.productId===removeId)ingredient.productId=keepId;});});
+  (workspace.menus||[]).forEach(menu=>(menu.items||[]).forEach(item=>(item.ingredients||[]).forEach(ingredient=>{if(ingredient&&typeof ingredient==='object'&&ingredient.productId===removeId){ingredient.productId=keepId;ingredient.productName=keep.name;ingredient.name=ingredient.name||keep.name;}})));
+  workspace.products=workspace.products.filter(product=>product.id!==removeId);
+  return true;
+}
+
+async function confirmProductMerge(){
+  const ids=[...selectedProds];
+  if(ids.length!==2||!productMergeKeepId){toast('Choose the product to keep.',true);return;}
+  const removeId=ids.find(id=>id!==productMergeKeepId);
+  const keep=getProduct(productMergeKeepId);const remove=getProduct(removeId);
+  const mergedState=typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state));
+  if(!keep||!remove||!mergeProductState(mergedState,keep.id,remove.id,productMergeFieldSources)){toast('The products could not be merged.',true);return;}
+  const button=document.getElementById('product-merge-confirm');if(button){button.disabled=true;button.textContent='Merging…';}
+  const shared=typeof cloudMergeProducts==='function'?await cloudMergeProducts(keep.id,remove.id,mergedState):null;
+  if(!shared){if(button){button.disabled=false;button.textContent=`Keep ${keep.name} & Merge`;}toast('The products could not be saved. Try again.',true);return;}
+  state=shared;normalizeLoadedState();
+  selectedProds.clear();productMergeKeepId=null;productMergeFieldSources={};
+  try{localStorage.setItem('keg_bar_v5',JSON.stringify(state));}catch(error){}
+  closeModal('modal-product-merge');renderProducts();updateProdSelBar();
+  toast(`${remove.name} merged into ${keep.name}.`);
 }
 function openProductModal(id=null){
   editingProductId=id;

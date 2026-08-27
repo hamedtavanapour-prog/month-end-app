@@ -6,13 +6,14 @@ import {
   createCountDraftInWorkspace,
   deleteCountFromWorkspace,
   finaliseCountInWorkspace,
+  importRoomlessCountInWorkspace,
   isCountJsonObject,
   preserveFinalisedCounts,
   saveCountRoomInWorkspace,
   setCountArchivedInWorkspace,
 } from "@/lib/workspace/count-state";
 import { renameCategoryInWorkspace } from "@/lib/workspace/category-state";
-import { isJsonObject, mergeProductIntoWorkspace } from "@/lib/workspace/product-state";
+import { isJsonObject, mergeProductIntoWorkspace, mergeProductsInWorkspace } from "@/lib/workspace/product-state";
 import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -218,13 +219,15 @@ export async function PATCH(request: Request) {
   const countArchive = isJsonObject(body.countArchive) ? body.countArchive : null;
   const countDelete = isJsonObject(body.countDelete) ? body.countDelete : null;
   const countDraft = isJsonObject(body.countDraft) ? body.countDraft : null;
+  const countImport = isJsonObject(body.countImport) ? body.countImport : null;
   const countRoomSave = isJsonObject(body.countRoomSave) ? body.countRoomSave : null;
   const countFinalise = isJsonObject(body.countFinalise) ? body.countFinalise : null;
+  const productMerge = isJsonObject(body.productMerge) ? body.productMerge : null;
   const product = isJsonObject(body.product) ? body.product : null;
-  if (!categoryRename && !countArchive && !countDelete && !countDraft && !countRoomSave && !countFinalise && !product) {
+  if (!categoryRename && !countArchive && !countDelete && !countDraft && !countImport && !countRoomSave && !countFinalise && !productMerge && !product) {
     return jsonResponse({ error: "A supported workspace update is required" }, 400);
   }
-  const requiredPermission = countFinalise ? "counts.finish" : countArchive || countDelete || countDraft || countRoomSave ? "counts.create" : "products.manage";
+  const requiredPermission = countFinalise ? "counts.finish" : countArchive || countDelete || countDraft || countImport || countRoomSave ? "counts.create" : "products.manage";
   if (!isAllowed(context, new Set([requiredPermission]))) {
     return jsonResponse({ error: "You do not have permission to make this change" }, 403);
   }
@@ -260,6 +263,39 @@ export async function PATCH(request: Request) {
     const canDeleteFinalised = context.role === "owner" || context.role === "admin";
     buildNextData = (data) => deleteCountFromWorkspace(data, countId, canDeleteFinalised);
     entityLabel = "deleted count";
+  } else if (countImport) {
+    const id = typeof countImport.id === "string" ? countImport.id.trim() : "";
+    const date = typeof countImport.date === "string" ? countImport.date.trim() : "";
+    const label = typeof countImport.label === "string" ? countImport.label.trim() : "";
+    const sourceFile = typeof countImport.sourceFile === "string" ? countImport.sourceFile.trim().slice(0, 200) : "Usage report";
+    const requestedItems = isJsonObject(countImport.items) ? countImport.items : null;
+    if (!id || id.length > 100 || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !label || label.length > 120 || !requestedItems) {
+      return jsonResponse({ error: "Valid imported count details are required" }, 400);
+    }
+    const items: Record<string, number> = {};
+    for (const [productId, rawQuantity] of Object.entries(requestedItems)) {
+      const quantity = typeof rawQuantity === "number" ? rawQuantity : Number(rawQuantity);
+      if (!productId || productId.length > 100 || !Number.isFinite(quantity) || quantity < 0) {
+        return jsonResponse({ error: "Imported count quantities must be zero or more" }, 400);
+      }
+      items[productId] = quantity;
+    }
+    if (!Object.keys(items).length || Object.keys(items).length > 5000) return jsonResponse({ error: "The imported count must contain between 1 and 5000 items" }, 400);
+    const actor = { id: context.userId, name: context.displayName.slice(0, 160), role: (context.jobTitle || context.role).slice(0, 80) };
+    const now = new Date().toISOString();
+    buildNextData = (data) => {
+      const workspace = isJsonObject(data) ? data : {};
+      const activeIds = new Set((Array.isArray(workspace.products) ? workspace.products : []).filter(isJsonObject).filter(item => item.archived !== true && typeof item.id === "string").map(item => String(item.id)));
+      const safeItems = Object.fromEntries(Object.entries(items).filter(([productId]) => activeIds.has(productId)));
+      if (!Object.keys(safeItems).length) throw new Error("count_import_no_products");
+      return importRoomlessCountInWorkspace(workspace, {
+        id, date, label, items: safeItems, rooms: [], sourceFile,
+        sourcePeriodStart: typeof countImport.sourcePeriodStart === "string" ? countImport.sourcePeriodStart.slice(0, 10) : "",
+        sourcePeriodEnd: typeof countImport.sourcePeriodEnd === "string" ? countImport.sourcePeriodEnd.slice(0, 10) : "",
+        createdBy: actor, createdAt: now, finalisedBy: actor, finalisedAt: now, updatedBy: actor, updatedAt: now,
+      });
+    };
+    entityLabel = "imported month-end count";
   } else if (countDraft) {
     const id = typeof countDraft.id === "string" ? countDraft.id.trim() : "";
     const date = typeof countDraft.date === "string" ? countDraft.date.trim() : "";
@@ -354,6 +390,15 @@ export async function PATCH(request: Request) {
     const actor = { id: context.userId, name: context.displayName, role: context.jobTitle || context.role };
     buildNextData = (data) => finaliseCountInWorkspace(data, countId, actor, zeroItemsByRoom);
     entityLabel = "finalised count";
+  } else if (productMerge) {
+    const keepId = typeof productMerge.keepId === "string" ? productMerge.keepId.trim() : "";
+    const removeId = typeof productMerge.removeId === "string" ? productMerge.removeId.trim() : "";
+    const keepProduct = isJsonObject(productMerge.keepProduct) ? productMerge.keepProduct : null;
+    if (!keepId || !removeId || keepId === removeId || !keepProduct || typeof keepProduct.name !== "string" || !keepProduct.name.trim()) {
+      return jsonResponse({ error: "Two valid products and the item to keep are required" }, 400);
+    }
+    buildNextData = (data) => mergeProductsInWorkspace(data, keepId, removeId, keepProduct);
+    entityLabel = "merged product";
   } else {
     if (!product || typeof product.id !== "string" || !product.id || typeof product.name !== "string" || !product.name.trim()) {
       return jsonResponse({ error: "Product ID and name are required" }, 400);
@@ -387,8 +432,17 @@ export async function PATCH(request: Request) {
       if (error instanceof Error && error.message === "count_not_found") {
         return jsonResponse({ error: "That count no longer exists" }, 404);
       }
+      if (error instanceof Error && error.message === "count_import_no_products") {
+        return jsonResponse({ error: "None of the imported products are active in this workspace" }, 409);
+      }
       if (error instanceof Error && error.message === "finalised_count_delete_forbidden") {
         return jsonResponse({ error: "Only an owner or administrator can delete a finalised count" }, 403);
+      }
+      if (error instanceof Error && error.message === "product_merge_not_found") {
+        return jsonResponse({ error: "One of those products no longer exists" }, 404);
+      }
+      if (error instanceof Error && error.message === "product_merge_invalid") {
+        return jsonResponse({ error: "Two different products are required" }, 400);
       }
       throw error;
     }

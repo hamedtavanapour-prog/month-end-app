@@ -44,7 +44,7 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
     },
   };
   runInNewContext(
-    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct,liveUsagePurchaseQty,liveUsagePurchaseQtyByProduct,liveInventoryQuantity,liveBelowParQty};`,
+    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct,liveUsagePurchaseQty,liveUsagePurchaseQtyByProduct,liveUsageReportValuesByProduct,liveUsageBeginQty,liveInventoryQuantity,liveBelowParQty,liveParDifference};`,
     context,
   );
   return (
@@ -54,8 +54,11 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
         liveUsageQtyByProduct: (baselineDate?: string) => Record<string, number>;
         liveUsagePurchaseQty: (row: UsageRow) => number;
         liveUsagePurchaseQtyByProduct: (baselineDate?: string) => Record<string, number>;
+        liveUsageReportValuesByProduct: (log: UsageLog, getter: (row: UsageRow) => number) => Record<string, number>;
+        liveUsageBeginQty: (row: UsageRow & { begin?: number | string }) => number;
         liveInventoryQuantity: (begin: number, reportPurchases: number, idealUsage: number) => number;
         liveBelowParQty: (row: LiveRow) => number;
+        liveParDifference: (row: LiveRow) => { label: string; value: string; className: string };
       };
     }
   ).__liveUsage;
@@ -105,6 +108,17 @@ describe("live inventory deductions from usage reports", () => {
     expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ barolo: 3 });
   });
 
+  it("reads one Begin value directly from the selected usage report", () => {
+    const rows = [
+      { productId: "barolo", matched: true, actualUsage: 8, idealUsage: 3, begin: 9 },
+      { productId: "barolo", matched: true, actualUsage: 2, idealUsage: 1, begin: 4 },
+    ];
+    const log = { periodEnd: "2026-08-25", rows };
+    const calculator = loadLiveUsageCalculator([log]);
+
+    expect(calculator.liveUsageReportValuesByProduct(log, calculator.liveUsageBeginQty)).toEqual({ barolo: 9 });
+  });
+
   it("does not read purchases from orders", () => {
     const source = readFileSync(new URL("../../public/legacy/js/inventory.js", import.meta.url), "utf8");
 
@@ -119,5 +133,6 @@ describe("live inventory deductions from usage reports", () => {
     expect(calculator.liveBelowParQty({ live: 12, par: 10 })).toBe(0);
     expect(calculator.liveBelowParQty({ live: -2, par: 10 })).toBe(12);
     expect(calculator.liveBelowParQty({ live: 3, par: 0 })).toBe(0);
+    expect(calculator.liveParDifference({ live: 12, par: 10 })).toEqual({ label: "Above Par", value: "2", className: "above-par" });
   });
 });

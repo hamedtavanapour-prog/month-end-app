@@ -3,6 +3,8 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
+import { importRoomlessCountInWorkspace } from "./workspace/count-state";
+
 function loadInventoryHelpers(inventories: Array<Record<string, unknown>> = []) {
   const source = readFileSync(new URL("../../public/legacy/js/inventory.js", import.meta.url), "utf8");
   const products = [
@@ -39,6 +41,26 @@ function loadInventoryHelpers(inventories: Array<Record<string, unknown>> = []) 
 }
 
 describe("count workflow helpers", () => {
+  it("stores imported End totals as a finalised count without rooms", () => {
+    const workspace = importRoomlessCountInWorkspace({ inventories: [] }, {
+      id: "imported-count",
+      date: "2026-08-25",
+      label: "August month end",
+      sourceFile: "usage.xls",
+      items: { listed: 6 },
+      createdBy: { id: "owner", name: "Owner", role: "Owner" },
+    });
+    const inventories = workspace.inventories as Array<Record<string, unknown>>;
+    expect(inventories[0]).toEqual(expect.objectContaining({
+      id: "imported-count",
+      recordType: "imported",
+      finalised: true,
+      status: "finalised",
+      rooms: [],
+      items: { listed: 6 },
+    }));
+  });
+
   it("groups every count-only addition under Unlisted", () => {
     const helpers = loadInventoryHelpers();
     expect(helpers.countProductDisplayGroup(

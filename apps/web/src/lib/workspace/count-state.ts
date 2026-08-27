@@ -93,6 +93,32 @@ export function createCountDraftInWorkspace(data: Json, draft: JsonObject): Json
   return { ...workspace, inventories };
 }
 
+export function importRoomlessCountInWorkspace(data: Json, imported: JsonObject): JsonObject {
+  const workspace = isCountJsonObject(data) ? data : {};
+  const inventories = Array.isArray(workspace.inventories) ? [...workspace.inventories] : [];
+  const importedId = String(imported.id ?? "");
+  if (!importedId) throw new Error("count_not_found");
+  if (inventories.some((candidate) => isCountJsonObject(candidate) && candidate.id === importedId)) return workspace;
+  const actor = isCountJsonObject(imported.createdBy) ? imported.createdBy : {};
+  inventories.push(appendCountHistory({
+    ...imported,
+    rooms: [],
+    draft: false,
+    status: "finalised",
+    finalised: true,
+    recordType: "imported",
+  }, historyEntry("imported", actor, {
+    sourceFile: typeof imported.sourceFile === "string" ? imported.sourceFile : "",
+    importedItems: isCountJsonObject(imported.items) ? Object.keys(imported.items).length : 0,
+  })));
+  inventories.sort((left, right) => {
+    const leftDate = isCountJsonObject(left) ? String(left.date ?? "") : "";
+    const rightDate = isCountJsonObject(right) ? String(right.date ?? "") : "";
+    return rightDate.localeCompare(leftDate);
+  });
+  return { ...workspace, inventories };
+}
+
 export function saveCountRoomInWorkspace(
   data: Json,
   countId: string,

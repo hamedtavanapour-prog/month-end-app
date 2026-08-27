@@ -194,6 +194,7 @@
     <span class="sel-count" id="prod-sel-count">0 selected</span>
     <button class="btn btn-secondary btn-sm" onclick="prodSelectVisible()">Select All Visible</button>
     <button class="btn btn-secondary btn-sm" onclick="prodClearSel()">Clear</button>
+    <button class="btn btn-primary btn-sm" id="prod-merge-selected" type="button" onclick="openProductMergeReview()" disabled>Merge Selected</button>
     <button class="btn btn-danger btn-sm" onclick="prodDeleteSelected()"> Delete Selected</button>
   </div>
   <div class="catalog-layout">
@@ -237,7 +238,6 @@
 <div class="page" id="page-live-inventory">
   <div class="page-header">
     <div class="page-header-text"><h2>Live Inventory</h2><p>Begin + Purchased from usage reports − Punched In (Ideal Usage).</p></div>
-    <button class="btn btn-secondary btn-sm" onclick="renderLiveInventoryPage()"> Refresh</button>
   </div>
   <div class="stat-grid" id="live-inv-stats"></div>
   <div class="card live-inv-filter-card" style="margin-bottom:14px;">
@@ -247,19 +247,16 @@
       <div class="live-inv-filter-sheet" id="live-inv-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="live-inv-filter-title">
         <div class="live-inv-filter-sheet-head mobile-only"><div><span>Live inventory options</span><h4 id="live-inv-filter-title">Sort &amp; Filter</h4></div><button type="button" aria-label="Close sort and filters" onclick="closeLiveInventoryFilterSheet()">&times;</button></div>
         <div class="live-inv-filter-fields">
-          <div class="form-group live-baseline-group" style="flex:1;min-width:180px;"><label for="live-inv-baseline-f">Baseline</label><select id="live-inv-baseline-f" onchange="setLiveInventoryBaseline(this.value)"></select></div>
+          <div class="form-group live-baseline-group" style="flex:1;min-width:220px;"><label for="live-inv-baseline-f">Begin source</label><select id="live-inv-baseline-f" onchange="setLiveInventoryBaseline(this.value)"></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-cat-f">Category</label><select id="live-inv-cat-f" onchange="updateSubcatFilter('live-inv-sub-f','live-inv-cat-f');renderLiveInventoryPage()"><option value="">All</option><option>Spirits</option><option>Liqueurs</option><option>Reds</option><option>Whites</option><option>Rosé &amp; Bubbles</option><option>Beer</option><option>Cider</option><option>Food</option><option>Supplies</option><option>Other</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-sub-f">Subcategory</label><select id="live-inv-sub-f" onchange="renderLiveInventoryPage()"><option value="">All</option></select></div>
           <div class="form-group" style="flex:1;min-width:110px;"><label for="live-inv-status-f">Status</label><select id="live-inv-status-f" onchange="renderLiveInventoryPage()"><option value="">All</option><option value="low">Low / At Par</option><option value="negative">Negative</option><option value="movement">Has Movement</option></select></div>
           <div class="form-group" style="flex:1;min-width:130px;"><label for="live-inv-sort-f">Sort</label><select id="live-inv-sort-f" onchange="renderLiveInventoryPage()"><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="live-desc">Live quantity — highest</option><option value="live-asc">Live quantity — lowest</option><option value="base-desc">Begin — highest</option><option value="base-asc">Begin — lowest</option><option value="belowPar-desc">Below par — highest</option><option value="belowPar-asc">Below par — lowest</option><option value="value-desc">Value — highest</option><option value="value-asc">Value — lowest</option></select></div>
-          <div class="form-group live-room-group"><label>Rooms</label><div class="drop-wrap live-room-picker"><button class="btn btn-secondary live-room-picker-button" id="live-room-picker-button" type="button" onclick="toggleMenu('live-room-menu')"><span id="live-room-picker-label">All rooms</span><span aria-hidden="true">▾</span></button><div class="drop-menu live-room-menu" id="live-room-menu" onclick="event.stopPropagation()"><div class="live-room-menu-head"><strong>Select rooms</strong><button type="button" onclick="selectAllLiveInventoryRooms()">All rooms</button></div><div id="live-room-options"></div><button class="live-room-done" type="button" onclick="closeAllMenus()">Done</button></div></div></div>
         </div>
         <button class="btn btn-primary live-inv-filter-done mobile-only" type="button" onclick="closeLiveInventoryFilterSheet()">Done</button>
       </div>
       <div class="form-group live-view-mode-group"><label>View As</label><div class="segmented-control" id="live-inv-view-mode">
         <button type="button" title="List view" onclick="setLiveInventoryViewMode('list')">List</button>
-        <button type="button" title="Icon view" onclick="setLiveInventoryViewMode('icons')">▦</button>
-        <button type="button" title="Box view" onclick="setLiveInventoryViewMode('boxes')">▥</button>
         <button type="button" title="Detailed movement view" onclick="setLiveInventoryViewMode('variances')">Details</button>
       </div></div>
     </div>
@@ -272,7 +269,9 @@
   <div class="page-header">
     <div class="page-header-text"><h2>Counts</h2><p>File and review count logs. New counts reset the live inventory baseline.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="icon-btn" id="inventory-select-toggle" type="button" aria-label="Select multiple counts" title="Select multiple counts" onclick="toggleInventorySelectionMode()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
       <button class="btn btn-secondary btn-sm" id="inv-archive-toggle" onclick="toggleArchivedInventories()">Archived (0)</button>
+      <button class="btn btn-secondary" type="button" onclick="openMonthEndCountUploadModal()">Upload Month-End Count</button>
       <button class="btn btn-primary count-new-button" onclick="openInventoryRoomSelect()">＋ New Count</button>
       <div class="drop-wrap counts-mobile-more">
         <button class="btn btn-secondary" type="button" aria-haspopup="menu" aria-controls="counts-mobile-more-menu" onclick="toggleMenu('counts-mobile-more-menu')">More</button>
@@ -281,6 +280,7 @@
     </div>
   </div>
   <div class="inventory-list-context" id="inventory-list-context" hidden></div>
+  <div class="sel-bar inventory-selection-bar" id="inventory-selection-bar"><span class="sel-count" id="inventory-selection-count">0 selected</span><button class="btn btn-secondary btn-sm" type="button" onclick="selectAllVisibleInventories()">Select visible</button><button class="btn btn-secondary btn-sm" type="button" onclick="selectedInventoryIds.clear();renderInventoryTable()">Clear</button><button class="btn btn-secondary btn-sm" id="inventory-batch-archive" type="button" onclick="archiveSelectedInventories(true)">Archive</button><button class="btn btn-secondary btn-sm" id="inventory-batch-restore" type="button" onclick="archiveSelectedInventories(false)">Restore</button><button class="btn btn-danger btn-sm" type="button" onclick="deleteSelectedInventories()">Delete</button><button class="btn btn-secondary btn-sm" type="button" onclick="toggleInventorySelectionMode(false)">Done</button></div>
   <div class="counts-search-wrap">
     <label class="counts-search" for="inventory-search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
@@ -333,9 +333,10 @@
   <div class="card" id="usage-log-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
       <h3 style="font-size:0.95rem;">Usage Logs</h3>
-      <div class="form-group" style="min-width:120px;margin:0;"><label>Status</label><select id="usage-log-status-f" onchange="renderUsageLogs()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div>
+      <div class="usage-log-list-tools"><button class="icon-btn" id="usage-log-select-toggle" type="button" aria-label="Select multiple usage logs" title="Select multiple usage logs" onclick="toggleUsageLogSelectionMode()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><div class="form-group" style="min-width:120px;margin:0;"><label>Status</label><select id="usage-log-status-f" onchange="selectedUsageLogIds.clear();renderUsageLogs()"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></div></div>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Period</th><th>File</th><th>Products</th><th>Total Usage</th><th>Total Ideal Usage</th><th>Created By</th><th>Imported</th><th>Actions</th></tr></thead><tbody id="usage-log-tbody"></tbody></table></div>
+    <div class="sel-bar usage-log-selection-bar" id="usage-log-selection-bar"><span class="sel-count" id="usage-log-selection-count">0 selected</span><button class="btn btn-secondary btn-sm" type="button" onclick="selectAllVisibleUsageLogs()">Select visible</button><button class="btn btn-secondary btn-sm" type="button" onclick="selectedUsageLogIds.clear();renderUsageLogs()">Clear</button><button class="btn btn-secondary btn-sm" id="usage-log-batch-archive" type="button" onclick="archiveSelectedUsageLogs(true)">Archive</button><button class="btn btn-secondary btn-sm" id="usage-log-batch-restore" type="button" onclick="archiveSelectedUsageLogs(false)">Restore</button><button class="btn btn-danger btn-sm" type="button" onclick="deleteSelectedUsageLogs()">Delete</button><button class="btn btn-secondary btn-sm" type="button" onclick="toggleUsageLogSelectionMode(false)">Done</button></div>
+    <div class="table-wrap"><table><thead id="usage-log-thead"></thead><tbody id="usage-log-tbody"></tbody></table></div>
   </div>
   <div class="card" id="usage-summary-card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -834,6 +835,18 @@
 </div>
 
 <!-- PRODUCT MODAL -->
+<div class="modal-overlay" id="modal-product-merge">
+<div class="modal product-merge-modal" role="dialog" aria-modal="true" aria-labelledby="product-merge-title">
+  <button class="modal-close" type="button" aria-label="Close product merge review" onclick="closeModal('modal-product-merge')">&times;</button>
+  <span class="detail-eyebrow">Product cleanup</span>
+  <h3 id="product-merge-title">Review and merge products</h3>
+  <p class="count-setup-intro">Choose the item to keep, then review every conflicting field before merging. The other product will be removed after its linked records are reassigned.</p>
+  <div id="product-merge-body"></div>
+  <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="closeModal('modal-product-merge')">Cancel</button><button class="btn btn-primary" id="product-merge-confirm" type="button" onclick="confirmProductMerge()">Merge Products</button></div>
+</div>
+</div>
+
+<!-- PRODUCT MODAL -->
 <div class="modal-overlay" id="modal-product">
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prod-modal-title">
   <button class="modal-close" type="button" aria-label="Close product editor" onclick="closeModal('modal-product')">&times;</button>
@@ -979,6 +992,14 @@
         <input type="radio" name="count-report-format" value="pdf" onchange="updateCountReportExportPreview()">
         <span><strong>PDF</strong><small>Print-ready merged count report</small></span>
       </label>
+    </div>
+  </fieldset>
+
+  <fieldset class="count-report-fieldset" id="count-report-recount-scope" hidden>
+    <legend>Re-count coverage</legend>
+    <div class="count-report-format-options">
+      <label class="count-report-format-option"><input type="radio" name="count-report-recount-scope" value="merged" checked onchange="updateCountReportExportPreview()"><span><strong>Full merged report</strong><small>Every original item, with re-counted quantities replacing the originals</small></span></label>
+      <label class="count-report-format-option"><input type="radio" name="count-report-recount-scope" value="recounted" onchange="updateCountReportExportPreview()"><span><strong>Re-counted items only</strong><small>Only the products included in this re-count</small></span></label>
     </div>
   </fieldset>
 
@@ -1132,6 +1153,30 @@
       <button class="btn btn-secondary" type="button" onclick="discardUsageImportReview()">Cancel</button>
       <button class="btn btn-primary" id="usage-import-create-log" type="button" onclick="finalizeUsageImport()">Create Usage Log</button>
     </div>
+  </section>
+</div>
+</div>
+
+<!-- MONTH-END COUNT UPLOAD MODAL -->
+<div class="modal-overlay" id="modal-count-import">
+<div class="modal count-import-modal" role="dialog" aria-modal="true" aria-labelledby="count-import-title">
+  <button class="modal-close" type="button" aria-label="Close month-end count upload" onclick="closeModal('modal-count-import')">&times;</button>
+  <h3 id="count-import-title">Upload Month-End Count</h3>
+  <p class="count-setup-intro">Upload a Usage Report. Only each matched product's <strong>End</strong> value becomes its total count; no rooms are created or changed.</p>
+  <div class="upload-zone" id="count-import-zone" role="button" tabindex="0" aria-label="Upload a month-end usage report" onclick="document.getElementById('count-import-file').click()" onkeydown="activateFilePicker(event,'count-import-file')">
+    <div class="up-icon">END</div>
+    <p><strong>Click or drag &amp; drop</strong> an Excel / CSV / PDF usage report</p>
+  </div>
+  <input type="file" id="count-import-file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="handleMonthEndCountUpload(event)">
+  <div id="count-import-status" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;"></div>
+  <section id="count-import-review" class="count-import-review" hidden>
+    <div class="inventory-template-import-summary" id="count-import-summary"></div>
+    <div class="form-grid count-import-fields">
+      <div class="form-group"><label for="count-import-date">Count Date</label><input type="date" id="count-import-date"></div>
+      <div class="form-group"><label for="count-import-label">Count Name</label><input type="text" id="count-import-label" maxlength="120"></div>
+    </div>
+    <div class="count-import-preview" id="count-import-preview"></div>
+    <div class="modal-actions"><button class="btn btn-secondary" type="button" onclick="resetMonthEndCountImport()">Choose Another File</button><button class="btn btn-primary" id="count-import-create" type="button" onclick="createMonthEndCountImport()">Create Count from End Values</button></div>
   </section>
 </div>
 </div>

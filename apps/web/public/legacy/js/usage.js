@@ -1354,7 +1354,7 @@ function renderUsageImportReview({preservePosition=false}={}){
       <label class="inventory-template-review-row">
         <input type="checkbox" data-usage-entry="${entry.index}" ${entry.selected?'checked':''} onchange="toggleUsageImportEntry(${entry.index},this.checked)">
         <span><strong>${escapeHtml(entry.row.reportProductName||entry.row.productName||entry.row.sku||'Unnamed product')}</strong><small>${escapeHtml(entry.category)} · ${escapeHtml(entry.subcategory)}${entry.row.reportSubcategory?` · Source: ${escapeHtml(entry.row.reportSubcategory)}`:''} · ${escapeHtml(entry.row.unitSize||'unit')} · Usage ${usageDisplayNumber(usageRowQty(entry.row))}</small></span>
-        <span class="usage-import-suggestion">${entry.suggestion?`<small>Possible match: ${escapeHtml(entry.suggestion.productName)}</small>`:'<small>No confident existing-product match</small>'}<span class="usage-import-match-actions">${entry.suggestion?`<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();useUsageImportSuggestion(${entry.index})">Use suggestion</button>`:''}<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();openUsageImportProductMatcher(${entry.index})">Find existing</button><button class="btn btn-primary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();addUsageImportEntryAsProduct(${entry.index})">Add as new</button></span></span>
+        <span class="usage-import-suggestion">${entry.suggestion?`<small>Possible match: ${escapeHtml(entry.suggestion.productName)}</small>`:'<small>No confident existing-product match</small>'}<span class="usage-import-match-actions">${entry.suggestion?`<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();useUsageImportSuggestion(${entry.index})">Use suggestion</button>`:''}<button class="btn btn-secondary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();openUsageImportProductMatcher(${entry.index})">Choose any product</button><button class="btn btn-primary btn-sm" type="button" onclick="event.preventDefault();event.stopPropagation();addUsageImportEntryAsProduct(${entry.index})">Add as new</button></span></span>
       </label>`).join('')}</div>
   </details>`;}).join('')||'<div class="inventory-template-empty">All extracted rows are matched.</div>';
   syncAllUsageImportControls();
@@ -1796,6 +1796,120 @@ function handleUsageUpload(e){
   reader.readAsArrayBuffer(file);
 }
 
+function monthEndCountItemsFromRows(rows=[]){
+  const items={};
+  const accepted=[];
+  const duplicates=[];
+  const unmatched=[];
+  rows.forEach(row=>{
+    const end=usageNumber(row?.end);
+    if(!row?.matched||!row.productId){unmatched.push(row);return;}
+    if(end===''||!Number.isFinite(Number(end))||Number(end)<0)return;
+    if(Object.prototype.hasOwnProperty.call(items,row.productId)){
+      duplicates.push(row);
+      return;
+    }
+    items[row.productId]=Number(end);
+    accepted.push({...row,end:Number(end)});
+  });
+  return{items,accepted,duplicates,unmatched};
+}
+
+function resetMonthEndCountImport(){
+  pendingMonthEndCountImport=null;
+  const input=document.getElementById('count-import-file');if(input)input.value='';
+  const zone=document.getElementById('count-import-zone');if(zone)zone.hidden=false;
+  const review=document.getElementById('count-import-review');if(review)review.hidden=true;
+  const status=document.getElementById('count-import-status');if(status)status.textContent='';
+}
+
+function openMonthEndCountUploadModal(){
+  resetMonthEndCountImport();
+  const date=document.getElementById('count-import-date');if(date)date.value=today();
+  const label=document.getElementById('count-import-label');if(label)label.value='Month-End Count';
+  openModal('modal-count-import');
+}
+
+function renderMonthEndCountImportReview(){
+  const pending=pendingMonthEndCountImport;
+  if(!pending)return;
+  const summary=document.getElementById('count-import-summary');
+  const preview=document.getElementById('count-import-preview');
+  const period=pending.period;
+  const periodText=period.start||period.end?`${period.start?fmtDate(period.start):'Unknown'} – ${period.end?fmtDate(period.end):'Unknown'}`:'Period not found';
+  if(summary)summary.innerHTML=`<strong>${pending.accepted.length} End value${pending.accepted.length===1?'':'s'} ready</strong><span>${escapeHtml(pending.fileName)} · ${escapeHtml(periodText)}</span>${pending.unmatched.length?`<small>${pending.unmatched.length} unmatched report row${pending.unmatched.length===1?' was':'s were'} skipped.</small>`:''}${pending.duplicates.length?`<small>${pending.duplicates.length} duplicate product row${pending.duplicates.length===1?' was':'s were'} skipped; values were not summed.</small>`:''}`;
+  if(preview)preview.innerHTML=`<div class="count-import-preview-head"><strong>Product</strong><strong>End total</strong></div>${pending.accepted.map(row=>`<div class="count-import-preview-row"><span><strong>${escapeHtml(getProduct(row.productId)?.name||row.productName||'Product')}</strong><small>${escapeHtml(row.unitSize||'')}</small></span><b>${escapeHtml(liveQty(row.end))}</b></div>`).join('')}`;
+  const zone=document.getElementById('count-import-zone');if(zone)zone.hidden=true;
+  const review=document.getElementById('count-import-review');if(review)review.hidden=false;
+}
+
+function handleMonthEndCountUpload(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  const status=document.getElementById('count-import-status');if(status)status.textContent='Reading End values from the usage report...';
+  const reader=new FileReader();
+  reader.onload=async loadEvent=>{
+    try{
+      const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+      const rows=isPdf?await readUsagePdfRows(loadEvent.target.result):readUsageSpreadsheetRows(loadEvent.target.result,{raw:true});
+      let parsed=[];
+      try{parsed=isPdf?parseFoodtrakUsagePdfRows(rows,file.name):parseFoodtrakUsageRows(rows,file.name);}catch(error){parsed=[];}
+      if(!parsed.length){
+        try{parsed=parseUsageReportRows(rows,file.name);}catch(error){parsed=[];}
+      }
+      if(isPdf&&!parsed.some(row=>row.matched))parsed=parseUsagePdfTextRows(rows,file.name);
+      if(!parsed.length)throw new Error('No usage-report rows could be read from this file.');
+      const extracted=monthEndCountItemsFromRows(parsed);
+      if(!extracted.accepted.length)throw new Error('No matched products with valid End values were found.');
+      const period=usagePeriodFromRows(parsed);
+      pendingMonthEndCountImport={fileName:file.name,period,...extracted};
+      const date=document.getElementById('count-import-date');if(date)date.value=period.end||today();
+      const label=document.getElementById('count-import-label');if(label)label.value=`Month-End Count — ${file.name.replace(/\.[^.]+$/,'')}`.slice(0,120);
+      if(status)status.textContent='Review the End totals below before creating the count.';
+      renderMonthEndCountImportReview();
+    }catch(error){
+      if(status)status.textContent=`Could not prepare this count: ${error.message}`;
+    }finally{
+      event.target.value='';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function createMonthEndCountImport(){
+  const pending=pendingMonthEndCountImport;
+  if(!pending)return;
+  const date=document.getElementById('count-import-date')?.value||'';
+  const label=document.getElementById('count-import-label')?.value.trim()||'';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Choose a valid count date.',true);return;}
+  if(!label){toast('Enter a name for this count.',true);return;}
+  const button=document.getElementById('count-import-create');
+  if(button){button.disabled=true;button.textContent='Creating Count...';}
+  const actor=typeof currentAuditStamp==='function'?currentAuditStamp():null;
+  const now=new Date().toISOString();
+  const record={
+    id:uid(),date,label:label.slice(0,120),items:{...pending.items},rooms:[],draft:false,status:'finalised',finalised:true,recordType:'imported',archived:false,
+    sourceFile:pending.fileName,sourcePeriodStart:pending.period.start||'',sourcePeriodEnd:pending.period.end||'',createdBy:actor,createdAt:now,updatedBy:actor,updatedAt:now,finalisedBy:actor,finalisedAt:now,
+    history:[inventoryHistoryEvent('imported',{sourceFile:pending.fileName,importedItems:pending.accepted.length})]
+  };
+  try{
+    const shared=typeof cloudImportMonthEndCount==='function'?await cloudImportMonthEndCount(record):null;
+    if(!shared)throw new Error('The count could not be saved.');
+    state=shared;
+    normalizeLoadedState();
+    renderInventoryTable();
+    refreshLiveInventoryIfVisible();
+    pendingMonthEndCountImport=null;
+    closeModal('modal-count-import');
+    toast(`Created ${label} from ${pending.accepted.length} End value${pending.accepted.length===1?'':'s'}.`);
+  }catch(error){
+    console.error('Month-end count import failed:',error);
+    toast(error.message||'The count could not be created.',true);
+  }finally{
+    if(button){button.disabled=false;button.textContent='Create Count from End Values';}
+  }
+}
+
 function inventoryTemplateUnitKey(value){
   return usageSizeKey(String(value||'').replace(/\s+/g,''));
 }
@@ -2127,14 +2241,43 @@ function editUsageLog(id){
   setTimeout(()=>document.querySelector('#modal-usage-log-detail input, #modal-usage-log-detail select')?.focus(),0);
 }
 
+function toggleUsageLogSelectionMode(force=null){
+  usageLogSelectionMode=force===null?!usageLogSelectionMode:!!force;
+  if(!usageLogSelectionMode)selectedUsageLogIds.clear();
+  renderUsageLogs();
+}
+function toggleUsageLogSelection(id,selected){
+  if(selected)selectedUsageLogIds.add(id);else selectedUsageLogIds.delete(id);
+  renderUsageLogs();
+}
+function visibleUsageLogs(){
+  const status=document.getElementById('usage-log-status-f')?.value||'active';
+  return ensureUsageLogs().filter(log=>status==='all'||(status==='archived'?!!log.archived:!log.archived));
+}
+function selectAllVisibleUsageLogs(){visibleUsageLogs().forEach(log=>selectedUsageLogIds.add(log.id));renderUsageLogs();}
+function syncUsageLogSelectionBar(){
+  const bar=document.getElementById('usage-log-selection-bar');
+  const count=document.getElementById('usage-log-selection-count');
+  const toggle=document.getElementById('usage-log-select-toggle');
+  const status=document.getElementById('usage-log-status-f')?.value||'active';
+  if(bar)bar.classList.toggle('show',usageLogSelectionMode);
+  if(count)count.textContent=`${selectedUsageLogIds.size} selected`;
+  if(toggle){toggle.classList.toggle('active',usageLogSelectionMode);toggle.setAttribute('aria-pressed',String(usageLogSelectionMode));}
+  const archive=document.getElementById('usage-log-batch-archive');if(archive)archive.hidden=status==='archived';
+  const restore=document.getElementById('usage-log-batch-restore');if(restore)restore.hidden=status==='active';
+}
+
 function renderUsageLogs(){
   const tbody=document.getElementById('usage-log-tbody');
-  if(!tbody)return;
-  const logs=ensureUsageLogs();
-  const status=document.getElementById('usage-log-status-f')?.value||'active';
-  const visibleLogs=logs.filter(log=>status==='all'||(status==='archived'?!!log.archived:!log.archived));
+  const thead=document.getElementById('usage-log-thead');
+  if(!tbody||!thead)return;
+  const visibleLogs=visibleUsageLogs();
+  const validIds=new Set(ensureUsageLogs().map(log=>log.id));
+  selectedUsageLogIds=new Set([...selectedUsageLogIds].filter(id=>validIds.has(id)));
+  thead.innerHTML=`<tr>${usageLogSelectionMode?'<th class="usage-log-select-column"><span class="sr-only">Select</span></th>':''}<th>Period</th><th>File</th><th>Products</th><th>Total Usage</th><th>Total Ideal Usage</th><th>Created By</th><th>Imported</th><th>Actions</th></tr>`;
+  syncUsageLogSelectionBar();
   if(!visibleLogs.length){
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No usage logs yet.</td></tr>';
+    tbody.innerHTML=`<tr><td colspan="${usageLogSelectionMode?9:8}" style="text-align:center;color:var(--text-muted);">No usage logs yet.</td></tr>`;
     return;
   }
   tbody.innerHTML=[...visibleLogs].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map((log,index)=>{
@@ -2147,7 +2290,10 @@ function renderUsageLogs(){
     const menuId=`usage-log-actions-${index}`;
     if(log.id===selectedUsageLogId)classes.push('row-selected');
     if(log.archived)classes.push('archived-row');
-    return`<tr class="${classes.join(' ')}" onclick="openUsageLogView('${log.id}')">
+    const checked=selectedUsageLogIds.has(log.id);
+    if(checked)classes.push('row-selected');
+    return`<tr class="${classes.join(' ')}" onclick="${usageLogSelectionMode?`toggleUsageLogSelection('${log.id}',!selectedUsageLogIds.has('${log.id}'))`:`openUsageLogView('${log.id}')`}">
+      ${usageLogSelectionMode?`<td class="usage-log-select-column" onclick="event.stopPropagation()"><input type="checkbox" aria-label="Select ${escapeHtml(log.fileName||'usage log')}" ${checked?'checked':''} onchange="toggleUsageLogSelection('${log.id}',this.checked)"></td>`:''}
       <td><strong>${period.start||'—'} to ${period.end||'—'}</strong>${log.archived?' <span class="sub-badge">Archived</span>':''}</td>
       <td>${escapeHtml(log.fileName||'Usage upload')}</td>
       <td>${matched.length}</td>
@@ -2155,7 +2301,7 @@ function renderUsageLogs(){
       <td>${idealValues.length?idealTotal.toFixed(2):'—'}</td>
       <td>${escapeHtml(log.createdBy?.name||'Unknown')}</td>
       <td>${log.createdAt?new Date(log.createdAt).toLocaleString():'—'}</td>
-      <td onclick="event.stopPropagation();">
+      <td onclick="event.stopPropagation();">${usageLogSelectionMode?'—':`
         <div class="drop-wrap">
           <button class="icon-btn overflow-menu-button" type="button" onclick="toggleMenu('${menuId}')" title="Usage log actions" aria-label="Usage log actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg></button>
           <div class="drop-menu" id="${menuId}">
@@ -2164,7 +2310,7 @@ function renderUsageLogs(){
             <button onclick="closeAllMenus();archiveUsageLog('${log.id}',${log.archived?'false':'true'})">${log.archived?'Restore':'Archive'}</button>
             <button onclick="closeAllMenus();deleteUsageLog('${log.id}')">Delete</button>
           </div>
-        </div>
+        </div>`}
       </td>
     </tr>`;
   }).join('');
@@ -2414,6 +2560,25 @@ function archiveUsageLog(id,archived=true){
   renderUsagePage();
   refreshLiveInventoryIfVisible();
   toast(archived?'Usage log archived.':'Usage log restored.');
+}
+
+function archiveSelectedUsageLogs(archived=true){
+  const selected=ensureUsageLogs().filter(log=>selectedUsageLogIds.has(log.id));
+  if(!selected.length){toast('Select at least one usage log.',true);return;}
+  selected.forEach(log=>{log.archived=archived;markUsageLogUpdated(log);});
+  selectedUsageLogIds.clear();save();renderUsagePage();refreshLiveInventoryIfVisible();
+  toast(`${selected.length} usage log${selected.length===1?'':'s'} ${archived?'archived':'restored'}.`);
+}
+
+function deleteSelectedUsageLogs(){
+  const selected=ensureUsageLogs().filter(log=>selectedUsageLogIds.has(log.id));
+  if(!selected.length){toast('Select at least one usage log.',true);return;}
+  if(!confirm(`Delete ${selected.length} selected usage log${selected.length===1?'':'s'}? This cannot be undone.`))return;
+  state.usageLogs=ensureUsageLogs().filter(log=>!selectedUsageLogIds.has(log.id));
+  selectedUsageLogIds.clear();
+  const nextLog=state.usageLogs.at(-1)||null;selectedUsageLogId=nextLog?.id||null;state.uploadedUsage=nextLog?.rows||[];
+  save();renderUsagePage();refreshLiveInventoryIfVisible();
+  toast(`${selected.length} usage log${selected.length===1?'':'s'} deleted.`);
 }
 
 function deleteUsageLog(id,fromModal=false){

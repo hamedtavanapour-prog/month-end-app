@@ -73,6 +73,12 @@ async function cloudPush(){
 
 async function cloudSaveProduct(product){
   try{
+    if(localOnlyMode){
+      const index=(state.products||[]).findIndex(candidate=>candidate.id===product.id);
+      if(index>=0)state.products[index]=product;else state.products.push(product);
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
     if(_pushTimer&&!await cloudPushNow())return null;
     if(!await _pushPromise)return null;
     const response=await fetch(WORKSPACE_STATE_ENDPOINT,{
@@ -88,6 +94,26 @@ async function cloudSaveProduct(product){
     console.error('Shared product save failed:',error);
     return null;
   }
+}
+
+async function cloudMergeProducts(keepId,removeId,mergedState){
+  try{
+    if(localOnlyMode){
+      state=mergedState;
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const keepProduct=(mergedState.products||[]).find(product=>product.id===keepId);
+    if(!keepProduct)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({productMerge:{keepId,removeId,keepProduct}})});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    if(!(payload.data?.products||[]).some(product=>product?.id===keepId)||(payload.data?.products||[]).some(product=>product?.id===removeId))throw new Error('The shared workspace did not return the merged product.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){console.error('Shared product merge failed:',error);return null;}
 }
 
 async function cloudSaveInventoryCategory(previousName,name,subcategories){
@@ -136,6 +162,26 @@ async function cloudCreateCountDraft(draft){
     console.error('Shared count draft save failed:',error);
     return null;
   }
+}
+
+async function cloudImportMonthEndCount(imported){
+  try{
+    if(localOnlyMode){
+      if(!(state.inventories||[]).some(item=>item.id===imported.id))state.inventories.push(imported);
+      state.inventories.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+      if(!persistLocalOnlyState())return null;
+      return state;
+    }
+    if(_pushTimer&&!await cloudPushNow())return null;
+    if(!await _pushPromise)return null;
+    const response=await fetch(WORKSPACE_STATE_ENDPOINT,{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({countImport:imported})});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    const saved=Array.isArray(payload.data?.inventories)?payload.data.inventories.find(item=>item?.id===imported.id):null;
+    if(!saved||saved.recordType!=='imported')throw new Error('The shared workspace did not return the imported count.');
+    cloudUpdatedAt=payload.updatedAt||cloudUpdatedAt;
+    return payload.data||null;
+  }catch(error){console.error('Month-end count import failed:',error);return null;}
 }
 
 async function cloudSaveCountRoom(countId,roomId,items,extraProductIds=[]){
