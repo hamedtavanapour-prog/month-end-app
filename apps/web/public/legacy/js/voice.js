@@ -16,6 +16,10 @@ let voiceRecordedMs=0;
 let voiceSegmentStartedAt=0;
 let inventoryTranscribeHistory=[];
 let recountTranscribeHistory=[];
+let voiceInventoryConflicts=[];
+let voiceInventoryUnlisted=[];
+let voiceInventoryAmbiguous=[];
+let voiceInventoryAppliedBeforeConflicts=0;
 const VOICE_MAX_RECORDING_MS=2*60*1000;
 const VOICE_TRANSCRIPTION_TIMEOUT_MS=45*1000;
 
@@ -512,49 +516,205 @@ function voiceProductMatch(query,products){
 }
 function fuzzyMatch(query,products){const q=normStr(query);if(!q)return null;for(const p of products){const aliases=(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean);if(aliases.includes(q))return{product:p,score:1};}for(const p of products){if(normStr(p.name)===q)return{product:p,score:1};}let best=null,bestScore=0;for(const p of products){const allNames=[normStr(p.name),...(p.aliases||'').split(',').map(a=>normStr(a.trim())).filter(Boolean)];for(const name of allNames){if(name.includes(q)||q.includes(name)){const score=Math.min(q.length,name.length)/Math.max(q.length,name.length);if(score>bestScore){bestScore=score;best=p;}}const qw=q.split(' ').filter(w=>w.length>1),nw=name.split(' ').filter(w=>w.length>1);let ov=0;for(const w of qw){if(nw.some(n=>n===w||n.startsWith(w)||w.startsWith(n)))ov++;}if(qw.length>0){const s2=ov/Math.max(qw.length,nw.length);if(s2>bestScore){bestScore=s2;best=p;}}}}return bestScore>=0.25?{product:best,score:bestScore}:null;}
 function applyVoiceProducts(parsed){let m=0;const updated=new Set(),um=[];parsed.forEach(({nameStr,qty})=>{const r=fuzzyMatch(nameStr,state.products);if(r){r.product.par=qty;updated.add(r.product.id);m++;}else um.push(nameStr);});if(m){save();renderProducts();document.querySelectorAll('#prod-tbody tr[data-id]').forEach(row=>{if(updated.has(row.dataset.id)){row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}});toast(`Voice: ${m} par level${m>1?'s':''} updated.`);}if(um.length)setTimeout(()=>toast('No match: '+um.join(', '),true),700);}
+function voiceInventoryReviewId(kind){return`voice-${kind}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;}
+function voiceInventoryReviewRemaining(){return voiceInventoryConflicts.length+voiceInventoryUnlisted.length+voiceInventoryAmbiguous.length;}
+function voiceConflictReviewSection(){
+  if(!voiceInventoryConflicts.length)return'';
+  const rows=voiceInventoryConflicts.map(conflict=>{const addTotal=window.MonthEndVoiceCommands.applyCountOperation(conflict.current,conflict.qty,'add');return`<article class="voice-conflict-row">
+    <div class="voice-conflict-product"><strong>${escapeHtml(conflict.productName)}</strong><div class="voice-conflict-values"><span>Existing: <strong>${escapeHtml(String(conflict.current))}</strong></span><span>Transcribed: <strong>${escapeHtml(String(conflict.qty))}</strong></span></div></div>
+    <div class="voice-conflict-item-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="resolveVoiceInventoryConflict('${conflict.id}','add')">Add → ${escapeHtml(String(addTotal))}</button><button class="btn btn-primary btn-sm" type="button" onclick="resolveVoiceInventoryConflict('${conflict.id}','replace')">Replace → ${escapeHtml(String(conflict.qty))}</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveVoiceInventoryConflict('${conflict.id}','skip')">Leave Unchanged</button></div>
+  </article>`;}).join('');
+  return`<section class="voice-review-section"><div class="voice-review-section-head"><div><h4>Existing counts</h4><p>Choose whether to add to or replace the saved quantity.</p></div><div class="voice-conflict-bulk-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="resolveAllVoiceInventoryConflicts('add')">Add to All</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveAllVoiceInventoryConflicts('replace')">Replace All</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveAllVoiceInventoryConflicts('skip')">Leave All</button></div></div>${rows}</section>`;
+}
+function voiceUnlistedReviewSection(){
+  if(!voiceInventoryUnlisted.length)return'';
+  const roomName=currentInventoryRoom()?.name||'this room';
+  const rows=voiceInventoryUnlisted.map(item=>`<article class="voice-conflict-row unlisted"><div class="voice-conflict-product"><strong>${escapeHtml(item.productName)}</strong><div class="voice-conflict-values"><span>Not listed in <strong>${escapeHtml(roomName)}</strong></span><span>Transcribed: <strong>${escapeHtml(String(item.qty))}</strong></span></div></div><div class="voice-conflict-item-actions"><button class="btn btn-primary btn-sm" type="button" onclick="resolveVoiceInventoryUnlisted('${item.id}','add')">Add &amp; Count</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveVoiceInventoryUnlisted('${item.id}','skip')">Leave Unchanged</button></div></article>`).join('');
+  return`<section class="voice-review-section"><div class="voice-review-section-head"><div><h4>Products outside this room</h4><p>These products were recognized in your catalog but are not listed in ${escapeHtml(roomName)}.</p></div><div class="voice-conflict-bulk-actions"><button class="btn btn-primary btn-sm" type="button" onclick="resolveAllVoiceInventoryUnlisted('add')">Add All &amp; Count</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveAllVoiceInventoryUnlisted('skip')">Leave All</button></div></div>${rows}</section>`;
+}
+function voiceAmbiguousReviewSection(){
+  if(!voiceInventoryAmbiguous.length)return'';
+  const rows=voiceInventoryAmbiguous.map(item=>`<article class="voice-conflict-row ambiguous"><div class="voice-conflict-product"><strong>We heard “${escapeHtml(item.query)}”</strong><div class="voice-conflict-values"><span>Transcribed quantity: <strong>${escapeHtml(String(item.qty))}</strong></span></div></div><div class="voice-ambiguous-choice"><label>Choose the intended product<select id="voice-ambiguous-select-${item.id}"><option value="">Select a product…</option>${item.candidates.map(candidate=>`<option value="${escapeHtml(candidate.product.id)}">${escapeHtml(candidate.product.inventoryName||candidate.product.name)} · ${escapeHtml(candidate.product.category||'Other')}</option>`).join('')}</select></label><button class="btn btn-primary btn-sm" type="button" onclick="resolveVoiceInventoryAmbiguous('${item.id}','select')">Use Product</button><button class="btn btn-secondary btn-sm" type="button" onclick="resolveVoiceInventoryAmbiguous('${item.id}','skip')">Leave Unchanged</button></div></article>`).join('');
+  return`<section class="voice-review-section"><div class="voice-review-section-head"><div><h4>Ambiguous matches</h4><p>Choose which catalog product you meant for each transcription.</p></div><div class="voice-conflict-bulk-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="resolveAllVoiceInventoryAmbiguous('skip')">Leave All</button></div></div>${rows}</section>`;
+}
+function renderVoiceInventoryConflicts(){
+  const list=document.getElementById('voice-conflict-list');
+  const summary=document.getElementById('voice-conflict-summary');
+  const remaining=document.getElementById('voice-conflict-remaining');
+  const decisions=voiceInventoryReviewRemaining();
+  if(summary)summary.textContent=`${voiceInventoryAppliedBeforeConflicts} item${voiceInventoryAppliedBeforeConflicts===1?' was':'s were'} applied automatically. Resolve the remaining ${decisions} item${decisions===1?'':'s'} below.`;
+  if(remaining)remaining.textContent=`${decisions} decision${decisions===1?'':'s'} remaining`;
+  if(list)list.innerHTML=voiceConflictReviewSection()+voiceUnlistedReviewSection()+voiceAmbiguousReviewSection();
+}
+function openVoiceInventoryConflictReview(conflicts,unlisted,ambiguous,appliedCount){
+  voiceInventoryConflicts=conflicts;
+  voiceInventoryUnlisted=unlisted;
+  voiceInventoryAmbiguous=ambiguous;
+  voiceInventoryAppliedBeforeConflicts=appliedCount;
+  renderVoiceInventoryConflicts();
+  openModal('modal-voice-conflicts');
+}
+function applyVoiceInventoryConflictDecision(conflict,decision){
+  if(decision==='skip')return{changed:false,description:`${conflict.productName}: left unchanged at ${conflict.current}`};
+  const latest=Number.parseFloat(liveInvCounts[conflict.productId]);
+  const current=Number.isFinite(latest)?latest:conflict.current;
+  const operation=decision==='add'?'add':'set';
+  const next=window.MonthEndVoiceCommands.applyCountOperation(current,conflict.qty,operation);
+  liveInvCounts[conflict.productId]=next;
+  return{changed:next!==current,description:decision==='add'?`${conflict.productName}: ${current} + ${conflict.qty} = ${next}`:`${conflict.productName}: ${current} replaced with ${next}`};
+}
+function finishVoiceInventoryConflictDecisions(results,decision,itemLabel='existing count'){
+  const applied=results.filter(result=>decision!=='skip');
+  const skipped=results.filter(result=>decision==='skip');
+  if(applied.length)addInventoryTranscribeHistory('applied',`${applied.length} ${itemLabel}${applied.length===1?'':'s'} updated`,applied.map(result=>result.description).join('\n'));
+  if(skipped.length)addInventoryTranscribeHistory('ambiguous',`${skipped.length} ${itemLabel}${skipped.length===1?'':'s'} left unchanged`,skipped.map(result=>result.description).join('\n'));
+  renderInvRows(true);
+  results.filter(result=>result.changed&&result.productId).forEach(result=>{
+    const row=document.getElementById('row-'+result.productId);
+    if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}
+  });
+}
+function finishVoiceReviewDecision(){
+  if(voiceInventoryReviewRemaining()){renderVoiceInventoryConflicts();return false;}
+  closeModal('modal-voice-conflicts');
+  toast('Voice review complete.');
+  return true;
+}
+function resolveVoiceInventoryConflict(conflictId,decision){
+  const index=voiceInventoryConflicts.findIndex(conflict=>conflict.id===conflictId);
+  if(index<0)return;
+  const conflict=voiceInventoryConflicts[index];
+  const result={...applyVoiceInventoryConflictDecision(conflict,decision),productId:conflict.productId};
+  voiceInventoryConflicts.splice(index,1);
+  finishVoiceInventoryConflictDecisions([result],decision);
+  finishVoiceReviewDecision();
+}
+function resolveAllVoiceInventoryConflicts(decision){
+  const conflicts=[...voiceInventoryConflicts];
+  if(!conflicts.length)return;
+  const results=conflicts.map(conflict=>({...applyVoiceInventoryConflictDecision(conflict,decision),productId:conflict.productId}));
+  voiceInventoryConflicts=[];
+  finishVoiceInventoryConflictDecisions(results,decision);
+  finishVoiceReviewDecision();
+}
+function applyVoiceInventoryReviewedProduct(item){
+  const previous=Number.parseFloat(liveInvCounts[item.productId]);
+  const current=Number.isFinite(previous)?previous:0;
+  const next=window.MonthEndVoiceCommands.applyCountOperation(current,item.qty,item.operation);
+  liveInvCounts[item.productId]=next;
+  const description=item.operation==='add'?`${item.productName}: ${current} + ${item.qty} = ${next}`:item.operation==='subtract'?`${item.productName}: ${current} − ${item.qty} = ${next}`:`${item.productName}: ${next}`;
+  return{changed:next!==current,description,productId:item.productId};
+}
+function resolveVoiceInventoryUnlisted(itemId,decision){
+  const index=voiceInventoryUnlisted.findIndex(item=>item.id===itemId);
+  if(index<0)return;
+  const item=voiceInventoryUnlisted[index];
+  voiceInventoryUnlisted.splice(index,1);
+  if(decision==='add'){
+    addCountExtraProducts([item.productId],{closePicker:false});
+    finishVoiceInventoryConflictDecisions([applyVoiceInventoryReviewedProduct(item)],'add','unlisted product');
+  }else addInventoryTranscribeHistory('ambiguous','Unlisted product left unchanged',`${item.productName}: not added to ${currentInventoryRoom()?.name||'this room'}`);
+  finishVoiceReviewDecision();
+}
+function resolveAllVoiceInventoryUnlisted(decision){
+  const items=[...voiceInventoryUnlisted];
+  if(!items.length)return;
+  voiceInventoryUnlisted=[];
+  if(decision==='add'){
+    addCountExtraProducts(items.map(item=>item.productId),{closePicker:false});
+    finishVoiceInventoryConflictDecisions(items.map(applyVoiceInventoryReviewedProduct),'add','unlisted product');
+  }else addInventoryTranscribeHistory('ambiguous',`${items.length} unlisted product${items.length===1?'':'s'} left unchanged`,items.map(item=>item.productName).join('\n'));
+  finishVoiceReviewDecision();
+}
+function resolveVoiceInventoryAmbiguous(itemId,decision){
+  const index=voiceInventoryAmbiguous.findIndex(item=>item.id===itemId);
+  if(index<0)return;
+  const item=voiceInventoryAmbiguous[index];
+  if(decision==='skip'){
+    voiceInventoryAmbiguous.splice(index,1);
+    addInventoryTranscribeHistory('ambiguous','Ambiguous transcription left unchanged',item.query);
+    finishVoiceReviewDecision();
+    return;
+  }
+  const selectedId=document.getElementById('voice-ambiguous-select-'+item.id)?.value||'';
+  const candidate=item.candidates.find(entry=>entry.product.id===selectedId);
+  if(!candidate){toast('Choose the intended product first.',true);return;}
+  voiceInventoryAmbiguous.splice(index,1);
+  const product=candidate.product;
+  const productName=product.inventoryName||product.name;
+  const roomProductIds=new Set((typeof currentRoomProducts==='function'?currentRoomProducts():state.products).map(entry=>entry.id));
+  if(!roomProductIds.has(product.id))voiceInventoryUnlisted.push({id:voiceInventoryReviewId('unlisted'),productId:product.id,productName,qty:item.qty,operation:item.operation});
+  else{
+    const previous=Number.parseFloat(liveInvCounts[product.id]);
+    if(item.operation==='set'&&Number.isFinite(previous))voiceInventoryConflicts.push({id:voiceInventoryReviewId('conflict'),productId:product.id,productName,current:previous,qty:item.qty});
+    else finishVoiceInventoryConflictDecisions([applyVoiceInventoryReviewedProduct({productId:product.id,productName,qty:item.qty,operation:item.operation})],'add','ambiguous selection');
+  }
+  finishVoiceReviewDecision();
+}
+function resolveAllVoiceInventoryAmbiguous(decision){
+  if(decision!=='skip'||!voiceInventoryAmbiguous.length)return;
+  const items=[...voiceInventoryAmbiguous];
+  voiceInventoryAmbiguous=[];
+  addInventoryTranscribeHistory('ambiguous',`${items.length} ambiguous transcription${items.length===1?'':'s'} left unchanged`,items.map(item=>item.query).join('\n'));
+  finishVoiceReviewDecision();
+}
+function cancelVoiceInventoryConflicts(){
+  const conflicts=[...voiceInventoryConflicts];
+  const unlisted=[...voiceInventoryUnlisted];
+  const ambiguous=[...voiceInventoryAmbiguous];
+  voiceInventoryConflicts=[];
+  voiceInventoryUnlisted=[];
+  voiceInventoryAmbiguous=[];
+  if(conflicts.length)addInventoryTranscribeHistory('ambiguous',`${conflicts.length} existing count${conflicts.length===1?'':'s'} left unchanged`,conflicts.map(conflict=>`${conflict.productName}: kept ${conflict.current}`).join('\n'));
+  if(unlisted.length)addInventoryTranscribeHistory('ambiguous',`${unlisted.length} unlisted product${unlisted.length===1?'':'s'} left unchanged`,unlisted.map(item=>item.productName).join('\n'));
+  if(ambiguous.length)addInventoryTranscribeHistory('ambiguous',`${ambiguous.length} ambiguous transcription${ambiguous.length===1?'':'s'} left unchanged`,ambiguous.map(item=>item.query).join('\n'));
+  closeModal('modal-voice-conflicts');
+  const total=conflicts.length+unlisted.length+ambiguous.length;
+  if(total)toast(`${total} unresolved item${total===1?' was':'s were'} left unchanged.`);
+}
 function applyVoiceInventory(parsed){
   let matched=0,changed=0;
-  const unmatched=[],ambiguous=[],updated=[],applied=[];
+  const unmatched=[],ambiguous=[],unlisted=[],updated=[],applied=[],conflicts=[];
   const products=typeof currentRoomProducts==='function'?currentRoomProducts():state.products;
   parsed.forEach(({nameStr,qty,operation='set'})=>{
     let result=voiceProductMatch(nameStr,products);
     if(!result){
       const recognized=voiceProductMatch(nameStr,state.products.filter(product=>!product.archived));
       if(recognized&&!recognized.ambiguous){
-        const roomName=currentInventoryRoom()?.name||'this room';
-        const productName=recognized.product.inventoryName||recognized.product.name;
-        if(window.confirm(`${productName} is not listed in ${roomName}, but it was recognized as a product. Add it to this room for this count only?`)){
-          addCountExtraProducts([recognized.product.id],{closePicker:false});
-          result=recognized;
-        }else{
-          unmatched.push(`${productName} (not added to ${roomName})`);
-          return;
-        }
-      }else if(recognized?.ambiguous)result=recognized;
+        unlisted.push({id:voiceInventoryReviewId('unlisted'),productId:recognized.product.id,productName:recognized.product.inventoryName||recognized.product.name,qty,operation});
+        return;
+      }
+      if(recognized?.ambiguous){
+        ambiguous.push({id:voiceInventoryReviewId('ambiguous'),query:nameStr,qty,operation,candidates:recognized.candidates});
+        return;
+      }
+      unmatched.push(nameStr);
+      return;
     }
-    if(result&&!result.ambiguous){
+    if(result.ambiguous){
+      ambiguous.push({id:voiceInventoryReviewId('ambiguous'),query:nameStr,qty,operation,candidates:result.candidates});
+      return;
+    }
+    if(result){
       const previous=Number.parseFloat(liveInvCounts[result.product.id]);
       const current=Number.isFinite(previous)?previous:0;
-      let resolvedOperation=operation;
       if(operation==='set'&&Number.isFinite(previous)){
-        const add=window.confirm(`${result.product.inventoryName||result.product.name} already has a count of ${previous}. Select OK to add ${qty}, or Cancel to replace it with ${qty}.`);
-        resolvedOperation=add?'add':'set';
+        conflicts.push({id:voiceInventoryReviewId('conflict'),productId:result.product.id,productName:result.product.inventoryName||result.product.name,current:previous,qty});
+        return;
       }
-      const next=window.MonthEndVoiceCommands.applyCountOperation(current,qty,resolvedOperation);
+      const next=window.MonthEndVoiceCommands.applyCountOperation(current,qty,operation);
       liveInvCounts[result.product.id]=next;
       updated.push(result.product.id);
       if(next!==current)changed++;
-      if(resolvedOperation==='add')applied.push(`${result.product.name}: ${current} + ${qty} = ${next}`);
-      else if(resolvedOperation==='subtract')applied.push(`${result.product.name}: ${current} − ${qty} = ${next}`);
+      if(operation==='add')applied.push(`${result.product.name}: ${current} + ${qty} = ${next}`);
+      else if(operation==='subtract')applied.push(`${result.product.name}: ${current} − ${qty} = ${next}`);
       else applied.push(`${result.product.name}: ${next}`);
       matched++;
-    }else if(result?.ambiguous){
-      ambiguous.push(`${nameStr}: ${result.candidates.map(candidate=>candidate.product.name).join(' / ')}`);
-    }else unmatched.push(nameStr);
+    }
   });
   if(applied.length)addInventoryTranscribeHistory('applied',`${applied.length} item${applied.length===1?'':'s'} applied`,applied.join('\n'));
-  if(ambiguous.length)addInventoryTranscribeHistory('ambiguous',`${ambiguous.length} ambiguous item${ambiguous.length===1?'':'s'}`,ambiguous.join('\n'));
   if(unmatched.length)addInventoryTranscribeHistory('unmatched',`${unmatched.length} item${unmatched.length===1?'':'s'} not applied`,unmatched.join('\n'));
+  const reviewCount=conflicts.length+unlisted.length+ambiguous.length;
   if(matched){
     renderInvRows(true);
     updated.forEach(productId=>{
@@ -562,10 +722,10 @@ function applyVoiceInventory(parsed){
       if(row){expandInventorySectionElement(row.closest('.inv-count-section'));row.classList.remove('voice-updated');void row.offsetWidth;row.classList.add('voice-updated');}
     });
     document.getElementById('row-'+updated[0])?.scrollIntoView({behavior:'smooth',block:'center'});
-    toast(`Voice: ${changed} item${changed===1?'':'s'} changed${matched!==changed?` (${matched} recognized)`:''}.`);
+    toast(`Voice: ${changed} item${changed===1?'':'s'} changed${reviewCount?`; ${reviewCount} need${reviewCount===1?'s':''} review`:matched!==changed?` (${matched} recognized)`:''}.`);
   }else updateInvProgress();
-  if(ambiguous.length)setTimeout(()=>toast('Ambiguous: '+ambiguous.join(', '),true),700);
-  else if(unmatched.length)setTimeout(()=>toast('No match: '+unmatched.join(', '),true),700);
+  if(reviewCount)openVoiceInventoryConflictReview(conflicts,unlisted,ambiguous,matched);
+  if(unmatched.length)setTimeout(()=>toast('No catalog match: '+unmatched.join(', '),true),700);
 }
 function applyVoiceCountExtra(parsed){
   const assigned=new Set(typeof currentRoomProducts==='function'?currentRoomProducts().map(product=>product.id):[]);

@@ -11,7 +11,7 @@
 <title>Keg Bar Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
-<link rel="stylesheet" href="css/styles.css?v=count-voice-workspace-2"/>
+<link rel="stylesheet" href="css/styles.css?v=voice-review-2"/>
 
 <!-- SheetJS for real .xlsx export; loadXLSXFallback() (defined below) swaps to a
      second CDN, and the app falls back to CSV if neither loads. -->
@@ -768,6 +768,18 @@
 </div>
 </div>
 
+<!-- VOICE COUNT REVIEW -->
+<div class="modal-overlay" id="modal-voice-conflicts" onclick="if(event.target===this){event.stopImmediatePropagation();cancelVoiceInventoryConflicts();}">
+<div class="modal voice-conflict-modal" role="dialog" aria-modal="true" aria-labelledby="voice-conflict-title">
+  <button class="modal-close" type="button" aria-label="Leave unresolved items unchanged" onclick="cancelVoiceInventoryConflicts()">&times;</button>
+  <span class="voice-conflict-eyebrow">Voice Count Review</span>
+  <h3 id="voice-conflict-title">Review transcribed items</h3>
+  <p class="count-setup-intro" id="voice-conflict-summary">Other transcribed items were already applied. Resolve the remaining items below.</p>
+  <div class="voice-conflict-list" id="voice-conflict-list"></div>
+  <div class="modal-actions voice-conflict-footer"><span id="voice-conflict-remaining"></span><button class="btn btn-secondary" type="button" onclick="cancelVoiceInventoryConflicts()">Leave Unresolved &amp; Close</button></div>
+</div>
+</div>
+
 <!-- RE-COUNT ITEM PICKER -->
 <div class="modal-overlay" id="modal-recount-select">
 <div class="modal recount-select-modal" role="dialog" aria-modal="true" aria-labelledby="recount-select-title">
@@ -1250,7 +1262,7 @@
 <script src="js/reports.js"></script>
 <script src="js/export-tools.js?v=count-report-export-1"></script>
 <script src="js/voice-commands.js?v=count-voice-two-1"></script>
-<script src="js/voice.js?v=count-voice-workspace-2"></script>
+<script src="js/voice.js?v=voice-review-2"></script>
 <script src="js/master-search.js"></script>
 <script src="js/routing.js?v=menu-library-5"></script>
 <script src="js/main.js?v=menu-card-view-1"></script>

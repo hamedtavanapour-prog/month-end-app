@@ -32,7 +32,7 @@
   const BASE_ROUTE_BY_MODAL={
     'modal-product':'products','modal-product-view':'products','modal-product-units':'products',
     'modal-menu-item-view':'menu','modal-prep-item-view':'menu',
-    'modal-inv-room-select':'inventory','modal-inv-room-picker':'inventory','modal-inventory':'inventory','modal-count-add-item':'inventory','modal-view-inv':'inventory',
+    'modal-inv-room-select':'inventory','modal-inv-room-picker':'inventory','modal-inventory':'inventory','modal-count-add-item':'inventory','modal-voice-conflicts':'inventory','modal-view-inv':'inventory',
     'modal-order':'orders','modal-order-detail':'orders','modal-scan':'orders','modal-view-scan':'orders',
     'modal-usage-upload':'usage','modal-usage-log-detail':'usage','modal-inventory-template-upload':'usage',
     'modal-supplier':'suppliers','modal-supplier-view':'suppliers',
