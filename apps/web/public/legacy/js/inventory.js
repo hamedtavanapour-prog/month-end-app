@@ -546,16 +546,20 @@ function liveUsagePurchaseQty(row){
 }
 
 function liveUsageQtyByProduct(baselineDate=''){
-  const totals={};
-  ensureUsageLogs().filter(log=>!log.archived).forEach(log=>{
+  const latest={};
+  ensureUsageLogs().filter(log=>!log.archived).forEach((log,index)=>{
     const period=usageLogPeriod(log);
-    if(!liveMovementAfterBaseline(period.end||period.start,baselineDate))return;
+    const reportDate=period.end||period.start||'';
+    if(!liveMovementAfterBaseline(reportDate,baselineDate))return;
+    const recency=[String(reportDate),String(log.updatedAt||log.createdAt||''),String(index).padStart(8,'0')].join('|');
     usageLogRows(log).forEach(row=>{
       if(!row.matched||!row.productId)return;
-      totals[row.productId]=(totals[row.productId]||0)+liveUsageDeductionQty(row);
+      if(!latest[row.productId]||recency>latest[row.productId].recency){
+        latest[row.productId]={recency,value:liveUsageDeductionQty(row)};
+      }
     });
   });
-  return totals;
+  return Object.fromEntries(Object.entries(latest).map(([productId,item])=>[productId,item.value]));
 }
 
 function liveUsagePurchaseQtyByProduct(baselineDate=''){

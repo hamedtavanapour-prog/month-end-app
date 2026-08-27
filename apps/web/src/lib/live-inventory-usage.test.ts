@@ -65,7 +65,7 @@ describe("live inventory deductions from usage reports", () => {
   it("deducts ideal usage without changing the report's actual usage", () => {
     const currentRows: UsageRow[] = [
       { productId: "p1", matched: true, actualUsage: 10, idealUsage: 6, purch: 4 },
-      { productId: "p1", matched: true, actualUsage: 5, idealUsage: 2, purch: 1.5 },
+      { productId: "p4", matched: true, actualUsage: 5, idealUsage: 2, purch: 1.5 },
       { productId: "p2", matched: true, actualUsage: 7, idealUsage: "", purch: "" },
       { productId: "p3", matched: false, actualUsage: 20, idealUsage: 12, purch: 9 },
     ];
@@ -84,10 +84,25 @@ describe("live inventory deductions from usage reports", () => {
 
     expect(calculator.liveUsageDeductionQty(currentRows[0])).toBe(6);
     expect(currentRows[0].actualUsage).toBe(10);
-    expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ p1: 8, p2: 0 });
+    expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ p1: 6, p4: 2, p2: 0 });
     expect(calculator.liveUsagePurchaseQty(currentRows[0])).toBe(4);
-    expect(calculator.liveUsagePurchaseQtyByProduct("2026-08-23")).toEqual({ p1: 5.5, p2: 0 });
+    expect(calculator.liveUsagePurchaseQtyByProduct("2026-08-23")).toEqual({ p1: 4, p4: 1.5, p2: 0 });
     expect(calculator.liveInventoryQuantity(10, 5.5, 8)).toBe(7.5);
+  });
+
+  it("uses the latest report's ideal usage instead of adding older reports", () => {
+    const calculator = loadLiveUsageCalculator([
+      {
+        periodEnd: "2026-08-24",
+        rows: [{ productId: "barolo", matched: true, actualUsage: 6, idealUsage: 6, purch: 0 }],
+      },
+      {
+        periodEnd: "2026-08-25",
+        rows: [{ productId: "barolo", matched: true, actualUsage: 8, idealUsage: 3, purch: 0 }],
+      },
+    ]);
+
+    expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ barolo: 3 });
   });
 
   it("does not read purchases from orders", () => {
