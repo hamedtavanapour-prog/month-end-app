@@ -8,6 +8,7 @@ type UsageRow = {
   matched: boolean;
   actualUsage: number;
   idealUsage: number | string;
+  purch?: number | string;
 };
 
 type UsageLog = {
@@ -43,7 +44,7 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
     },
   };
   runInNewContext(
-    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct,liveBelowParQty};`,
+    `${source}\n;globalThis.__liveUsage={liveUsageDeductionQty,liveUsageQtyByProduct,liveUsagePurchaseQty,liveUsagePurchaseQtyByProduct,liveInventoryQuantity,liveBelowParQty};`,
     context,
   );
   return (
@@ -51,6 +52,9 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
       __liveUsage: {
         liveUsageDeductionQty: (row: UsageRow) => number;
         liveUsageQtyByProduct: (baselineDate?: string) => Record<string, number>;
+        liveUsagePurchaseQty: (row: UsageRow) => number;
+        liveUsagePurchaseQtyByProduct: (baselineDate?: string) => Record<string, number>;
+        liveInventoryQuantity: (begin: number, reportPurchases: number, idealUsage: number) => number;
         liveBelowParQty: (row: LiveRow) => number;
       };
     }
@@ -60,27 +64,37 @@ function loadLiveUsageCalculator(usageLogs: UsageLog[]) {
 describe("live inventory deductions from usage reports", () => {
   it("deducts ideal usage without changing the report's actual usage", () => {
     const currentRows: UsageRow[] = [
-      { productId: "p1", matched: true, actualUsage: 10, idealUsage: 6 },
-      { productId: "p1", matched: true, actualUsage: 5, idealUsage: 2 },
-      { productId: "p2", matched: true, actualUsage: 7, idealUsage: "" },
-      { productId: "p3", matched: false, actualUsage: 20, idealUsage: 12 },
+      { productId: "p1", matched: true, actualUsage: 10, idealUsage: 6, purch: 4 },
+      { productId: "p1", matched: true, actualUsage: 5, idealUsage: 2, purch: 1.5 },
+      { productId: "p2", matched: true, actualUsage: 7, idealUsage: "", purch: "" },
+      { productId: "p3", matched: false, actualUsage: 20, idealUsage: 12, purch: 9 },
     ];
     const calculator = loadLiveUsageCalculator([
       { periodEnd: "2026-08-24", rows: currentRows },
       {
         periodEnd: "2026-08-20",
-        rows: [{ productId: "p1", matched: true, actualUsage: 40, idealUsage: 30 }],
+        rows: [{ productId: "p1", matched: true, actualUsage: 40, idealUsage: 30, purch: 8 }],
       },
       {
         archived: true,
         periodEnd: "2026-08-24",
-        rows: [{ productId: "p1", matched: true, actualUsage: 50, idealUsage: 35 }],
+        rows: [{ productId: "p1", matched: true, actualUsage: 50, idealUsage: 35, purch: 12 }],
       },
     ]);
 
     expect(calculator.liveUsageDeductionQty(currentRows[0])).toBe(6);
     expect(currentRows[0].actualUsage).toBe(10);
     expect(calculator.liveUsageQtyByProduct("2026-08-23")).toEqual({ p1: 8, p2: 0 });
+    expect(calculator.liveUsagePurchaseQty(currentRows[0])).toBe(4);
+    expect(calculator.liveUsagePurchaseQtyByProduct("2026-08-23")).toEqual({ p1: 5.5, p2: 0 });
+    expect(calculator.liveInventoryQuantity(10, 5.5, 8)).toBe(7.5);
+  });
+
+  it("does not read purchases from orders", () => {
+    const source = readFileSync(new URL("../../public/legacy/js/inventory.js", import.meta.url), "utf8");
+
+    expect(source).not.toContain("liveOrderQtyByProduct");
+    expect(source).not.toContain("orderPurchased");
   });
 
   it("shows only the amount that live inventory is below its par level", () => {

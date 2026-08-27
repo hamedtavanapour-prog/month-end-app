@@ -535,24 +535,14 @@ function liveMovementAfterBaseline(date,baselineDate){
   return String(date)>=String(baselineDate);
 }
 
-function liveOrderQtyByProduct(baselineDate=''){
-  const totals={};
-  state.orders.forEach(raw=>{
-    const order=typeof normalizeOrder==='function'?normalizeOrder(raw):raw;
-    if(!liveMovementAfterBaseline(order.date,baselineDate))return;
-    const sign=order.isRefund?-1:1;
-    (order.lines||[]).forEach(line=>{
-      const normalized=typeof normalizeLine==='function'?normalizeLine(line):line;
-      if(!normalized.productId)return;
-      totals[normalized.productId]=(totals[normalized.productId]||0)+(parseFloat(normalized.qty)||0)*sign;
-    });
-  });
-  return totals;
-}
-
 function liveUsageDeductionQty(row){
   const ideal=typeof usageNumber==='function'?usageNumber(row?.idealUsage):parseFloat(row?.idealUsage);
   return ideal===''||!Number.isFinite(ideal)?0:ideal;
+}
+
+function liveUsagePurchaseQty(row){
+  const purchased=typeof usageNumber==='function'?usageNumber(row?.purch):parseFloat(row?.purch);
+  return purchased===''||!Number.isFinite(purchased)?0:purchased;
 }
 
 function liveUsageQtyByProduct(baselineDate=''){
@@ -566,6 +556,23 @@ function liveUsageQtyByProduct(baselineDate=''){
     });
   });
   return totals;
+}
+
+function liveUsagePurchaseQtyByProduct(baselineDate=''){
+  const totals={};
+  ensureUsageLogs().filter(log=>!log.archived).forEach(log=>{
+    const period=usageLogPeriod(log);
+    if(!liveMovementAfterBaseline(period.end||period.start,baselineDate))return;
+    usageLogRows(log).forEach(row=>{
+      if(!row.matched||!row.productId)return;
+      totals[row.productId]=(totals[row.productId]||0)+liveUsagePurchaseQty(row);
+    });
+  });
+  return totals;
+}
+
+function liveInventoryQuantity(begin,reportPurchases,idealUsage){
+  return(parseFloat(begin)||0)+(parseFloat(reportPurchases)||0)-(parseFloat(idealUsage)||0);
 }
 
 function selectedLiveInventoryRooms(){
@@ -623,19 +630,19 @@ function liveInventoryRows(){
   const rooms=selectedLiveInventoryRooms();
   const allRooms=liveInventoryRoomIds===null;
   const baselineItems=resolvedLiveBaselineItems(baseline);
-  const ordered=allRooms?liveOrderQtyByProduct(baselineDate):{};
+  const reportPurchases=allRooms?liveUsagePurchaseQtyByProduct(baselineDate):{};
   const used=allRooms?liveUsageQtyByProduct(baselineDate):{};
   const allowed=allRooms?null:new Set(rooms.flatMap(room=>roomProductIds(room)));
   const roomLabel=allRooms?'All rooms':rooms.length===1?rooms[0].name:`${rooms.length} rooms`;
   return state.products.filter(product=>!product.archived&&(!allowed||allowed.has(product.id))).map(product=>{
     const base=allRooms?(baselineItems[product.id]??product.lastCount??0):rooms.reduce((sum,room)=>sum+(parseFloat(resolvedLiveBaselineRoomItems(baseline,room.id)?.[product.id])||0),0);
-    const orderQty=ordered[product.id]||0;
+    const purchaseQty=reportPurchases[product.id]||0;
     const usageQty=used[product.id]||0;
-    const live=base+orderQty-usageQty;
+    const live=liveInventoryQuantity(base,purchaseQty,usageQty);
     const par=parseFloat(product.par)||0;
     const belowPar=par>0?Math.max(par-live,0):0;
     const value=live*(parseFloat(product.cost)||0);
-    return{product,name:product.name,category:product.category,subcategory:product.subcategory||'',unit:product.unit||'',base,ordered:orderQty,used:usageQty,live,par,belowPar,value,baselineDate,roomName:roomLabel};
+    return{product,name:product.name,category:product.category,subcategory:product.subcategory||'',unit:product.unit||'',base,purchased:purchaseQty,used:usageQty,live,par,belowPar,value,baselineDate,roomName:roomLabel};
   });
 }
 
@@ -693,7 +700,7 @@ function liveVarianceHeader(label,col){
 }
 function liveInventoryVariances(rows){
   const sorted=sortArr(rows,liveVarianceSort.col,liveVarianceSort.dir);
-  return`<div class="table-wrap"><table><thead><tr>${liveVarianceHeader('Product','name')}${liveVarianceHeader('Begin','base')}${liveVarianceHeader('Purchased','ordered')}${liveVarianceHeader('Punched In','used')}${liveVarianceHeader('Live','live')}${liveVarianceHeader('Par Level','par')}${liveVarianceHeader('Below Par','belowPar')}</tr></thead><tbody>${sorted.map(row=>`<tr onclick="openLiveInventoryDetail('${row.product.id}')"><td><strong>${escapeHtml(row.name)}</strong></td><td>${liveQty(row.base)}</td><td class="live-plus">${liveQty(row.ordered)}</td><td class="live-minus">${liveQty(row.used)}</td><td><strong>${liveQty(row.live)}</strong></td><td>${liveParDisplay(row)}</td><td class="${row.belowPar>0?'live-minus':''}">${liveBelowParDisplay(row)}</td></tr>`).join('')}</tbody></table></div>`;
+  return`<div class="table-wrap"><table><thead><tr>${liveVarianceHeader('Product','name')}${liveVarianceHeader('Begin','base')}${liveVarianceHeader('Purchased','purchased')}${liveVarianceHeader('Punched In','used')}${liveVarianceHeader('Live','live')}${liveVarianceHeader('Par Level','par')}${liveVarianceHeader('Below Par','belowPar')}</tr></thead><tbody>${sorted.map(row=>`<tr onclick="openLiveInventoryDetail('${row.product.id}')"><td><strong>${escapeHtml(row.name)}</strong></td><td>${liveQty(row.base)}</td><td class="live-plus">${liveQty(row.purchased)}</td><td class="live-minus">${liveQty(row.used)}</td><td><strong>${liveQty(row.live)}</strong></td><td>${liveParDisplay(row)}</td><td class="${row.belowPar>0?'live-minus':''}">${liveBelowParDisplay(row)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 let liveInventoryFilterHome=null;
@@ -763,7 +770,7 @@ function liveInventoryMetric(label,value,className=''){
 
 function liveInventoryMetrics(row,includeLive=true){
   return`${liveInventoryMetric('Begin',liveQty(row.base))}
-    ${liveInventoryMetric('Purchased',liveQty(row.ordered),'purchased')}
+    ${liveInventoryMetric('Purchased',liveQty(row.purchased),'purchased')}
     ${liveInventoryMetric('Punched In',liveQty(row.used),'punched-in')}
     ${includeLive?liveInventoryMetric('Live',liveQty(row.live),'live'):''}
     ${liveInventoryMetric('Par Level',liveParDisplay(row))}
@@ -831,14 +838,14 @@ function renderLiveInventoryPage(){
   );
   if(status==='low')rows=rows.filter(row=>row.par>0&&row.live<=row.par);
   if(status==='negative')rows=rows.filter(row=>row.live<0);
-  if(status==='movement')rows=rows.filter(row=>row.ordered||row.used);
+  if(status==='movement')rows=rows.filter(row=>row.purchased||row.used);
   const [sortColumn,sortDirection]=sort.split('-');
   sortState.liveInventory={col:sortColumn||'name',dir:sortDirection||'asc'};
   rows=sortArr(rows,sortState.liveInventory.col,sortState.liveInventory.dir);
   const totalValue=rows.reduce((sum,row)=>sum+row.value,0);
   const lowCount=allLiveRows.filter(row=>row.par>0&&row.live<=row.par).length;
   const negativeCount=allLiveRows.filter(row=>row.live<0).length;
-  const movementCount=allLiveRows.filter(row=>row.ordered||row.used).length;
+  const movementCount=allLiveRows.filter(row=>row.purchased||row.used).length;
   const stats=document.getElementById('live-inv-stats');
   if(stats)stats.innerHTML=`
     <div class="stat-card"><div class="label">Rooms</div><div class="value" style="font-size:1rem;">${escapeHtml(roomLabel)}</div><div class="sub">${allRooms?'Merged inventory':`Combined count from ${selectedRooms.length} selected room${selectedRooms.length===1?'':'s'}`}</div></div>
@@ -874,7 +881,7 @@ function openLiveInventoryDetail(productId){
     <div class="product-detail-grid">
       <div class="product-detail-field"><div class="label">Live Quantity</div><div class="value">${liveQty(row.live)}</div></div>
       <div class="product-detail-field"><div class="label">Begin</div><div class="value">${liveQty(row.base)}</div></div>
-      <div class="product-detail-field"><div class="label">Purchased</div><div class="value live-plus">${row.ordered?`+${liveQty(row.ordered)}`:'0'}</div></div>
+      <div class="product-detail-field"><div class="label">Purchased (Usage Reports)</div><div class="value live-plus">${row.purchased?`+${liveQty(row.purchased)}`:'0'}</div></div>
       <div class="product-detail-field"><div class="label">Punched In (Ideal Usage)</div><div class="value live-minus">${row.used?`-${liveQty(row.used)}`:'0'}</div></div>
       <div class="product-detail-field"><div class="label">Par Level</div><div class="value">${liveParDisplay(row)}</div></div>
       <div class="product-detail-field"><div class="label">Below Par</div><div class="value ${row.belowPar>0?'live-minus':''}">${liveBelowParDisplay(row)}</div></div>
