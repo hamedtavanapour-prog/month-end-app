@@ -132,6 +132,18 @@ begin
   on conflict (membership_id, location_id) do update
     set is_primary = excluded.is_primary;
 
+  update public.membership_positions assignment
+  set is_primary = false
+  where assignment.membership_id in (
+    select membership.id
+    from public.memberships membership
+    where membership.organization_id = v_organization_id
+      and (
+        lower(membership.job_title) in ('bar manager', 'culinary manager', 'kitchen manager', 'assistant manager', 'general manager')
+        or membership.role = 'staff'
+      )
+  );
+
   insert into public.membership_positions (
     membership_id, organization_id, position_id, location_id, is_primary, assigned_by
   )
