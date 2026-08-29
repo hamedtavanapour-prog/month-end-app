@@ -1,7 +1,12 @@
 -- Convert the existing Keg workspace into the first customer/location model.
 -- This is conditional so fresh installations and other customers are unchanged.
 
-do $$
+create or replace function private.seed_existing_keg_people_structure()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
 declare
   v_organization_id uuid;
   v_region_id uuid;
@@ -182,3 +187,6 @@ begin
   on conflict do nothing;
 end;
 $$;
+
+revoke all on function private.seed_existing_keg_people_structure() from public, anon, authenticated;
+select private.seed_existing_keg_people_structure();

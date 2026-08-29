@@ -1,6 +1,6 @@
 begin;
 
-select plan(19);
+select plan(20);
 
 select has_table('public', 'regions', 'regions are modeled explicitly');
 select has_table('public', 'locations', 'restaurant locations are modeled explicitly');
@@ -177,6 +177,16 @@ select throws_ok(
   'P0001',
   'permission_denied',
   'an owner cannot update a member in another customer organization'
+);
+
+reset role;
+update public.organizations
+set slug = 'keg-bar'
+where id = '21000000-0000-0000-0000-000000000001';
+
+select lives_ok(
+  $$ select private.seed_existing_keg_people_structure() $$,
+  'the existing Keg workspace conversion runs safely against populated customer data'
 );
 
 select * from finish();
