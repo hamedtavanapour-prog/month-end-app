@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(19);
 
 select has_table('public', 'regions', 'regions are modeled explicitly');
 select has_table('public', 'locations', 'restaurant locations are modeled explicitly');
@@ -55,6 +55,23 @@ values
   ('61000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', 'Bar Manager', 'bar-manager', true, '11000000-0000-0000-0000-000000000001'),
   ('61000000-0000-0000-0000-000000000002', '21000000-0000-0000-0000-000000000002', '51000000-0000-0000-0000-000000000002', 'Manager', 'manager', true, '11000000-0000-0000-0000-000000000003');
 
+insert into public.position_permissions (position_id, permission_key, allowed, created_by)
+values
+  ('61000000-0000-0000-0000-000000000001', 'dashboard.view', true, '11000000-0000-0000-0000-000000000001'),
+  ('61000000-0000-0000-0000-000000000001', 'products.view', true, '11000000-0000-0000-0000-000000000001');
+
+insert into public.membership_positions (membership_id, organization_id, position_id, location_id, is_primary, assigned_by)
+values (
+  '31000000-0000-0000-0000-000000000002', '21000000-0000-0000-0000-000000000001',
+  '61000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', true,
+  '11000000-0000-0000-0000-000000000001'
+);
+
+insert into public.membership_permissions (membership_id, permission_key, allowed, granted_by)
+values ('31000000-0000-0000-0000-000000000002', 'products.view', false, '11000000-0000-0000-0000-000000000001');
+
+select has_function('public', 'get_my_effective_access', array['uuid'], 'effective access has one central read API');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11000000-0000-0000-0000-000000000002","role":"authenticated"}';
 
@@ -76,6 +93,16 @@ select is(
   'staff see positions only within their customer organization'
 );
 
+select ok(
+  'dashboard.view' = any((select permission_keys from public.get_my_effective_access('21000000-0000-0000-0000-000000000001'))),
+  'position permissions are inherited by assigned members'
+);
+
+select ok(
+  not ('products.view' = any((select permission_keys from public.get_my_effective_access('21000000-0000-0000-0000-000000000001')))),
+  'an explicit member denial overrides an inherited position permission'
+);
+
 select throws_ok(
   $$
     insert into public.regions (organization_id, name, slug, created_by)
@@ -89,6 +116,18 @@ select throws_ok(
   '42501',
   'new row violates row-level security policy for table "regions"',
   'staff cannot create organization structure'
+);
+
+select throws_ok(
+  $$
+    select public.create_position(
+      '21000000-0000-0000-0000-000000000001', 'Unauthorized Position', '', null,
+      '51000000-0000-0000-0000-000000000001', false, array[]::uuid[], null, array[]::text[]
+    )
+  $$,
+  'P0001',
+  'permission_denied',
+  'staff cannot create a position template'
 );
 
 set local request.jwt.claims = '{"sub":"11000000-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -105,6 +144,29 @@ select lives_ok(
     )
   $$,
   'organization owners can create position templates'
+);
+
+select lives_ok(
+  $$
+    select public.create_position(
+      '21000000-0000-0000-0000-000000000001', 'Location Coordinator', '', null,
+      '51000000-0000-0000-0000-000000000001', true,
+      array[]::uuid[], null, array['dashboard.view']
+    )
+  $$,
+  'owners can create a scoped reusable position through the access API'
+);
+
+select throws_ok(
+  $$
+    select public.set_member_structure(
+      '31000000-0000-0000-0000-000000000003', array[]::uuid[], null,
+      array[]::uuid[], null, array[]::uuid[], null, null
+    )
+  $$,
+  'P0001',
+  'permission_denied',
+  'an owner cannot update a member in another customer organization'
 );
 
 select * from finish();
