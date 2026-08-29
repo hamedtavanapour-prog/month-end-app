@@ -24,7 +24,7 @@ function teamUrl(formData: FormData, values: Record<string, string> = {}) {
   const params = new URLSearchParams(values);
   if (formData.get("embedded") === "1") params.set("embedded", "1");
   const query = params.toString();
-  return `/app/team${query ? `?${query}` : ""}`;
+  return `/app/people${query ? `?${query}` : ""}`;
 }
 
 export async function createInvitation(formData: FormData) {
@@ -61,7 +61,7 @@ export async function createInvitation(formData: FormData) {
     token,
   });
 
-  revalidatePath("/app/team");
+  revalidatePath("/app/people");
   redirect(teamUrl(formData, { created: displayName, token, delivery: emailError ? "failed" : "email" }));
 }
 
@@ -79,7 +79,7 @@ export async function createPreparedAccount(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const loginUrl = `${getPublicAppUrl()}/login?workspace=${encodeURIComponent(context.organizationSlug)}&email=${encodeURIComponent(email)}&status=prepared`;
+  const loginUrl = `${getPublicAppUrl()}/login?email=${encodeURIComponent(email)}&status=prepared`;
   const { data, error } = await supabase.functions.invoke("create-prepared-user", { body: {
     organizationId: context.organizationId,
     email,
@@ -95,7 +95,7 @@ export async function createPreparedAccount(formData: FormData) {
     const code = data?.error === "account_exists" ? "account_exists" : invitationError(data?.error || error?.message);
     redirect(teamUrl(formData, { error: code }));
   }
-  revalidatePath("/app/team");
+  revalidatePath("/app/people");
   redirect(teamUrl(formData, { prepared: displayName, delivery: data.emailDelivered ? "email" : "failed" }));
 }
 
@@ -121,7 +121,7 @@ export async function updateTeamMember(formData: FormData) {
   });
 
   if (error) redirect(teamUrl(formData, { error: "update_failed" }));
-  revalidatePath("/app/team");
+  revalidatePath("/app/people");
   redirect(teamUrl(formData, { updated: "1" }));
 }
 
@@ -134,6 +134,6 @@ export async function revokeInvitation(formData: FormData) {
   });
 
   if (error) redirect(teamUrl(formData, { error: "revoke_failed" }));
-  revalidatePath("/app/team");
+  revalidatePath("/app/people");
   redirect(teamUrl(formData, { revoked: "1" }));
 }

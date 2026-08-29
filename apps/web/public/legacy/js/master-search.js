@@ -104,7 +104,7 @@ function buildMasterSearchIndex(){
     ['orders','Create an order','Start a new purchase order','new invoice purchase','plus',()=>openOrderModal()],
     ['usage','Upload a usage report','Import a PDF or spreadsheet for usage matching','pdf food trak ideal usage import','upload',()=>openUsageUploadModal('other')],
     ['suppliers','Add a supplier','Create a supplier and contact record','new vendor contact','plus',()=>openSupplierModal()],
-    ['settings','Manage users and access','View profiles, roles, and permissions','staff manager administrator profile','people',()=>setSettingsSection('profiles')]
+    ['settings','Manage people and access','Open people, positions, and permissions','staff manager administrator profile','people',()=>{window.top.location.href='/app/people';}]
   ];
   actions.forEach(([page,title,subtitle,keywords,icon,callback],index)=>{if(can(page))add({id:`action:${masterSearchNormalize(title).replace(/ /g,'-')}`,group:'Quick actions',title,subtitle,keywords,icon,page,priority:65,suggest:100-index,action:()=>masterSearchAfterPage(page,callback)});});
 
@@ -112,7 +112,7 @@ function buildMasterSearchIndex(){
     const settings=[
       ['general','General','Workspace and application information','workspace account'],['floor-plan','Floor Plan','Rooms and the items assigned to them','locations room'],['categories','Categories','Inventory categories and subcategories','taxonomy classifications'],['departments','Departments','Department workspaces and assignments','bar kitchen'],['profiles','Users & Access','Profiles, roles, departments, and permissions','staff managers team'],['appearance','Appearance','Theme and display preferences','dark light colors'],['sync','Sync & Storage','Cloud sync and browser cache','backup database'],['exports','Exports','Spreadsheet and print preferences','xlsx csv pdf']
     ];
-    settings.forEach(([key,title,subtitle,keywords],index)=>add({id:`settings:${key}`,group:'Settings',title,subtitle,keywords,icon:'settings',page:'settings',priority:38,suggest:index<5?55-index:0,action:()=>masterSearchAfterPage('settings',()=>setSettingsSection(key))}));
+    settings.forEach(([key,title,subtitle,keywords],index)=>add({id:`settings:${key}`,group:'Settings',title,subtitle,keywords,icon:'settings',page:'settings',priority:38,suggest:index<5?55-index:0,action:()=>key==='profiles'?window.top.location.href='/app/people':masterSearchAfterPage('settings',()=>setSettingsSection(key))}));
   }
 
   if(can('products')){
@@ -147,7 +147,7 @@ function buildMasterSearchIndex(){
     (state.rooms||[]).filter(item=>!item.archived).forEach(room=>add({id:`room:${room.id}`,group:'Rooms',title:room.name||'Unnamed room',subtitle:'Floor Plan room',keywords:[room.categoryNames,room.categories,(room.productIds||[]).map(id=>(state.products||[]).find(item=>item.id===id)?.name)].flat(2).filter(Boolean).join(' '),icon:'room',page:'settings',priority:16,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('floor-plan');requestAnimationFrame(()=>openFloorPlanRoomEditor(room.id));})}));
     Object.entries(state.inventoryCategories||{}).forEach(([name,subcategories])=>add({id:`category:${name}`,group:'Categories',title:name,subtitle:`${subcategories.length} subcategor${subcategories.length===1?'y':'ies'}`,keywords:subcategories.join(' '),icon:'category',page:'settings',priority:15,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('categories');requestAnimationFrame(()=>openInventoryCategoryEditor(name));})}));
     (state.departments||[]).filter(item=>!item.archived).forEach(department=>add({id:`department:${department.id}`,group:'Departments',title:department.name||'Unnamed department',subtitle:'Department settings',keywords:[department.description,department.type].filter(Boolean).join(' '),icon:'department',page:'settings',priority:13,action:()=>masterSearchAfterPage('settings',()=>{setSettingsSection('departments');if(typeof selectDepartmentSettings==='function')requestAnimationFrame(()=>selectDepartmentSettings(department.id));})}));
-    if(typeof profileCanManageProfiles!=='function'||profileCanManageProfiles())(state.profiles||[]).filter(item=>!item.archived).forEach(profile=>add({id:`profile:${profile.id}`,group:'People',title:profile.name||profile.email||'Unnamed user',subtitle:[profile.role,profile.email].filter(Boolean).join(' · '),keywords:[profile.position,profile.status].filter(Boolean).join(' '),icon:'people',page:'settings',priority:12,action:()=>masterSearchAfterPage('settings',()=>setSettingsSection('profiles'))}));
+    if(typeof profileCanManageProfiles!=='function'||profileCanManageProfiles())(state.profiles||[]).filter(item=>!item.archived).forEach(profile=>add({id:`profile:${profile.id}`,group:'People',title:profile.name||profile.email||'Unnamed user',subtitle:[profile.role,profile.email].filter(Boolean).join(' · '),keywords:[profile.position,profile.status].filter(Boolean).join(' '),icon:'people',page:'settings',priority:12,action:()=>{window.top.location.href='/app/people';}}));
   }
   return records;
 }

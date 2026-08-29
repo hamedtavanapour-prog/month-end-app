@@ -76,7 +76,7 @@
     document.querySelectorAll('[data-settings-key="profiles"]').forEach(button=>{
       button.textContent='';
       button.innerHTML='<span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 5a3 3 0 0 1 0 6M17 14c2.6.4 4 2.3 4 5"/></svg></span><span>Users & Access</span>';
-      button.onclick=()=>{showPage('settings');setSettingsSection('profiles');};
+      button.onclick=()=>{window.top.location.href='/app/people';};
       button.style.display=access.canManageUsers?'flex':'none';
     });
     document.querySelectorAll('[data-pos-integrations-link]').forEach(button=>{

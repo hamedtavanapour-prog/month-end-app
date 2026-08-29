@@ -395,7 +395,7 @@ function inviteEmailBody(profile){
   return[
     `Hi ${profile.name},`,
     '',
-    'You have been invited to Keg Bar Inventory for this restaurant.',
+    'You have been invited to Month\'s End for this restaurant.',
     '',
     `Role: ${profile.role}`,
     `Room access: ${rooms}`,
@@ -413,7 +413,7 @@ async function sendProfileInvite(profile){
     const data=await response.json().catch(()=>({}));
     if(response.ok&&data.sent)return true;
   }catch(e){}
-  const subject=encodeURIComponent('Invitation to Keg Bar Inventory');
+  const subject=encodeURIComponent('Invitation to Month\'s End');
   const body=encodeURIComponent(payload.body);
   window.location.href=`mailto:${encodeURIComponent(profile.email)}?subject=${subject}&body=${body}`;
   return false;
@@ -553,12 +553,15 @@ function setSettingsSection(section){
     if(app)app.classList.remove('detail-open');
     return;
   }
+  if(section==='profiles'){
+    window.top.location.href='/app/people';
+    return;
+  }
   if(section!=='profiles'&&!profileCanAccessPage(currentProfile(),'settings')){
     toast('You can only view your own profile.',true);
     section='profiles';
   }
   activeSettingsSection=section;
-  if(section==='profiles')ensureSettingsUsersFrameLoaded();
   document.querySelectorAll('.settings-nav-item').forEach(item=>item.classList.toggle('active',item.dataset.settingsKey===section));
   document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.settingsPane===section));
   syncSidebarSettingsFlyout();

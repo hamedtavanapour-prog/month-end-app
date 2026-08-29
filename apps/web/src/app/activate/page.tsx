@@ -51,8 +51,8 @@ export default async function ActivatePage({ searchParams }: ActivatePageProps) 
             <p className="eyebrow">First owner setup</p>
             <h1>Create your Owner account.</h1>
             <p>
-              This account will own the Keg Bar workspace and can later invite
-              managers and staff.
+              This account initializes Month&apos;s End and can later create customer
+              organizations and invite their administrators.
             </p>
 
             {errorMessage ? <div className="form-alert" role="alert">{errorMessage}</div> : null}

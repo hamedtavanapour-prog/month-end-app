@@ -100,6 +100,17 @@ input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance:
 .primary-link, .secondary-link { display: block; width: fit-content; margin: 24px auto 0; border-radius: 10px; padding: 13px 18px; font-weight: 750; text-decoration: none; }
 .primary-link { color: #fff; background: linear-gradient(180deg, #5f6d7e, #3f4c5e); }
 .secondary-link { border: 1px solid var(--line); color: var(--ink); background: #fff; }
+.workspace-choice-card { text-align: left; }
+.workspace-choice-card > .brand-mark { display: grid; margin-inline: auto; }
+.workspace-choice-card > .eyebrow,.workspace-choice-card > h1,.workspace-choice-card > p { text-align: center; }
+.workspace-choice-list { display: grid; gap: 10px; margin-top: 28px; }
+.workspace-choice-list form { margin: 0; }
+.workspace-choice-list button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 15px 17px; color: var(--ink); background: var(--paper); text-align: left; }
+.workspace-choice-list button:hover,.workspace-choice-list button:focus-visible { border-color: var(--amber); background: var(--amber-soft); outline: none; }
+.workspace-choice-list button span { display: grid; gap: 3px; }
+.workspace-choice-list button strong { font-size: 15px; }
+.workspace-choice-list button small { color: var(--muted); }
+.workspace-choice-list button i { color: var(--muted); font-size: 20px; font-style: normal; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 242px minmax(0, 1fr); }
 .app-sidebar { position: sticky; top: 0; display: flex; height: 100vh; flex-direction: column; padding: 26px 18px 20px; border-right: 1px solid #263044; color: #e9edf4; background: #172033; }

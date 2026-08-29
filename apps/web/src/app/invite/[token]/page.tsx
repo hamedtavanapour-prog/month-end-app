@@ -6,7 +6,7 @@ import { acceptInvitation, finishEmailedInvitation, sendInvitationAccessEmail } 
 import { InviteSessionBridge } from "./invite-session-bridge";
 import { createHash } from "node:crypto";
 
-export const metadata: Metadata = { title: "Join Keg Bar" };
+export const metadata: Metadata = { title: "Join Month's End" };
 export const dynamic = "force-dynamic";
 
 type InvitePageProps = {
@@ -39,8 +39,8 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
   return (
     <main className="login-page invite-page">
       <InviteSessionBridge />
-      <section className="login-story" aria-label="Keg Bar invitation">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">ME</span><span>Keg Bar</span></div>
+      <section className="login-story" aria-label="Month's End invitation">
+        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">ME</span><span>Month&apos;s End</span></div>
         <div className="story-copy"><p className="eyebrow">Team invitation</p><h1>You’re joining one shared operation.</h1><p>Your work will be saved under your own account, with access limited to the departments and actions assigned to you.</p></div>
         <p className="story-footnote">Individual login · Department access · Activity history</p>
       </section>

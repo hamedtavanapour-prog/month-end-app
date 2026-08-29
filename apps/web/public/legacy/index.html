@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Month End"/>
-<title>Keg Bar Inventory</title>
+<title>Month&apos;s End Inventory</title>
 <meta name="description" content="Multi-department inventory counting, ordering, usage tracking, and reporting for hospitality teams."/>
 <meta name="app-version" content="1.0.0"/>
 <link rel="stylesheet" href="css/styles.css?v=live-inventory-fields-1"/>
@@ -27,7 +27,7 @@
 <nav class="sidebar" aria-label="Primary navigation">
   <div class="sidebar-top">
     <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Toggle sidebar">ME</button>
-    <div class="sidebar-logo"><h1><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>Keg Bar</h1><span>Inventory Manager</span></div>
+    <div class="sidebar-logo"><h1><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>Month&apos;s End</h1><span>Inventory Manager</span></div>
   </div>
   <button class="master-search-trigger" id="master-search-trigger" type="button" onclick="openMasterSearch(this)" aria-label="Search everything" aria-haspopup="dialog">
     <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>
@@ -595,7 +595,8 @@
         <div id="settings-department-detail" hidden></div>
       </div>
       <div class="settings-pane" data-settings-pane="profiles">
-        <iframe class="settings-users-frame" data-src="/app/team?embedded=1" loading="lazy" title="Users and access settings" onload="syncEmbeddedTheme(document.documentElement.dataset.theme||'slate')"></iframe>
+        <div class="settings-section-head"><h3>People &amp; Access</h3><p>User management now opens as a full workspace so profiles, positions, and permissions are not constrained inside Settings.</p></div>
+        <div class="settings-group"><button class="btn btn-primary" type="button" onclick="window.top.location.href='/app/people'">Open People &amp; Access</button></div>
       </div>
       <div class="settings-pane" data-settings-pane="appearance">
         <div class="settings-section-head"><h3>Appearance</h3><p>Choose a saved visual theme for this device.</p></div>

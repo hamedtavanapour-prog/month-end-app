@@ -11,7 +11,7 @@ import { MemberDirectory } from "./member-directory";
 import { PreparedAccountWizard } from "./prepared-account-wizard";
 import { ThemeBridge } from "./theme-bridge";
 
-export const metadata: Metadata = { title: "Users & access" };
+export const metadata: Metadata = { title: "People & Access" };
 export const dynamic = "force-dynamic";
 
 type TeamPageProps = {
@@ -102,11 +102,11 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
     <main className={`team-shell ${params.embedded === "1" ? "team-shell-embedded" : ""}`}>
       <ThemeBridge />
       <aside className="team-sidebar">
-        <Link className="legacy-brand" href="/app"><strong>ME / Keg Bar</strong><span>Inventory Manager</span></Link>
+        <Link className="legacy-brand" href="/app"><strong>Month&apos;s End</strong><span>{context.organizationName}</span></Link>
         <nav>
           <Link href="/app">← Inventory workspace</Link>
-          <span className="active">Users & access</span>
-          <Link href="/app">Departments</Link>
+          <span className="active">People & Access</span>
+          <Link href="/app/settings/departments">Organization structure</Link>
           <Link href="/app/activity">Activity log</Link>
           {can(context, "integrations.pos.view") ? <Link href="/app/settings/integrations/pos">POS integrations</Link> : null}
         </nav>
@@ -118,7 +118,7 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
 
       <section className="team-content">
         <header className="team-header">
-          <div><p className="eyebrow">Settings</p><h1>Users & access</h1><p>Control who can see and change each part of {context.organizationName}.</p></div>
+          <div><p className="eyebrow">Administration</p><h1>People & Access</h1><p>Manage people, responsibilities, and effective access across {context.organizationName}.</p></div>
           {params.embedded === "1" ? null : <Link className="team-back" href="/app">Done</Link>}
         </header>
 

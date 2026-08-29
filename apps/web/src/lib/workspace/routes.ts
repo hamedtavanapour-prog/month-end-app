@@ -57,6 +57,7 @@ const pageRoutes: Record<string, WorkspaceRoute> = {
 };
 
 const aliases: Record<string, string> = {
+  "settings/users": "/app/people",
   products: "/app/catalog/products",
   "live-inventory": "/app/inventory/live",
   counts: "/app/inventory/counts",
