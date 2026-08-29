@@ -14,8 +14,12 @@ export type AccessContext = {
   mustChangePassword: boolean;
   displayName: string;
   email: string;
+  locationIds: string[];
+  positionIds: string[];
   departmentIds: string[];
   permissionKeys: string[];
+  canManagePeople: boolean;
+  canManagePositions: boolean;
 };
 
 export const WORKSPACE_COOKIE = "me_workspace";
@@ -62,11 +66,13 @@ export async function getAccessContext(): Promise<AccessContext | null> {
 
   if (!membership) return null;
 
-  const [{ data: profile }, { data: departmentRows }, { data: permissionRows }] = await Promise.all([
+  const [{ data: profile }, { data: effectiveRows }, { data: locationAuthority }, { data: regionAuthority }] = await Promise.all([
     supabase.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
-    supabase.from("membership_departments").select("department_id").eq("membership_id", membership.id),
-    supabase.from("membership_permissions").select("permission_key, allowed").eq("membership_id", membership.id),
+    supabase.rpc("get_my_effective_access", { p_organization_id: membership.organization_id }),
+    supabase.from("membership_location_assignments").select("authority").eq("membership_id", membership.id).eq("authority", "location_admin").limit(1),
+    supabase.from("membership_region_assignments").select("is_manager").eq("membership_id", membership.id).eq("is_manager", true).limit(1),
   ]);
+  const effective = effectiveRows?.[0];
 
   const organization = selected?.organization;
   const claimEmail = typeof claimsData.claims.email === "string" ? claimsData.claims.email : "";
@@ -82,8 +88,12 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     mustChangePassword: membership.must_change_password,
     displayName: profile?.display_name || claimEmail.split("@")[0] || "Team member",
     email: profile?.email || claimEmail,
-    departmentIds: departmentRows?.map((row) => row.department_id) ?? [],
-    permissionKeys: permissionRows?.filter((row) => row.allowed).map((row) => row.permission_key) ?? [],
+    locationIds: effective?.location_ids ?? [],
+    positionIds: effective?.position_ids ?? [],
+    departmentIds: effective?.department_ids ?? [],
+    permissionKeys: effective?.permission_keys ?? [],
+    canManagePeople: effective?.can_manage_people ?? ["owner", "admin"].includes(membership.role),
+    canManagePositions: ["owner", "admin"].includes(membership.role) || Boolean(locationAuthority?.length || regionAuthority?.length),
   };
 }
 

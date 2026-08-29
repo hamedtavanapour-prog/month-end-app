@@ -6,6 +6,7 @@ import { createPreparedAccount } from "./actions";
 
 type Department = { id: string; name: string };
 type Permission = { key: string; area: string; label: string; description: string };
+type Position = { id: string; name: string };
 type CreatorRole = "owner" | "admin" | "manager" | "staff";
 type AccessPreset = "full" | "manager" | "restricted" | "supporting" | "advanced";
 
@@ -52,11 +53,13 @@ function presetKeys(preset: AccessPreset, permissions: Permission[]) {
 export function PreparedAccountWizard({
   departments,
   permissions,
+  positions,
   creatorRole,
   embedded,
 }: {
   departments: Department[];
   permissions: Permission[];
+  positions: Position[];
   creatorRole: CreatorRole;
   embedded: boolean;
 }) {
@@ -152,8 +155,8 @@ export function PreparedAccountWizard({
               {creatorRole !== "manager" ? <option value="manager">Manager</option> : null}
               <option value="staff">Staff</option>
             </select></label>
-            <label><span>Position</span><select name="jobTitle" defaultValue="Bar Manager">
-              <option>General Manager</option><option>Bar Manager</option><option>Culinary Manager</option><option>Dining Room Manager</option><option>Assistant Manager</option><option>Inventory Manager</option><option>Team Member</option>
+            <label><span>Position</span><select name="jobTitle" defaultValue={positions.find((position) => position.name === "Bar Manager")?.name ?? positions[0]?.name ?? "Team Member"}>
+              {positions.map((position) => <option key={position.id} value={position.name}>{position.name}</option>)}
             </select></label>
           </div>
           <div className="generated-password">

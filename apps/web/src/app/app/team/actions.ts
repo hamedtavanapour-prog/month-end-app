@@ -20,6 +20,13 @@ function invitationError(message?: string) {
   return "invite_failed";
 }
 
+function positionError(message?: string) {
+  if (message?.includes("already_exists")) return "position_exists";
+  if (message?.includes("ceiling")) return "permission_ceiling";
+  if (message?.includes("scope") || message?.includes("denied")) return "position_scope";
+  return "position_failed";
+}
+
 function teamUrl(formData: FormData, values: Record<string, string> = {}) {
   const params = new URLSearchParams(values);
   if (formData.get("embedded") === "1") params.set("embedded", "1");
@@ -108,6 +115,12 @@ export async function updateTeamMember(formData: FormData) {
   const status = String(formData.get("status") ?? "active");
   const departmentIds = values(formData, "departments");
   const permissionKeys = values(formData, "permissions");
+  const locationIds = values(formData, "locations");
+  const positionIds = values(formData, "positions");
+  const primaryLocationId = String(formData.get("primaryLocation") ?? "") || null;
+  const primaryPositionId = String(formData.get("primaryPosition") ?? "") || null;
+  const primaryDepartmentId = String(formData.get("primaryDepartment") ?? "") || null;
+  const supervisorMembershipId = String(formData.get("supervisorMembership") ?? "") || null;
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("update_team_member_profile", {
@@ -121,8 +134,48 @@ export async function updateTeamMember(formData: FormData) {
   });
 
   if (error) redirect(teamUrl(formData, { error: "update_failed" }));
+  const { error: structureError } = await supabase.rpc("set_member_structure", {
+    p_membership_id: membershipId,
+    p_location_ids: locationIds,
+    p_primary_location_id: primaryLocationId,
+    p_position_ids: positionIds,
+    p_primary_position_id: primaryPositionId,
+    p_department_ids: departmentIds,
+    p_primary_department_id: primaryDepartmentId,
+    p_supervisor_membership_id: supervisorMembershipId,
+  });
+  if (structureError) redirect(teamUrl(formData, { error: "update_failed" }));
   revalidatePath("/app/people");
   redirect(teamUrl(formData, { updated: "1" }));
+}
+
+export async function createPosition(formData: FormData) {
+  const context = await requireAccessContext();
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const locationId = String(formData.get("locationId") ?? "") || null;
+  const departmentIds = values(formData, "departments");
+  const primaryDepartmentId = String(formData.get("primaryDepartment") ?? "") || null;
+  const permissionKeys = values(formData, "permissions");
+  if (!name || !locationId || !permissionKeys.length) {
+    redirect(teamUrl(formData, { error: "invalid_position" }));
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("create_position", {
+    p_organization_id: context.organizationId,
+    p_name: name,
+    p_description: description,
+    p_region_id: null,
+    p_location_id: locationId,
+    p_can_manage_people: formData.get("canManagePeople") === "on",
+    p_department_ids: departmentIds,
+    p_primary_department_id: primaryDepartmentId,
+    p_permission_keys: permissionKeys,
+  });
+  if (error) redirect(teamUrl(formData, { error: positionError(error.message) }));
+  revalidatePath("/app/people");
+  redirect(teamUrl(formData, { position_created: "1" }));
 }
 
 export async function revokeInvitation(formData: FormData) {

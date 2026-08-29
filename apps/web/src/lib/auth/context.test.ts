@@ -14,8 +14,12 @@ function context(role: AccessContext["role"], permissionKeys: string[] = []): Ac
     mustChangePassword: false,
     displayName: "Test User",
     email: "test@example.com",
+    locationIds: [],
+    positionIds: [],
     departmentIds: [],
     permissionKeys,
+    canManagePeople: role === "owner" || role === "admin",
+    canManagePositions: role === "owner" || role === "admin",
   };
 }
 

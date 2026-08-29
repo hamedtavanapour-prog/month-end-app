@@ -176,6 +176,30 @@ input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance:
 .access-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
 .access-card-heading h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
 .access-card-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.access-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+.access-overview > div { display: grid; min-height: 112px; align-content: start; gap: 5px; border: 1px solid var(--line); border-radius: 13px; padding: 16px; background: var(--paper); }
+.access-overview small { color: var(--muted); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.access-overview strong { margin-top: 8px; font-size: 21px; letter-spacing: -.03em; }
+.access-overview span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.hierarchy-tree { display: grid; gap: 8px; padding: 22px 24px; color: var(--muted); font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.6; }
+.hierarchy-tree strong { color: var(--ink); font-family: inherit; }
+.hierarchy-tree > span { white-space: nowrap; }
+.structure-count { display: grid; min-width: 34px; height: 34px; place-items: center; border-radius: 999px; color: var(--amber-dark); background: var(--amber-soft); font-size: 12px; font-weight: 850; }
+.position-list { display: grid; }
+.position-row { display: grid; grid-template-columns: minmax(170px, .8fr) minmax(220px, 1.2fr) auto; align-items: center; gap: 18px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.position-row > div:first-child { display: grid; gap: 3px; }
+.position-row strong { font-size: 14px; }
+.position-row small,.position-row p,.position-metadata { color: var(--muted); font-size: 11px; }
+.position-row p { margin: 0; line-height: 1.5; }
+.position-metadata { display: grid; justify-items: end; gap: 4px; text-align: right; }
+.position-create { border-top: 1px solid var(--line); }
+.position-create > summary { padding: 17px 22px; color: var(--amber-dark); background: var(--amber-soft); cursor: pointer; font-size: 13px; font-weight: 850; }
+.position-form { border-top: 1px solid var(--line); }
+.position-description { grid-column: span 2; }
+.position-manage-toggle { align-self: end; }
+.position-manage-toggle span { display: grid !important; gap: 2px; }
+.position-manage-toggle small { color: var(--muted); font-size: 10px; font-weight: 450; }
+.primary-choice { display: grid; max-width: 360px; }
 .team-form { display: grid; gap: 24px; padding: 24px; }
 .team-form-grid { display: grid; grid-template-columns: 1fr 1.25fr .8fr; gap: 14px; }
 .team-form-grid.compact { grid-template-columns: repeat(2, minmax(0, 220px)); }
@@ -389,6 +413,9 @@ body:has(.team-shell-embedded) { background: transparent; }
   .team-current-user { display: none; }
   .team-content { padding: 28px 22px 60px; }
   .team-form-grid, .choice-grid { grid-template-columns: 1fr 1fr; }
+  .access-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .position-row { grid-template-columns: 1fr; gap: 7px; }
+  .position-metadata { justify-items: start; text-align: left; }
   .pos-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .pos-metric-grid > div:nth-child(2) { border-right: 0; }
   .pos-metric-grid > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
@@ -409,6 +436,9 @@ body:has(.team-shell-embedded) { background: transparent; }
   .team-header { align-items: stretch; flex-direction: column; }
   .team-back { width: fit-content; }
   .team-form-grid, .team-form-grid.compact, .choice-grid { grid-template-columns: 1fr; }
+  .access-overview { grid-template-columns: 1fr; }
+  .position-description { grid-column: auto; }
+  .hierarchy-tree { overflow-x: auto; }
   .member-card summary { grid-template-columns: 38px minmax(0, 1fr) 18px; }
   .member-card summary .role-pill { grid-column: 2; width: fit-content; }
   .member-editor, .protected-access { padding-left: 24px; }

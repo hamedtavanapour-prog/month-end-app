@@ -8,6 +8,7 @@ import { getPublicAppUrl } from "@/lib/auth/public-url";
 import { createClient } from "@/lib/supabase/server";
 import { revokeInvitation } from "./actions";
 import { MemberDirectory } from "./member-directory";
+import { PositionDirectory } from "./position-directory";
 import { PreparedAccountWizard } from "./prepared-account-wizard";
 import { ThemeBridge } from "./theme-bridge";
 
@@ -23,6 +24,7 @@ type TeamPageProps = {
     error?: string;
     delivery?: string;
     prepared?: string;
+    position_created?: string;
     embedded?: string;
   }>;
 };
@@ -38,6 +40,11 @@ const errorMessages: Record<string, string> = {
   invite_failed: "The invitation could not be created.",
   update_failed: "That user’s access could not be updated.",
   revoke_failed: "The invitation could not be revoked.",
+  invalid_position: "Enter a position name, location, and at least one permission.",
+  position_exists: "A position with that name already exists in this location.",
+  permission_ceiling: "A position cannot grant access that you do not have.",
+  position_scope: "You can only create positions inside locations you manage.",
+  position_failed: "The position could not be created.",
 };
 
 function initials(name: string) {
@@ -46,18 +53,26 @@ function initials(name: string) {
 
 export default async function TeamPage({ searchParams }: TeamPageProps) {
   const context = await requireAccessContext();
-  if (!(["owner", "admin", "manager"] as string[]).includes(context.role)) redirect("/app");
+  if (!context.canManagePeople && !(["owner", "admin", "manager"] as string[]).includes(context.role)) redirect("/app");
 
   const supabase = await createClient();
   const params = await searchParams;
-  const [departmentsResult, permissionsResult, membershipsResult, departmentAssignmentsResult, permissionAssignmentsResult, profilesResult, invitationsResult] = await Promise.all([
-    supabase.from("departments").select("id, name").eq("organization_id", context.organizationId).is("archived_at", null).order("name"),
+  const [departmentsResult, permissionsResult, membershipsResult, departmentAssignmentsResult, permissionAssignmentsResult, profilesResult, invitationsResult, regionsResult, locationsResult, positionsResult, positionDepartmentsResult, positionPermissionsResult, membershipPositionsResult, membershipLocationsResult, reportingLinesResult] = await Promise.all([
+    supabase.from("departments").select("id, name, location_id").eq("organization_id", context.organizationId).is("archived_at", null).order("name"),
     supabase.from("permission_definitions").select("key, area, label, description, manager_assignable").order("area").order("label"),
     supabase.from("memberships").select("id, user_id, role, job_title, must_change_password, status, reports_to_membership_id, created_at").eq("organization_id", context.organizationId).order("status").order("created_at"),
-    supabase.from("membership_departments").select("membership_id, department_id"),
+    supabase.from("membership_departments").select("membership_id, department_id, is_primary"),
     supabase.from("membership_permissions").select("membership_id, permission_key, allowed"),
     supabase.from("profiles").select("id, display_name, email"),
     supabase.from("invitations").select("id, email, display_name, role, status, expires_at, invited_by, created_at").eq("organization_id", context.organizationId).eq("status", "pending").order("created_at", { ascending: false }),
+    supabase.from("regions").select("id, name").eq("organization_id", context.organizationId).is("archived_at", null).order("name"),
+    supabase.from("locations").select("id, name, region_id").eq("organization_id", context.organizationId).is("archived_at", null).order("name"),
+    supabase.from("positions").select("id, name, description, can_manage_people, region_id, location_id").eq("organization_id", context.organizationId).is("archived_at", null).order("name"),
+    supabase.from("position_departments").select("position_id, department_id, is_primary"),
+    supabase.from("position_permissions").select("position_id, permission_key, allowed"),
+    supabase.from("membership_positions").select("membership_id, position_id, is_primary"),
+    supabase.from("membership_location_assignments").select("membership_id, location_id, authority, is_primary"),
+    supabase.from("membership_reporting_lines").select("membership_id, supervisor_membership_id, location_id"),
   ]);
 
   const departments = departmentsResult.data ?? [];
@@ -69,6 +84,14 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
   const departmentAssignments = departmentAssignmentsResult.data ?? [];
   const permissionAssignments = permissionAssignmentsResult.data ?? [];
   const allMemberships = membershipsResult.data ?? [];
+  const regions = regionsResult.data ?? [];
+  const locations = locationsResult.data ?? [];
+  const positions = positionsResult.data ?? [];
+  const positionDepartments = positionDepartmentsResult.data ?? [];
+  const positionPermissions = positionPermissionsResult.data ?? [];
+  const membershipPositions = membershipPositionsResult.data ?? [];
+  const membershipLocations = membershipLocationsResult.data ?? [];
+  const reportingLines = reportingLinesResult.data ?? [];
   const memberships = context.role === "manager"
     ? allMemberships.filter((member) => member.id === context.membershipId || member.reports_to_membership_id === context.membershipId)
     : allMemberships;
@@ -95,6 +118,12 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
       protected: member.role === "owner" || member.id === context.membershipId,
       departmentIds: departmentAssignments.filter((row) => row.membership_id === member.id).map((row) => row.department_id),
       permissionKeys: permissionAssignments.filter((row) => row.membership_id === member.id && row.allowed).map((row) => row.permission_key),
+      positionIds: membershipPositions.filter((row) => row.membership_id === member.id).map((row) => row.position_id),
+      primaryPositionId: membershipPositions.find((row) => row.membership_id === member.id && row.is_primary)?.position_id ?? null,
+      locationIds: membershipLocations.filter((row) => row.membership_id === member.id).map((row) => row.location_id),
+      primaryLocationId: membershipLocations.find((row) => row.membership_id === member.id && row.is_primary)?.location_id ?? null,
+      primaryDepartmentId: departmentAssignments.find((row) => row.membership_id === member.id && row.is_primary)?.department_id ?? null,
+      supervisorMembershipId: reportingLines.find((row) => row.membership_id === member.id && row.location_id === null)?.supervisor_membership_id ?? member.reports_to_membership_id,
     };
   });
 
@@ -106,7 +135,8 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
         <nav>
           <Link href="/app">← Inventory workspace</Link>
           <span className="active">People & Access</span>
-          <Link href="/app/settings/departments">Organization structure</Link>
+          <Link href="#positions">Positions</Link>
+          <Link href="#structure">Organization structure</Link>
           <Link href="/app/activity">Activity log</Link>
           {can(context, "integrations.pos.view") ? <Link href="/app/settings/integrations/pos">POS integrations</Link> : null}
         </nav>
@@ -124,6 +154,7 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
 
         {params.error ? <div className="form-alert" role="alert">{errorMessages[params.error] ?? "Something went wrong."}</div> : null}
         {params.updated ? <div className="success-alert">User access updated.</div> : null}
+        {params.position_created ? <div className="success-alert">Position created and ready to assign.</div> : null}
         {params.revoked ? <div className="success-alert">Invitation revoked.</div> : null}
         {params.prepared ? <div className="success-alert">{params.prepared}&apos;s account is ready. {params.delivery === "email" ? "The login link was emailed." : "Give them the login link and temporary password directly."}</div> : null}
         {inviteUrl ? (
@@ -136,14 +167,37 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
           </div>
         ) : null}
 
+        <section className="access-overview" aria-label="Organization access structure">
+          <div><small>Customer</small><strong>{context.organizationName}</strong><span>Restaurant account</span></div>
+          <div><small>Regions</small><strong>{regions.length}</strong><span>{regions.map((region) => region.name).join(", ") || "None"}</span></div>
+          <div><small>Locations</small><strong>{locations.length}</strong><span>{locations.map((location) => location.name).join(", ") || "None"}</span></div>
+          <div><small>Positions</small><strong>{positions.length}</strong><span>Reusable access templates</span></div>
+        </section>
+
+        <section className="access-card hierarchy-map" id="structure">
+          <div className="access-card-heading"><div><h2>Authority map</h2><p>Platform administration stays separate from restaurant authority.</p></div></div>
+          <div className="hierarchy-tree"><strong>Month&apos;s End platform</strong><span>└ Platform Administrator</span><span>　└ {context.organizationName}</span>{regions.map((region) => <span key={region.id}>　　└ {region.name}<br />　　　└ Regional Manager{locations.filter((location) => location.region_id === region.id).map((location) => <span key={location.id}><br />　　　　└ {location.name}<br />　　　　　└ General Manager<br />　　　　　　└ Custom positions → People</span>)}</span>)}</div>
+        </section>
+
         <PreparedAccountWizard
           departments={visibleDepartments}
           permissions={assignablePermissions}
+          positions={positions}
           creatorRole={context.role}
           embedded={params.embedded === "1"}
         />
 
-        <MemberDirectory members={teamMembers} departments={visibleDepartments} permissions={assignablePermissions} contextRole={context.role} embedded={params.embedded === "1"} />
+        <MemberDirectory members={teamMembers} departments={visibleDepartments} permissions={assignablePermissions} positions={positions} locations={locations} contextRole={context.role} embedded={params.embedded === "1"} />
+
+        <PositionDirectory
+          positions={positions}
+          locations={locations}
+          departments={departments}
+          permissions={assignablePermissions}
+          positionDepartmentIds={new Map(positions.map((position) => [position.id, positionDepartments.filter((row) => row.position_id === position.id).map((row) => row.department_id)]))}
+          positionPermissionCounts={new Map(positions.map((position) => [position.id, positionPermissions.filter((row) => row.position_id === position.id && row.allowed).length]))}
+          canCreate={context.canManagePositions}
+        />
 
         {invitations.length ? <section className="access-card pending-invitations-card">
           <div className="access-card-heading"><div><h2>Pending invitations</h2><p>Invitations expire automatically after seven days.</p></div></div>

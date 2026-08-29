@@ -6,6 +6,8 @@ import { updateTeamMember } from "./actions";
 
 export type TeamDepartment = { id: string; name: string };
 export type TeamPermission = { key: string; area: string; label: string; description: string };
+export type TeamPosition = { id: string; name: string; location_id: string | null };
+export type TeamLocation = { id: string; name: string };
 export type TeamMemberView = {
   id: string;
   name: string;
@@ -17,6 +19,12 @@ export type TeamMemberView = {
   protected: boolean;
   departmentIds: string[];
   permissionKeys: string[];
+  positionIds: string[];
+  primaryPositionId: string | null;
+  locationIds: string[];
+  primaryLocationId: string | null;
+  primaryDepartmentId: string | null;
+  supervisorMembershipId: string | null;
 };
 
 function initials(name: string) {
@@ -31,12 +39,16 @@ export function MemberDirectory({
   members,
   departments,
   permissions,
+  positions,
+  locations,
   contextRole,
   embedded,
 }: {
   members: TeamMemberView[];
   departments: TeamDepartment[];
   permissions: TeamPermission[];
+  positions: TeamPosition[];
+  locations: TeamLocation[];
   contextRole: string;
   embedded: boolean;
 }) {
@@ -45,6 +57,8 @@ export function MemberDirectory({
   const selected = members.find((member) => member.id === selectedId) ?? null;
   const selectedDepartments = selected ? departments.filter((department) => selected.departmentIds.includes(department.id)) : [];
   const selectedPermissions = selected ? permissions.filter((permission) => selected.permissionKeys.includes(permission.key)) : [];
+  const selectedPositions = selected ? positions.filter((position) => selected.positionIds.includes(position.id)) : [];
+  const selectedLocations = selected ? locations.filter((location) => selected.locationIds.includes(location.id)) : [];
   const permissionAreas = Array.from(new Set(selectedPermissions.map((permission) => permission.area)));
 
   function openMember(id: string) {
@@ -93,11 +107,11 @@ export function MemberDirectory({
                 <input name="membershipId" type="hidden" value={selected.id} />
 
                 <section className="member-profile-section">
-                  <div className="member-profile-section-title"><span>01</span><div><h3>Profile information</h3><p>Name, position, role, and account status.</p></div></div>
+                  <div className="member-profile-section-title"><span>01</span><div><h3>Profile information</h3><p>Name, legacy authority, and account status.</p></div></div>
                   <div className="team-form-grid member-profile-fields">
                     <label><span>Name</span><input name="displayName" defaultValue={selected.name} maxLength={120} required /></label>
                     <label><span>Email</span><input value={selected.email} readOnly aria-describedby="email-readonly-note" /></label>
-                    <label><span>Position</span><input name="jobTitle" defaultValue={selected.jobTitle} maxLength={120} required /></label>
+                    <label><span>Display title</span><input name="jobTitle" defaultValue={selected.jobTitle} maxLength={120} required /></label>
                     <label><span>Role</span><select name="role" defaultValue={selected.role}>
                       {contextRole === "owner" ? <option value="admin">Administrator</option> : null}
                       {contextRole !== "manager" ? <option value="manager">Manager</option> : null}
@@ -109,14 +123,30 @@ export function MemberDirectory({
                 </section>
 
                 <section className="member-profile-section">
-                  <div className="member-profile-section-title"><span>02</span><div><h3>Department access</h3><p>Choose where this person can work and view data.</p></div></div>
+                  <div className="member-profile-section-title"><span>02</span><div><h3>Location and position</h3><p>Assign reusable responsibilities within authorized locations.</p></div></div>
                   <div className="choice-grid member-department-grid">
-                    {departments.map((department) => <label className="choice" key={department.id}><input name="departments" type="checkbox" value={department.id} defaultChecked={selected.departmentIds.includes(department.id)} /><span>{department.name}</span></label>)}
+                    {locations.map((location) => <label className="choice" key={location.id}><input name="locations" type="checkbox" value={location.id} defaultChecked={selected.locationIds.includes(location.id)} /><span>{location.name}</span></label>)}
+                  </div>
+                  <div className="team-form-grid member-profile-fields">
+                    <label><span>Primary location</span><select name="primaryLocation" defaultValue={selected.primaryLocationId ?? ""}><option value="">None</option>{locations.map((location) => <option value={location.id} key={location.id}>{location.name}</option>)}</select></label>
+                    <label><span>Primary position</span><select name="primaryPosition" defaultValue={selected.primaryPositionId ?? ""}><option value="">None</option>{positions.map((position) => <option value={position.id} key={position.id}>{position.name}</option>)}</select></label>
+                    <label><span>Reports to</span><select name="supervisorMembership" defaultValue={selected.supervisorMembershipId ?? ""}><option value="">No direct supervisor</option>{members.filter((member) => member.id !== selected.id).map((member) => <option value={member.id} key={member.id}>{member.name} · {member.jobTitle}</option>)}</select></label>
+                  </div>
+                  <div className="choice-grid member-department-grid">
+                    {positions.map((position) => <label className="choice" key={position.id}><input name="positions" type="checkbox" value={position.id} defaultChecked={selected.positionIds.includes(position.id)} /><span>{position.name}</span></label>)}
                   </div>
                 </section>
 
                 <section className="member-profile-section">
-                  <div className="member-profile-section-title"><span>03</span><div><h3>Permissions</h3><p>Individual actions this person can perform.</p></div></div>
+                  <div className="member-profile-section-title"><span>03</span><div><h3>Department access</h3><p>Choose a primary department and any additional areas where this person can help.</p></div></div>
+                  <div className="choice-grid member-department-grid">
+                    {departments.map((department) => <label className="choice" key={department.id}><input name="departments" type="checkbox" value={department.id} defaultChecked={selected.departmentIds.includes(department.id)} /><span>{department.name}</span></label>)}
+                  </div>
+                  <label className="primary-choice"><span>Primary department</span><select name="primaryDepartment" defaultValue={selected.primaryDepartmentId ?? ""}><option value="">None</option>{departments.map((department) => <option value={department.id} key={department.id}>{department.name}</option>)}</select></label>
+                </section>
+
+                <section className="member-profile-section">
+                  <div className="member-profile-section-title"><span>04</span><div><h3>Permission exceptions</h3><p>Individual access layered on top of the assigned position.</p></div></div>
                   <div className="permission-sections member-permission-editor">
                     {Array.from(new Set(permissions.map((permission) => permission.area))).map((area) => (
                       <div key={area}><h4>{area}</h4><div className="choice-grid">
@@ -133,7 +163,7 @@ export function MemberDirectory({
                 <section className="member-profile-section">
                   <div className="member-profile-section-title"><span>01</span><div><h3>Profile information</h3><p>Identity and role in this workspace.</p></div></div>
                   <dl className="member-detail-grid">
-                    <div><dt>Position</dt><dd>{selected.jobTitle}</dd></div><div><dt>Role</dt><dd>{roleLabel(selected.role)}</dd></div><div><dt>Status</dt><dd><em className={`role-pill ${selected.status}`}>{selected.status}</em></dd></div><div><dt>Password</dt><dd>{selected.mustChangePassword ? "Setup required" : "Active"}</dd></div>
+                    <div><dt>Position</dt><dd>{selectedPositions.map((position) => position.name).join(", ") || selected.jobTitle}</dd></div><div><dt>Location</dt><dd>{selectedLocations.map((location) => location.name).join(", ") || "Not assigned"}</dd></div><div><dt>Authority</dt><dd>{roleLabel(selected.role)}</dd></div><div><dt>Status</dt><dd><em className={`role-pill ${selected.status}`}>{selected.status}</em></dd></div><div><dt>Password</dt><dd>{selected.mustChangePassword ? "Setup required" : "Active"}</dd></div>
                   </dl>
                 </section>
                 <section className="member-profile-section">

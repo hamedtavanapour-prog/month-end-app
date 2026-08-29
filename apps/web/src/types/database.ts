@@ -6,155 +6,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-type InsertShape<Row, RequiredKeys extends keyof Row> = Partial<Row> & Pick<Row, RequiredKeys>
-
-type PosIntegrationRow = {
-  id: string
-  organization_id: string
-  provider: string
-  integration_type: string
-  mode: string
-  status: string
-  configuration: Json
-  connected_at: string | null
-  last_sync_at: string | null
-  last_successful_sync_at: string | null
-  sync_error: string | null
-  created_by: string | null
-  updated_by: string | null
-  created_at: string
-  updated_at: string
-}
-
-type PosLocationRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  external_location_id: string
-  name: string
-  timezone: string | null
-  status: string
-  metadata: Json
-  last_sync_at: string | null
-  last_successful_sync_at: string | null
-  sync_error: string | null
-  created_at: string
-  updated_at: string
-}
-
-type PosMenuItemRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  location_id: string
-  external_item_id: string
-  name: string
-  category: string | null
-  sku: string | null
-  price: number | null
-  currency: string | null
-  is_active: boolean
-  source_updated_at: string | null
-  imported_at: string
-  updated_at: string
-}
-
-type PosItemMappingRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  pos_menu_item_id: string
-  external_item_id: string
-  external_item_name: string
-  month_end_menu_item_id: string | null
-  month_end_menu_item_name: string | null
-  month_end_menu_variant_key: string | null
-  month_end_menu_variant_name: string | null
-  mapping_status: string
-  mapped_by: string | null
-  mapped_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-type PosTicketRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  location_id: string
-  external_ticket_id: string
-  ticket_number: string | null
-  status: string
-  opened_at: string | null
-  closed_at: string | null
-  source_updated_at: string | null
-  external_employee_id: string | null
-  employee_name: string | null
-  guest_count: number | null
-  subtotal: number | null
-  total: number | null
-  currency: string | null
-  content_hash: string
-  imported_at: string
-  updated_at: string
-}
-
-type PosTicketItemRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  ticket_id: string
-  pos_menu_item_id: string | null
-  external_ticket_item_id: string
-  external_menu_item_id: string | null
-  name: string
-  quantity: number
-  unit_price: number | null
-  total: number | null
-  is_voided: boolean
-  is_cancelled: boolean
-  modifiers: Json
-  created_at: string
-  updated_at: string
-}
-
-type PosSyncRunRow = {
-  id: string
-  organization_id: string
-  integration_id: string
-  location_id: string | null
-  sync_kind: string
-  trigger_type: string
-  status: string
-  range_start: string | null
-  range_end: string | null
-  records_received: number
-  records_created: number
-  records_updated: number
-  records_skipped: number
-  error: string | null
-  details: Json
-  triggered_by: string | null
-  started_at: string
-  completed_at: string | null
-}
-
-type IntegrationEventRow = {
-  id: number
-  organization_id: string
-  integration_id: string | null
-  provider: string
-  external_id: string | null
-  event_type: string
-  payload: Json
-  processing_status: string
-  attempt_count: number
-  error: string | null
-  received_at: string
-  processed_at: string | null
-  retained_until: string
-}
-
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -261,12 +112,53 @@ export type Database = {
           },
         ]
       }
+      department_managers: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          department_id: string
+          is_primary: boolean
+          membership_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          department_id: string
+          is_primary?: boolean
+          membership_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          department_id?: string
+          is_primary?: boolean
+          membership_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_managers_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_managers_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           archived_at: string | null
           created_at: string
           created_by: string
           id: string
+          inventory_enabled: boolean
+          location_id: string | null
           name: string
           organization_id: string
           slug: string
@@ -277,6 +169,8 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          inventory_enabled?: boolean
+          location_id?: string | null
           name: string
           organization_id: string
           slug: string
@@ -287,6 +181,8 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          inventory_enabled?: boolean
+          location_id?: string | null
           name?: string
           organization_id?: string
           slug?: string
@@ -294,7 +190,77 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "departments_location_organization_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
             foreignKeyName: "departments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_events: {
+        Row: {
+          attempt_count: number
+          error: string | null
+          event_type: string
+          external_id: string | null
+          id: number
+          integration_id: string | null
+          organization_id: string
+          payload: Json
+          processed_at: string | null
+          processing_status: string
+          provider: string
+          received_at: string
+          retained_until: string
+        }
+        Insert: {
+          attempt_count?: number
+          error?: string | null
+          event_type: string
+          external_id?: string | null
+          id?: never
+          integration_id?: string | null
+          organization_id: string
+          payload: Json
+          processed_at?: string | null
+          processing_status?: string
+          provider: string
+          received_at?: string
+          retained_until?: string
+        }
+        Update: {
+          attempt_count?: number
+          error?: string | null
+          event_type?: string
+          external_id?: string | null
+          id?: never
+          integration_id?: string | null
+          organization_id?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_status?: string
+          provider?: string
+          received_at?: string
+          retained_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_events_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "integration_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -428,23 +394,83 @@ export type Database = {
           },
         ]
       }
+      locations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inventory_enabled: boolean
+          name: string
+          organization_id: string
+          region_id: string | null
+          slug: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_enabled?: boolean
+          name: string
+          organization_id: string
+          region_id?: string | null
+          slug: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_enabled?: boolean
+          name?: string
+          organization_id?: string
+          region_id?: string | null
+          slug?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_region_id_organization_id_fkey"
+            columns: ["region_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       membership_departments: {
         Row: {
           created_at: string
           created_by: string | null
           department_id: string
+          is_primary: boolean
           membership_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           department_id: string
+          is_primary?: boolean
           membership_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
           department_id?: string
+          is_primary?: boolean
           membership_id?: string
         }
         Relationships: [
@@ -461,6 +487,54 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_location_assignments: {
+        Row: {
+          authority: string
+          created_at: string
+          created_by: string | null
+          is_primary: boolean
+          location_id: string
+          membership_id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          authority?: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          location_id: string
+          membership_id: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          authority?: string
+          created_at?: string
+          created_by?: string | null
+          is_primary?: boolean
+          location_id?: string
+          membership_id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_location_assignmen_membership_id_organization_i_fkey"
+            columns: ["membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_location_assignment_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -503,6 +577,162 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "permission_definitions"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      membership_positions: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          is_primary: boolean
+          location_id: string | null
+          membership_id: string
+          organization_id: string
+          position_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          is_primary?: boolean
+          location_id?: string | null
+          membership_id: string
+          organization_id: string
+          position_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          is_primary?: boolean
+          location_id?: string | null
+          membership_id?: string
+          organization_id?: string
+          position_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_positions_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_positions_membership_id_organization_id_fkey"
+            columns: ["membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_positions_position_id_organization_id_fkey"
+            columns: ["position_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      membership_region_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          is_manager: boolean
+          membership_id: string
+          organization_id: string
+          region_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          is_manager?: boolean
+          membership_id: string
+          organization_id: string
+          region_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          is_manager?: boolean
+          membership_id?: string
+          organization_id?: string
+          region_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_region_assignments_membership_id_organization_i_fkey"
+            columns: ["membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_region_assignments_region_id_organization_id_fkey"
+            columns: ["region_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      membership_reporting_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          membership_id: string
+          organization_id: string
+          supervisor_membership_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          membership_id: string
+          organization_id: string
+          supervisor_membership_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          membership_id?: string
+          organization_id?: string
+          supervisor_membership_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_reporting_lines_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_reporting_lines_membership_id_organization_id_fkey"
+            columns: ["membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "membership_reporting_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_reporting_lines_supervisor_membership_id_organi_fkey"
+            columns: ["supervisor_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -566,45 +796,6 @@ export type Database = {
           },
         ]
       }
-      department_managers: {
-        Row: {
-          assigned_by: string | null
-          created_at: string
-          department_id: string
-          is_primary: boolean
-          membership_id: string
-        }
-        Insert: {
-          assigned_by?: string | null
-          created_at?: string
-          department_id: string
-          is_primary?: boolean
-          membership_id: string
-        }
-        Update: {
-          assigned_by?: string | null
-          created_at?: string
-          department_id?: string
-          is_primary?: boolean
-          membership_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "department_managers_department_id_fkey"
-            columns: ["department_id"]
-            isOneToOne: false
-            referencedRelation: "departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "department_managers_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organizations: {
         Row: {
           archived_at: string | null
@@ -662,53 +853,704 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_administrators: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pos_integrations: {
-        Row: PosIntegrationRow
-        Insert: InsertShape<PosIntegrationRow, "organization_id" | "provider">
-        Update: Partial<PosIntegrationRow>
-        Relationships: []
-      }
-      pos_locations: {
-        Row: PosLocationRow
-        Insert: InsertShape<PosLocationRow, "organization_id" | "integration_id" | "external_location_id" | "name">
-        Update: Partial<PosLocationRow>
-        Relationships: []
-      }
-      pos_menu_items: {
-        Row: PosMenuItemRow
-        Insert: InsertShape<PosMenuItemRow, "organization_id" | "integration_id" | "location_id" | "external_item_id" | "name">
-        Update: Partial<PosMenuItemRow>
-        Relationships: []
+        Row: {
+          configuration: Json
+          connected_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          integration_type: string
+          last_successful_sync_at: string | null
+          last_sync_at: string | null
+          mode: string
+          organization_id: string
+          provider: string
+          status: string
+          sync_error: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          configuration?: Json
+          connected_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          integration_type?: string
+          last_successful_sync_at?: string | null
+          last_sync_at?: string | null
+          mode?: string
+          organization_id: string
+          provider: string
+          status?: string
+          sync_error?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          configuration?: Json
+          connected_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          integration_type?: string
+          last_successful_sync_at?: string | null
+          last_sync_at?: string | null
+          mode?: string
+          organization_id?: string
+          provider?: string
+          status?: string
+          sync_error?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_item_mappings: {
-        Row: PosItemMappingRow
-        Insert: InsertShape<PosItemMappingRow, "organization_id" | "integration_id" | "pos_menu_item_id" | "external_item_id" | "external_item_name">
-        Update: Partial<PosItemMappingRow>
-        Relationships: []
+        Row: {
+          created_at: string
+          external_item_id: string
+          external_item_name: string
+          id: string
+          integration_id: string
+          mapped_at: string | null
+          mapped_by: string | null
+          mapping_status: string
+          month_end_menu_item_id: string | null
+          month_end_menu_item_name: string | null
+          month_end_menu_variant_key: string | null
+          month_end_menu_variant_name: string | null
+          organization_id: string
+          pos_menu_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_item_id: string
+          external_item_name: string
+          id?: string
+          integration_id: string
+          mapped_at?: string | null
+          mapped_by?: string | null
+          mapping_status?: string
+          month_end_menu_item_id?: string | null
+          month_end_menu_item_name?: string | null
+          month_end_menu_variant_key?: string | null
+          month_end_menu_variant_name?: string | null
+          organization_id: string
+          pos_menu_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_item_id?: string
+          external_item_name?: string
+          id?: string
+          integration_id?: string
+          mapped_at?: string | null
+          mapped_by?: string | null
+          mapping_status?: string
+          month_end_menu_item_id?: string | null
+          month_end_menu_item_name?: string | null
+          month_end_menu_variant_key?: string | null
+          month_end_menu_variant_name?: string | null
+          organization_id?: string
+          pos_menu_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_item_mappings_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_item_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_item_mappings_pos_menu_item_id_organization_id_fkey"
+            columns: ["pos_menu_item_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_menu_items"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
       }
-      pos_tickets: {
-        Row: PosTicketRow
-        Insert: InsertShape<PosTicketRow, "organization_id" | "integration_id" | "location_id" | "external_ticket_id" | "status" | "content_hash">
-        Update: Partial<PosTicketRow>
-        Relationships: []
+      pos_locations: {
+        Row: {
+          created_at: string
+          external_location_id: string
+          id: string
+          integration_id: string
+          last_successful_sync_at: string | null
+          last_sync_at: string | null
+          metadata: Json
+          name: string
+          organization_id: string
+          status: string
+          sync_error: string | null
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_location_id: string
+          id?: string
+          integration_id: string
+          last_successful_sync_at?: string | null
+          last_sync_at?: string | null
+          metadata?: Json
+          name: string
+          organization_id: string
+          status?: string
+          sync_error?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_location_id?: string
+          id?: string
+          integration_id?: string
+          last_successful_sync_at?: string | null
+          last_sync_at?: string | null
+          metadata?: Json
+          name?: string
+          organization_id?: string
+          status?: string
+          sync_error?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_locations_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      pos_ticket_items: {
-        Row: PosTicketItemRow
-        Insert: InsertShape<PosTicketItemRow, "organization_id" | "integration_id" | "ticket_id" | "external_ticket_item_id" | "name" | "quantity">
-        Update: Partial<PosTicketItemRow>
-        Relationships: []
+      pos_menu_items: {
+        Row: {
+          category: string | null
+          currency: string | null
+          external_item_id: string
+          id: string
+          imported_at: string
+          integration_id: string
+          is_active: boolean
+          location_id: string
+          name: string
+          organization_id: string
+          price: number | null
+          sku: string | null
+          source_updated_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          currency?: string | null
+          external_item_id: string
+          id?: string
+          imported_at?: string
+          integration_id: string
+          is_active?: boolean
+          location_id: string
+          name: string
+          organization_id: string
+          price?: number | null
+          sku?: string | null
+          source_updated_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          currency?: string | null
+          external_item_id?: string
+          id?: string
+          imported_at?: string
+          integration_id?: string
+          is_active?: boolean
+          location_id?: string
+          name?: string
+          organization_id?: string
+          price?: number | null
+          sku?: string | null
+          source_updated_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_menu_items_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_menu_items_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_menu_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_sync_runs: {
-        Row: PosSyncRunRow
-        Insert: InsertShape<PosSyncRunRow, "organization_id" | "integration_id" | "sync_kind" | "trigger_type">
-        Update: Partial<PosSyncRunRow>
-        Relationships: []
+        Row: {
+          completed_at: string | null
+          details: Json
+          error: string | null
+          id: string
+          integration_id: string
+          location_id: string | null
+          organization_id: string
+          range_end: string | null
+          range_start: string | null
+          records_created: number
+          records_received: number
+          records_skipped: number
+          records_updated: number
+          started_at: string
+          status: string
+          sync_kind: string
+          trigger_type: string
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          details?: Json
+          error?: string | null
+          id?: string
+          integration_id: string
+          location_id?: string | null
+          organization_id: string
+          range_end?: string | null
+          range_start?: string | null
+          records_created?: number
+          records_received?: number
+          records_skipped?: number
+          records_updated?: number
+          started_at?: string
+          status?: string
+          sync_kind: string
+          trigger_type: string
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          details?: Json
+          error?: string | null
+          id?: string
+          integration_id?: string
+          location_id?: string | null
+          organization_id?: string
+          range_end?: string | null
+          range_start?: string | null
+          records_created?: number
+          records_received?: number
+          records_skipped?: number
+          records_updated?: number
+          started_at?: string
+          status?: string
+          sync_kind?: string
+          trigger_type?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_sync_runs_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_sync_runs_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_sync_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      integration_events: {
-        Row: IntegrationEventRow
-        Insert: InsertShape<IntegrationEventRow, "organization_id" | "provider" | "event_type" | "payload">
-        Update: Partial<IntegrationEventRow>
-        Relationships: []
+      pos_ticket_items: {
+        Row: {
+          created_at: string
+          external_menu_item_id: string | null
+          external_ticket_item_id: string
+          id: string
+          integration_id: string
+          is_cancelled: boolean
+          is_voided: boolean
+          modifiers: Json
+          name: string
+          organization_id: string
+          pos_menu_item_id: string | null
+          quantity: number
+          ticket_id: string
+          total: number | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_menu_item_id?: string | null
+          external_ticket_item_id: string
+          id?: string
+          integration_id: string
+          is_cancelled?: boolean
+          is_voided?: boolean
+          modifiers?: Json
+          name: string
+          organization_id: string
+          pos_menu_item_id?: string | null
+          quantity: number
+          ticket_id: string
+          total?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_menu_item_id?: string | null
+          external_ticket_item_id?: string
+          id?: string
+          integration_id?: string
+          is_cancelled?: boolean
+          is_voided?: boolean
+          modifiers?: Json
+          name?: string
+          organization_id?: string
+          pos_menu_item_id?: string | null
+          quantity?: number
+          ticket_id?: string
+          total?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_ticket_items_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_ticket_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_ticket_items_pos_menu_item_id_organization_id_fkey"
+            columns: ["pos_menu_item_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_menu_items"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_ticket_items_ticket_id_organization_id_fkey"
+            columns: ["ticket_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_tickets"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      pos_tickets: {
+        Row: {
+          closed_at: string | null
+          content_hash: string
+          currency: string | null
+          employee_name: string | null
+          external_employee_id: string | null
+          external_ticket_id: string
+          guest_count: number | null
+          id: string
+          imported_at: string
+          integration_id: string
+          location_id: string
+          opened_at: string | null
+          organization_id: string
+          source_updated_at: string | null
+          status: string
+          subtotal: number | null
+          ticket_number: string | null
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          content_hash: string
+          currency?: string | null
+          employee_name?: string | null
+          external_employee_id?: string | null
+          external_ticket_id: string
+          guest_count?: number | null
+          id?: string
+          imported_at?: string
+          integration_id: string
+          location_id: string
+          opened_at?: string | null
+          organization_id: string
+          source_updated_at?: string | null
+          status: string
+          subtotal?: number | null
+          ticket_number?: string | null
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          content_hash?: string
+          currency?: string | null
+          employee_name?: string | null
+          external_employee_id?: string | null
+          external_ticket_id?: string
+          guest_count?: number | null
+          id?: string
+          imported_at?: string
+          integration_id?: string
+          location_id?: string
+          opened_at?: string | null
+          organization_id?: string
+          source_updated_at?: string | null
+          status?: string
+          subtotal?: number | null
+          ticket_number?: string | null
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_tickets_integration_id_organization_id_fkey"
+            columns: ["integration_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_tickets_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "pos_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string
+          is_primary: boolean
+          position_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          is_primary?: boolean
+          position_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          is_primary?: boolean
+          position_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "position_departments_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_permissions: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          created_by: string | null
+          permission_key: string
+          position_id: string
+          updated_at: string
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          created_by?: string | null
+          permission_key: string
+          position_id: string
+          updated_at?: string
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          created_by?: string | null
+          permission_key?: string
+          position_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_definitions"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "position_permissions_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      positions: {
+        Row: {
+          archived_at: string | null
+          can_manage_people: boolean
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          location_id: string | null
+          name: string
+          organization_id: string
+          region_id: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          can_manage_people?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          location_id?: string | null
+          name: string
+          organization_id: string
+          region_id?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          can_manage_people?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          location_id?: string | null
+          name?: string
+          organization_id?: string
+          region_id?: string | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_location_id_organization_id_fkey"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "positions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "positions_region_id_organization_id_fkey"
+            columns: ["region_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -737,33 +1579,42 @@ export type Database = {
         }
         Relationships: []
       }
-      workspace_states: {
+      regions: {
         Row: {
+          archived_at: string | null
           created_at: string
-          data: Json
+          created_by: string | null
+          id: string
+          name: string
           organization_id: string
+          slug: string
           updated_at: string
-          updated_by: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
-          data?: Json
+          created_by?: string | null
+          id?: string
+          name: string
           organization_id: string
+          slug: string
           updated_at?: string
-          updated_by: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
-          data?: Json
+          created_by?: string | null
+          id?: string
+          name?: string
           organization_id?: string
+          slug?: string
           updated_at?: string
-          updated_by?: string
         }
         Relationships: [
           {
-            foreignKeyName: "workspace_states_organization_id_fkey"
+            foreignKeyName: "regions_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -801,11 +1652,47 @@ export type Database = {
           },
         ]
       }
+      workspace_states: {
+        Row: {
+          created_at: string
+          data: Json
+          organization_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          organization_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_states_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      accept_team_invitation: {
+        Args: { p_token_hash: string }
+        Returns: string
+      }
       acquire_count_room_lock: {
         Args: {
           p_count_id: string
@@ -819,8 +1706,26 @@ export type Database = {
           user_id: string
         }[]
       }
-      accept_team_invitation: {
-        Args: { p_token_hash: string }
+      complete_first_login: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
+      create_position: {
+        Args: {
+          p_can_manage_people?: boolean
+          p_department_ids?: string[]
+          p_description?: string
+          p_location_id?: string | null
+          p_name: string
+          p_organization_id: string
+          p_permission_keys?: string[]
+          p_primary_department_id?: string | null
+          p_region_id?: string | null
+        }
+        Returns: string
+      }
+      create_restaurant_workspace: {
+        Args: { p_name: string; p_owner_user_id: string; p_slug: string }
         Returns: string
       }
       create_team_invitation: {
@@ -836,10 +1741,6 @@ export type Database = {
         }
         Returns: string
       }
-      create_restaurant_workspace: {
-        Args: { p_name: string; p_owner_user_id: string; p_slug: string }
-        Returns: string
-      }
       get_invitation_details: {
         Args: { p_token_hash: string }
         Returns: {
@@ -851,6 +1752,17 @@ export type Database = {
           status: string
         }[]
       }
+      get_my_effective_access: {
+        Args: { p_organization_id: string }
+        Returns: {
+          can_manage_people: boolean
+          department_ids: string[]
+          location_ids: string[]
+          membership_id: string
+          permission_keys: string[]
+          position_ids: string[]
+        }[]
+      }
       get_my_workspace_membership: {
         Args: { p_identifier: string }
         Returns: {
@@ -860,29 +1772,6 @@ export type Database = {
           organization_slug: string
           status: string
         }[]
-      }
-      record_workspace_save: {
-        Args: { p_organization_id: string }
-        Returns: undefined
-      }
-      release_count_room_lock: {
-        Args: {
-          p_count_id: string
-          p_organization_id: string
-          p_room_id: string
-        }
-        Returns: boolean
-      }
-      resolve_workspace: {
-        Args: { p_identifier: string }
-        Returns: {
-          name: string
-          slug: string
-        }[]
-      }
-      complete_first_login: {
-        Args: { p_membership_id: string }
-        Returns: undefined
       }
       provision_team_member: {
         Args: {
@@ -909,12 +1798,44 @@ export type Database = {
         }
         Returns: number
       }
+      record_workspace_save: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
+      release_count_room_lock: {
+        Args: {
+          p_count_id: string
+          p_organization_id: string
+          p_room_id: string
+        }
+        Returns: boolean
+      }
+      resolve_workspace: {
+        Args: { p_identifier: string }
+        Returns: {
+          name: string
+          slug: string
+        }[]
+      }
       revoke_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: undefined
       }
       set_department_primary_manager: {
         Args: { p_department_id: string; p_membership_id: string | null }
+        Returns: undefined
+      }
+      set_member_structure: {
+        Args: {
+          p_department_ids?: string[]
+          p_location_ids?: string[]
+          p_membership_id: string
+          p_position_ids?: string[]
+          p_primary_department_id?: string | null
+          p_primary_location_id?: string | null
+          p_primary_position_id?: string | null
+          p_supervisor_membership_id?: string | null
+        }
         Returns: undefined
       }
       update_team_member: {

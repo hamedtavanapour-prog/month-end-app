@@ -1,6 +1,6 @@
 begin;
 
-select plan(20);
+select plan(23);
 
 select has_table('public', 'regions', 'regions are modeled explicitly');
 select has_table('public', 'locations', 'restaurant locations are modeled explicitly');
@@ -165,6 +165,39 @@ select lives_ok(
     )
   $$,
   'owners can create a scoped reusable position through the access API'
+);
+
+select lives_ok(
+  $$
+    select public.create_position(
+      '21000000-0000-0000-0000-000000000001', 'General Manager', '', null,
+      '51000000-0000-0000-0000-000000000001', true,
+      array[]::uuid[], null, array['dashboard.view']
+    )
+  $$,
+  'an owner can create a General Manager position'
+);
+
+select lives_ok(
+  $$
+    select public.set_member_structure(
+      '31000000-0000-0000-0000-000000000002',
+      array['51000000-0000-0000-0000-000000000001']::uuid[],
+      '51000000-0000-0000-0000-000000000001',
+      array[(select id from public.positions where name = 'General Manager' and organization_id = '21000000-0000-0000-0000-000000000001')],
+      (select id from public.positions where name = 'General Manager' and organization_id = '21000000-0000-0000-0000-000000000001'),
+      array[]::uuid[], null, null
+    )
+  $$,
+  'an owner can assign the General Manager position'
+);
+
+select is(
+  (select authority from public.membership_location_assignments
+   where membership_id = '31000000-0000-0000-0000-000000000002'
+     and location_id = '51000000-0000-0000-0000-000000000001'),
+  'location_admin',
+  'the General Manager position grants location administrator authority'
 );
 
 select throws_ok(
