@@ -94,12 +94,22 @@ select is(
 );
 
 select ok(
-  'dashboard.view' = any((select permission_keys from public.get_my_effective_access('21000000-0000-0000-0000-000000000001'))),
+  exists (
+    select 1
+    from public.get_my_effective_access('21000000-0000-0000-0000-000000000001') access,
+      unnest(access.permission_keys) permission_key
+    where permission_key = 'dashboard.view'
+  ),
   'position permissions are inherited by assigned members'
 );
 
 select ok(
-  not ('products.view' = any((select permission_keys from public.get_my_effective_access('21000000-0000-0000-0000-000000000001')))),
+  not exists (
+    select 1
+    from public.get_my_effective_access('21000000-0000-0000-0000-000000000001') access,
+      unnest(access.permission_keys) permission_key
+    where permission_key = 'products.view'
+  ),
   'an explicit member denial overrides an inherited position permission'
 );
 
