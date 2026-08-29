@@ -42,6 +42,7 @@ as $$
 $$;
 
 revoke all on function private.effective_permission_keys(uuid) from public, anon, authenticated;
+grant execute on function private.effective_permission_keys(uuid) to authenticated;
 
 create or replace function private.can_manage_scope(
   p_organization_id uuid,
@@ -85,6 +86,7 @@ as $$
 $$;
 
 revoke all on function private.can_manage_scope(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function private.can_manage_scope(uuid, uuid, uuid) to authenticated;
 
 create or replace function private.create_position(
   p_organization_id uuid,
