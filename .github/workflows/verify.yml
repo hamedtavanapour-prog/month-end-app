@@ -1,0 +1,47 @@
+name: Verify application and database
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/people-access-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Start disposable database
+        run: npx supabase db start
+
+      - name: Run database isolation tests
+        run: npx supabase test db
+
+      - name: Run application tests
+        run: npm test
+
+      - name: Run type checking
+        run: npm run typecheck
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Build production application
+        run: npm run build
